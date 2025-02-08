@@ -16,18 +16,20 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Check branch name
-      run: |
-        BRANCH_NAME=${{ github.ref_name }}
-        if [[ ! "$BRANCH_NAME" =~ ^[a-zA-Z0-9]+(\-[a-zA-Z0-9]+)*\/issue\-[0-9]+$ ]]
-        then
-          echo "Branch name should follow pattern <author-names>/issue-<issue-number>"
-          exit 1
-        fi
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const branchName = context.ref.replace("refs/heads/", "")
+          if (branchName.match(/^[\w\d]+(\+[\w\d]+)*\/issue-\d+$/) === null) {
+            console.error(`Branch name should follow pattern <author-names>/issue-<issue-number>, instead found ${branchName}`)
+            process.exit(1)
+          }
       continue-on-error: false
 
     - name: Verify issue number
       uses: actions/github-script@v7
       with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const branchName = context.ref.replace("refs/heads/", "")
           const issue = Number(branch.split("/")[1].replace(/[^\d]/, ""))
@@ -53,9 +55,10 @@ jobs:
             }
           }
 
-    - name:
+    - name: Assign authors to PR
       uses: actions/github-script@v7
       with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const branchName = context.ref.replace("refs/heads/", "")
 
