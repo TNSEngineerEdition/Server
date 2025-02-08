@@ -10,11 +10,11 @@ Branches created in this repository should be named in the following way:
 
 `<author-name(s)>/issue-<issue-number>`
 
-The `<author-name(s)>` field should correspond to your GitHub usernames. The names should be ordered alphabetically and be separated with `-` signs. The `<issue-number>` field should correspond to the issue existing in the repository. Examples of correct branch names:
+The `<author-name(s)>` field should correspond to your GitHub usernames. The names should be ordered alphabetically and be separated with `+` signs. The `<issue-number>` field should correspond to the issue existing in the repository. Examples of correct branch names:
 ```
 RCRalph/issue-41
-Codefident-RCRalph/issue-341
-olobuszolo-Redor114/issue-412
+Codefident+RCRalph/issue-341
+olobuszolo+Redor114/issue-412
 ```
 
 ### Contributing code to main branch

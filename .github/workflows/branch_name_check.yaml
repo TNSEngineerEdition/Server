@@ -1,0 +1,72 @@
+name: Branch name and PR description check
+
+on:
+  pull-request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+jobs:
+  branch-name-check:
+    runs-on: self-hosted
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Check branch name
+      run: |
+        BRANCH_NAME=${{ github.ref_name }}
+        if [[ ! BRANCH_NAME ~= "^[a-zA-Z0-9]+(\-[a-zA-Z0-9]+)*\/issue\-[0-9]+$" ]]
+        then
+          echo "Branch name should follow pattern <author-names>/issue-<issue-number>"
+          exit 1
+        fi
+      continue-on-error: false
+
+    - name: Verify issue number
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const branchName = context.ref.replace("refs/heads/", "")
+          const issue = Number(branch.split("/")[1].replace(/[^\d]/, ""))
+          const {owner, repo} = context.issue
+
+          try {
+            const response = await github.rest.issues.get({
+              owner: owner,
+              repo: repo,
+              issue_number: Number(issue)
+            })
+
+            if (response.data.pull_request) {
+              console.error("Provided issue number is a pull request")
+              process.exit(1)
+            }
+          } catch (error) {
+            if (error.status === 404) {
+              console.error("Provided issue doesn't exist")
+              process.exit(1)
+            } else {
+              throw error
+            }
+          }
+
+    - name:
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const branchName = context.ref.replace("refs/heads/", "")
+
+          const authors = branch.split("/")[0].split("+")
+          if ([...authors].sort().toString() != authors.toString()) {
+            console.error("Author usernames aren't in alphabetical order")
+            process.exit(1)
+          }
+
+          console.log(`Assigning ${authors.join(", ")} to PR`)
+          const {owner, repo, number} = context.issue
+          await github.rest.issues.addAssignees({
+            owner, repo, issue_number: number, assignees: authors
+          })
