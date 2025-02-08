@@ -1,15 +1,16 @@
 # TNSEngineerEdition
-This repository contains prototypes, source code, and tests for engineering thesis: **Concurrent interactive simulator of Krakow's tram network**.
+This repository contains prototypes, source code, and tests for engineering thesis:  \
+**Concurrent interactive simulator of Krakow's tram network**
 
 ## Development setup and notes
 In order to efficiently and cleanly develop the application, we need to follow a few simple rules.
 
 ### Branch names
-Branches created in this repository should be named in the following way: <div style="text-align: center">
-```<author-name(s)>/issue-<issue-number>```
-</div>
+Branches created in this repository should be named in the following way:
 
-The `<author-name(s)>` field should ideally correspond to your GitHub usernames. The names should be ordered alphabetically and be separated with `-` signs. The `<issue-number>` field should correspond to the issue existing in the repository. Examples of correct branch names:
+`<author-name(s)>/issue-<issue-number>`
+
+The `<author-name(s)>` field should correspond to your GitHub usernames. The names should be ordered alphabetically and be separated with `-` signs. The `<issue-number>` field should correspond to the issue existing in the repository. Examples of correct branch names:
 ```
 RCRalph/issue-41
 Codefident-RCRalph/issue-341
