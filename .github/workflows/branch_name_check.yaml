@@ -18,7 +18,7 @@ jobs:
     - name: Check branch name
       run: |
         BRANCH_NAME=${{ github.ref_name }}
-        if [[ ! "$BRANCH_NAME" ~= ^[a-zA-Z0-9]+(\-[a-zA-Z0-9]+)*\/issue\-[0-9]+$ ]]
+        if [[ ! "$BRANCH_NAME" =~ ^[a-zA-Z0-9]+(\-[a-zA-Z0-9]+)*\/issue\-[0-9]+$ ]]
         then
           echo "Branch name should follow pattern <author-names>/issue-<issue-number>"
           exit 1
