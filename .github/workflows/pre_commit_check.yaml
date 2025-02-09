@@ -8,6 +8,8 @@ on:
 jobs:
   pre-commit:
     runs-on: self-hosted
+    env:
+      PIP_ROOT_USER_ACTION: ignore
 
     steps:
     - name: Checkout code
