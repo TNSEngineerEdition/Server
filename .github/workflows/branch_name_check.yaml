@@ -19,7 +19,9 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          const branchName = context.ref_name
+          console.log(github)
+          console.log(context)
+          const branchName = context
           if (branchName.match(/^[\w\d]+(\+[\w\d]+)*\/issue-\d+$/) === null) {
             console.error(`Branch name should follow pattern <author-names>/issue-<issue-number>, instead found ${branchName}`)
             process.exit(1)
