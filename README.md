@@ -53,3 +53,16 @@ pre-commit install
 ```
 
 This command assumes `pre-commit` is available through the currently active Python virtual environment.
+
+### Running GitHub Actions pipelines locally
+In order to run pipelines locally, install [act](https://github.com/nektos/act), preferably using GitHub CLI:
+```
+gh extension install https://github.com/nektos/gh-act
+```
+
+You can then run the pipelines using:
+```
+gh act -P self-hosted=catthehacker/ubuntu:act-22.04
+```
+
+You can find more details about running pipelines locally in [act user guide](https://nektosact.com/).
