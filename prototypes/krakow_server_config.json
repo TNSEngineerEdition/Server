@@ -1,0 +1,12 @@
+{
+    "area_name": "Kraków",
+    "gtfs_url": "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip",
+    "ignored_lines": ["99"],
+    "custom_stop_nodes": {
+        "stop_272_46419": 1770194211,
+        "stop_273_46529": 2163355814,
+        "stop_274_46619": 2756848361,
+        "stop_294_61419": 3114829955,
+        "stop_314_92239": 629106153
+    }
+}
