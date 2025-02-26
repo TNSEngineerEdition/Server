@@ -19,7 +19,7 @@ Examples of correct branch names:
 RCRalph/issue-41
 Codefident+RCRalph/issue-341
 olobuszolo+Redor114/issue-412-432
-Codefident+olobuszolo+RCRalph+Redor114/issue-653-5422-543346
+Codefident+olobuszolo+RCRalph+Redor144/issue-653-5422-543346
 ```
 
 ### Contributing code to main branch
