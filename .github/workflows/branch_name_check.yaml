@@ -105,7 +105,11 @@ jobs:
           })
 
           const branchName = pullRequest.data.head.ref
-          const authors = branchName.split("/")[0].split("+")
+          const authors = branchName
+            .split("/")[0]
+            .split("+")
+            .map(item => item.toLowerCase())
+
           if (!isArraySorted(authors)) {
             console.error("Author usernames aren't in alphabetical order")
             process.exit(1)
