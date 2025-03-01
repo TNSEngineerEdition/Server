@@ -59,7 +59,7 @@ class TestGTFSPackage:
         "timepoint",
     ]
 
-    GTFS_FILE_PATH = "tests/assets/example_gtfs_schedule.zip"
+    GTFS_FILE_PATH = "tests/assets/gtfs_schedule.zip"
 
     @staticmethod
     def _assert_data_frame_content(
