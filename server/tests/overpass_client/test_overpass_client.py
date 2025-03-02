@@ -23,7 +23,7 @@ class TestOverpassClient:
     @pytest.mark.parametrize(
         ("area_name", "custom_node_ids", "expected_query"),
         [
-            (
+            pytest.param(
                 "Some area",
                 [1, 2, 3, 4],
                 """
@@ -36,8 +36,9 @@ class TestOverpassClient:
                 );
                 out geom;
                 """,
+                id="custom_node_ids with content",
             ),
-            (
+            pytest.param(
                 "Some area",
                 [],
                 """
@@ -49,6 +50,7 @@ class TestOverpassClient:
                 );
                 out geom;
                 """,
+                id="empty custom_node_ids",
             ),
         ],
     )

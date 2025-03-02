@@ -1,0 +1,2 @@
+Unable to build correct mapping of GTFS stops to OSM nodes.
+Stops without mapping: stop_272_46419, stop_273_46529, stop_274_46619, stop_294_61419, stop_314_92239

@@ -1,12 +1,12 @@
 import pickle
 import sys
 from datetime import datetime
-from pathlib import Path
 
 from src.model import CityConfiguration, GTFSPackage
 from src.overpass_client import OverpassClient
-
-TRAM_STOP_MAPPING_DIRECTORY = Path(__file__).parents[1] / "assets" / "tram_stop_mapping"
+from tests.tram_stop_mapping.test_tram_stop_mapper import (
+    TRAM_STOP_MAPPING_DIRECTORY,
+)
 
 
 def main(city_configuration_path: str):
