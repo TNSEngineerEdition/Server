@@ -30,4 +30,4 @@ jobs:
       working-directory: ${{github.workspace}}/server
       env:
         PYTHONPATH: ${{github.workspace}}/server
-      run: pytest tests
+      run: pytest -vv tests
