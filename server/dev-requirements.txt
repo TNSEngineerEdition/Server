@@ -1,4 +1,1 @@
 pytest>=8.3.4
-iniconfig>=2.0.0
-packaging>=24.2
-pluggy<2,>=1.5
