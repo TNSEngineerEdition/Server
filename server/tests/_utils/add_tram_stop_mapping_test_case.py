@@ -37,7 +37,7 @@ def main(city_configuration_path: str):
 
 if __name__ == "__main__":
     """
-    Example usage: python3 tests/_utils/add_tram_stop_mapping_test_case.py src/cities/krakow.json
+    Example usage: python3 tests/_utils/add_tram_stop_mapping_test_case.py config/cities/krakow.json
     """
 
     main(sys.argv[1])
