@@ -20,7 +20,7 @@ def main(city_configuration_path: str):
         city_configuration.custom_stop_mapping.values(),
     )
 
-    current_date_iso = datetime.now().isoformat(timespec="seconds")
+    current_date_iso = datetime.now().isoformat(timespec="seconds").replace(":", "-")
 
     with ZipFile(
         TRAM_STOP_MAPPING_DIRECTORY / (current_date_iso + ".zip"), "w", ZIP_DEFLATED

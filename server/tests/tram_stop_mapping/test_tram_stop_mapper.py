@@ -15,14 +15,14 @@ TRAM_STOP_MAPPING_DIRECTORY = Path(__file__).parents[1] / "assets" / "tram_stop_
 
 class TestTramStopMapper:
     FILES_WITH_CORRECT_MAPPING = [
-        "2025-03-01T20:02:24.zip",
+        "2025-03-01T20-02-24.zip",
     ]
 
     FILES_WITH_INCORRECT_MAPPING = [
-        "2025-03-02T21:34:51.zip",
-        "2025-03-02T22:06:42.zip",
-        "2025-03-03T08:31:48.zip",
-        "2025-03-03T16:20:24.zip",
+        "2025-03-02T21-34-51.zip",
+        "2025-03-02T22-06-42.zip",
+        "2025-03-03T08-31-48.zip",
+        "2025-03-03T16-20-24.zip",
     ]
 
     @staticmethod
@@ -138,7 +138,7 @@ class TestTramStopMapper:
     def test_get_stop_nodes_by_gtfs_trip_id(self):
         # Arrange
         with ZipFile(
-            TRAM_STOP_MAPPING_DIRECTORY / "2025-03-01T20:02:24.zip"
+            TRAM_STOP_MAPPING_DIRECTORY / "2025-03-01T20-02-24.zip"
         ) as zip_file:
             (
                 city_configuration,
