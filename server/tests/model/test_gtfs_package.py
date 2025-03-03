@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -146,3 +147,31 @@ class TestGTFSPackage:
             columns=self.GTFS_STOP_TIMES_COLUMNS,
             row_count=481672,
         )
+
+    def test_stop_id_sequence_by_trip_id(self):
+        # Arrange
+        gtfs_package = GTFSPackage.from_file(self.GTFS_FILE_PATH)
+
+        sorted_stop_times = gtfs_package.stop_times.sort_values(
+            ["trip_id", "stop_sequence"]
+        )
+
+        index_by_trip_id: defaultdict[str, int] = defaultdict(int)
+
+        # Act
+        stop_id_sequence_by_trip_id = gtfs_package.stop_id_sequence_by_trip_id
+
+        # Assert
+        assert set(stop_id_sequence_by_trip_id.keys()) == set(gtfs_package.trips.index)
+
+        for _, row in sorted_stop_times.iterrows():
+            trip_id = row["trip_id"]
+            assert (
+                stop_id_sequence_by_trip_id[trip_id][index_by_trip_id[trip_id]]
+                == row["stop_id"]
+            )
+
+            index_by_trip_id[trip_id] += 1
+
+        # Make sure the property isn't re-calculated every time for better performance
+        assert stop_id_sequence_by_trip_id is gtfs_package.stop_id_sequence_by_trip_id

@@ -42,24 +42,6 @@ class TramStopMapper:
             raise TramStopMappingBuildError(self._mapping_errors)
 
     @cached_property
-    def _gtfs_stop_ids_by_trip_id(self):
-        gtfs_stop_times_dict = self._gtfs_package.stop_times.set_index(
-            ["trip_id", "stop_sequence"]
-        ).to_dict()
-
-        gtfs_stop_times_dict_for_stop_ids: dict[tuple[str, int], str] = (
-            gtfs_stop_times_dict["stop_id"]
-        )
-        gtfs_stop_ids_by_trip_id: defaultdict[str, list[str]] = defaultdict(list)
-
-        for trip_id, stop_sequence in sorted(gtfs_stop_times_dict_for_stop_ids.keys()):
-            gtfs_stop_ids_by_trip_id[trip_id].append(
-                gtfs_stop_times_dict_for_stop_ids[trip_id, stop_sequence]
-            )
-
-        return dict(gtfs_stop_ids_by_trip_id)
-
-    @cached_property
     def _osm_node_by_id(self):
         return {item.id: item for item in self._osm_relations_and_stops.get_nodes()}
 
@@ -171,7 +153,9 @@ class TramStopMapper:
     def _add_trip_to_mapping(
         self, gtfs_trip_id: str, line_relations: list[overpy.Relation]
     ):
-        gtfs_trip_stop_ids = self._gtfs_stop_ids_by_trip_id[gtfs_trip_id]
+        gtfs_trip_stop_ids = self._gtfs_package.stop_id_sequence_by_trip_id[
+            gtfs_trip_id
+        ]
         gtfs_trip_stop_data = self._gtfs_package.stops.loc[gtfs_trip_stop_ids]
         gtfs_trip_stop_names = list(
             map(self._to_universal_stop_name, gtfs_trip_stop_data["stop_name"])
@@ -341,7 +325,9 @@ class TramStopMapper:
                 longest_relation
             ]
 
-            gtfs_trip_stops = self._gtfs_stop_ids_by_trip_id[gtfs_trip_id]
+            gtfs_trip_stops = self._gtfs_package.stop_id_sequence_by_trip_id[
+                gtfs_trip_id
+            ]
             gtfs_trip_stop_data = self._gtfs_package.stops.loc[gtfs_trip_stops]
             gtfs_trip_stop_names = [
                 self._to_universal_stop_name(item)

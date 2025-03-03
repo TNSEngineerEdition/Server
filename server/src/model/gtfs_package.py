@@ -1,3 +1,5 @@
+from collections import defaultdict
+from functools import cached_property
 from io import BytesIO
 from zipfile import ZipFile
 
@@ -40,3 +42,21 @@ class GTFSPackage(BaseModel):
         response = requests.get(url, stream=True)
         zip_file = ZipFile(BytesIO(response.content))
         return cls._from_zip_file(zip_file)
+
+    @cached_property
+    def stop_id_sequence_by_trip_id(self):
+        stop_times_dict = self.stop_times.set_index(
+            ["trip_id", "stop_sequence"]
+        ).to_dict()
+
+        stop_times_dict_for_stop_ids: dict[tuple[str, int], str] = stop_times_dict[
+            "stop_id"
+        ]
+        stop_ids_by_trip_id: defaultdict[str, list[str]] = defaultdict(list)
+
+        for trip_id, stop_sequence in sorted(stop_times_dict_for_stop_ids.keys()):
+            stop_ids_by_trip_id[trip_id].append(
+                stop_times_dict_for_stop_ids[trip_id, stop_sequence]
+            )
+
+        return dict(stop_ids_by_trip_id)
