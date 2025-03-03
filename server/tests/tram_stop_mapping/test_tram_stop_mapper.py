@@ -110,6 +110,7 @@ class TestTramStopMapper:
         [
             "2025-03-02T21:34:51",
             "2025-03-02T22:06:42",
+            "2025-03-03T08:31:48",
         ],
     )
     def test_tram_stop_mapper_exception(self, directory_name: str):

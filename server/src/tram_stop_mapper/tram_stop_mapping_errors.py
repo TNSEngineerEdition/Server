@@ -22,8 +22,10 @@ class TramStopMappingErrors(BaseModel):
     def _nodes_with_conflict_error_message(self):
         return "\n".join(
             (
-                f"{gtfs_stop_id}: "
-                ", ".join(f"{stop_name} ({stop_id})" for stop_name, stop_id in nodes)
+                f"{gtfs_stop_id}: {", ".join(
+                    f"{stop_name} ({stop_id})"
+                    for stop_name, stop_id in sorted(nodes, key=lambda x: x[1])
+                )}"
             )
             for gtfs_stop_id, nodes in self.nodes_with_conflict.items()
         )
