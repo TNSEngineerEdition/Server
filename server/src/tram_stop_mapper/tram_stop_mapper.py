@@ -6,10 +6,7 @@ from functools import cached_property
 
 import overpy
 from src.model import CityConfiguration, GTFSPackage
-from src.tram_stop_mapper.exceptions import (
-    TramStopMappingBuildError,
-    TramStopMappingUnknownNodeException,
-)
+from src.tram_stop_mapper.exceptions import TramStopMappingBuildError
 from src.tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
 
 
@@ -254,9 +251,9 @@ class TramStopMapper:
                     ]
 
         self._mapping_errors.stops_without_mapping = (
-            self._mapping_errors.stops_without_mapping.difference(
-                self._first_stop_mapping.keys()
-            ).difference(self._last_stop_mapping.keys())
+            self._mapping_errors.stops_without_mapping
+            - set(self._first_stop_mapping.keys())
+            - set(self._last_stop_mapping.keys())
         )
 
         self._mapping_errors.underutilized_relations = {
@@ -310,11 +307,13 @@ class TramStopMapper:
         if gtfs_stop_id in self.last_gtfs_stop_id_to_osm_node_ids:
             return random.choice(self.last_gtfs_stop_id_to_osm_node_ids[gtfs_stop_id])
 
-        return None
+        raise ValueError(  # pragma: no cover
+            f"Stop {gtfs_stop_id} not found in any mapping.\n"
+            "TramStopMappingBuildError should have been raised but wasn't."
+        )
 
     def get_stop_nodes_by_gtfs_trip_id(self):
         stop_nodes_by_gtfs_trip_id: dict[str, list[int]] = {}
-        gtfs_trips_with_missing_node_ids: dict[str, list[int | None]] = {}
 
         for (
             gtfs_trip_id,
@@ -345,12 +344,6 @@ class TramStopMapper:
                 for i, stop in enumerate(gtfs_trip_stops)
             ]
 
-            if None not in stop_nodes_from_mapping:
-                stop_nodes_by_gtfs_trip_id[gtfs_trip_id] = stop_nodes_from_mapping
-            else:
-                gtfs_trips_with_missing_node_ids[gtfs_trip_id] = stop_nodes_from_mapping
-
-        if gtfs_trips_with_missing_node_ids:
-            raise TramStopMappingUnknownNodeException(gtfs_trips_with_missing_node_ids)
+            stop_nodes_by_gtfs_trip_id[gtfs_trip_id] = stop_nodes_from_mapping
 
         return stop_nodes_by_gtfs_trip_id
