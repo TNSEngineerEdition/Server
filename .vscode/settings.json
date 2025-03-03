@@ -13,9 +13,11 @@
     "python.testing.pytestEnabled": true,
     "python.testing.cwd": "${workspaceFolder}/server",
     "cSpell.words": [
+        "compresslevel",
         "GTFS",
         "iloc",
         "iterrows",
-        "overpy"
+        "overpy",
+        "timespec"
     ]
 }

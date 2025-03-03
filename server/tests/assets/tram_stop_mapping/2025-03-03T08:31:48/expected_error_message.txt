@@ -1,3 +1,0 @@
-Unable to build correct mapping of GTFS stops to OSM nodes.
-Nodes with conflict:
-stop_257_43529: Darwina 02 (10727973597), Darwina 01 (10727973614)

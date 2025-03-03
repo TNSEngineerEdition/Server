@@ -1,6 +1,7 @@
 import pickle
 import sys
 from datetime import datetime
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from src.model import CityConfiguration, GTFSPackage
 from src.overpass_client import OverpassClient
@@ -20,17 +21,18 @@ def main(city_configuration_path: str):
     )
 
     current_date_iso = datetime.now().isoformat(timespec="seconds")
-    target_directory = TRAM_STOP_MAPPING_DIRECTORY / current_date_iso
-    target_directory.mkdir()
 
-    with open(target_directory / "city_configuration.pickle", "wb") as file:
-        pickle.dump(city_configuration, file)
+    with ZipFile(
+        TRAM_STOP_MAPPING_DIRECTORY / (current_date_iso + ".zip"), "w", ZIP_DEFLATED
+    ) as zip_file:
+        with zip_file.open("city_configuration.pickle", "w") as file:
+            pickle.dump(city_configuration, file)
 
-    with open(target_directory / "gtfs_package.pickle", "wb") as file:
-        pickle.dump(gtfs_package, file)
+        with zip_file.open("gtfs_package.pickle", "w") as file:
+            pickle.dump(gtfs_package, file)
 
-    with open(target_directory / "osm_relations_and_stops.pickle", "wb") as file:
-        pickle.dump(osm_relations_and_stops, file)
+        with zip_file.open("osm_relations_and_stops.pickle", "w") as file:
+            pickle.dump(osm_relations_and_stops, file)
 
 
 if __name__ == "__main__":

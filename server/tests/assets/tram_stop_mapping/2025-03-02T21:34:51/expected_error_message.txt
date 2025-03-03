@@ -1,2 +1,0 @@
-Unable to build correct mapping of GTFS stops to OSM nodes.
-Missing relations for lines: 99
