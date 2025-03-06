@@ -11,6 +11,26 @@ from src.tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
 
 
 class TramStopMapper:
+    """
+    TramStopMapper class creates mapping of GTFS stop_id to OpenStreetMap's node IDs.
+    There are three categories of tram stop mapping:
+    - regular: 1-to-1 mapping between GTFS and OpenStreetMap
+    - first: 1-to-many mapping, as there can be multiple platforms from which a trip starts
+    - last: 1-to-many mapping, as there can be multiple platforms where a trip ends
+
+    The mapping is created using GTFS dataset, OSM node IDs representing tram stops
+    and OSM relations representing tram trips. Bare in mind that a given stop_id can
+    be present in all three mappings, because GTFS datasets may not correctly
+    differentiate between platforms where trip starts and platforms where trips end.
+
+    The mapping is created when the class instantiates. If the supplied data contains
+    ambiguities or insufficient data, a TramStopMappingBuildError is raised. Otherwise
+    the created mapping is available under gtfs_stop_id_to_osm_node_id_mapping,
+    first_gtfs_stop_id_to_osm_node_id_mapping and last_gtfs_stop_id_to_osm_node_id_mapping
+    properties. In order to efficiently use the mapping, the get_stop_nodes_by_gtfs_trip_id
+    method is available.
+    """
+
     def __init__(
         self,
         city_configuration: CityConfiguration,
