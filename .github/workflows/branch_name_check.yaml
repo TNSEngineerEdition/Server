@@ -50,9 +50,8 @@ jobs:
           const authors = branchName
             .split("/")[0]
             .split("+")
-            .map(item => item.toLowerCase())
 
-          if (!isArraySorted(authors)) {
+          if (!isArraySorted(authors.map(item => item.toLowerCase()))) {
             console.error("Author usernames aren't in alphabetical order")
             process.exit(1)
           }
