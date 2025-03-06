@@ -8,18 +8,18 @@ In order to efficiently and cleanly develop the application, we need to follow a
 ### Branch names
 Branches created in this repository should be named in the following way:
 
-`<author-names>/issue-<issue-numbers>`
+`<author-names>/<short-description>`
 
 The `<author-names>` field should correspond to your GitHub usernames. The names should be ordered alphabetically and be separated with `+` characters.
 
-The `<issue-numbers>` field should correspond to the issues existing in the repository. The numbers should be order in ascending order and be separated with `-` characters.
+The `<short-description>` field should include a summary of the changes.
 
 Examples of correct branch names:
 ```
-RCRalph/issue-41
-Codefident+RCRalph/issue-341
-olobuszolo+Redor114/issue-412-432
-Codefident+olobuszolo+RCRalph+Redor144/issue-653-5422-543346
+RCRalph/added-pre-commit-check
+Codefident+RCRalph/server-integration-tests
+olobuszolo+Redor114/tram-network-graph-transformation
+Codefident+olobuszolo+RCRalph+Redor144/test-cases-for-tram-stop-mapping
 ```
 
 ### Contributing code to main branch
