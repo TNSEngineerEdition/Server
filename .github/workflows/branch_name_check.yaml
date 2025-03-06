@@ -25,71 +25,13 @@ jobs:
           })
 
           const branchName = pullRequest.data.head.ref
-          if (branchName.match(/^[\w\d]+(\+[\w\d]+)*\/issue-\d+(\-\d+)*$/) === null) {
+          if (branchName.match(/^[\w\d]+(\+[\w\d]+)*\/.+$/) === null) {
             console.error(
-              `Branch name should follow pattern "<author-names>/issue-<issue-number>", instead found ${branchName}`
+              `Branch name should follow pattern "<author-names>/<short-description>", instead found ${branchName}`
             )
             process.exit(1)
           }
       continue-on-error: false
-
-    - name: Verify issue numbers
-      uses: actions/github-script@v7
-      with:
-        script: |
-          function isArraySorted(arr, comparator = undefined) {
-            return [...arr].sort(comparator).toString() == arr.toString()
-          }
-
-          const {owner, repo, number} = context.issue
-          const pullRequest = await github.rest.pulls.get({
-            owner, repo, pull_number: number
-          })
-
-          const branchName = pullRequest.data.head.ref
-          const branchIssueNumbers = branchName
-            .split("/")[1].slice("issue-".length)
-            .split("-")
-            .map(Number)
-
-          if (!isArraySorted(branchIssueNumbers, (a, b) => a - b)) {
-            console.error("Issue numbers in branch name aren't in ascending order")
-            process.exit(1)
-          }
-
-          const pullRequestMentionedIssues = pullRequest.data.body.match(/\-\s+#\d+\r\n/)
-            .map(item => item.slice(item.indexOf("#") + 1, -2))
-            .map(Number)
-
-          if (!isArraySorted(pullRequestMentionedIssues, (a, b) => a - b)) {
-            console.error("Issue numbers in PR description aren't in ascending order")
-            process.exit(1)
-          }
-
-          for (const branchIssueNumber of branchIssueNumbers) {
-            if (!pullRequestMentionedIssues.includes(branchIssueNumber)) {
-              console.error(`Pull request description should mention issue ${branchIssueNumber}`)
-              process.exit(1)
-            }
-
-            try {
-              const issue = await github.rest.issues.get({
-                owner, repo, issue_number: branchIssueNumber
-              })
-
-              if (issue.data.pull_request) {
-                console.error("Provided issue number is a pull request, must be a regular issue")
-                process.exit(1)
-              }
-            } catch (error) {
-              if (error.status === 404) {
-                console.error("Provided issue doesn't exist")
-                process.exit(1)
-              }
-
-              throw error
-            }
-          }
 
     - name: Assign authors to PR
       uses: actions/github-script@v7
@@ -108,9 +50,8 @@ jobs:
           const authors = branchName
             .split("/")[0]
             .split("+")
-            .map(item => item.toLowerCase())
 
-          if (!isArraySorted(authors)) {
+          if (!isArraySorted(authors.map(item => item.toLowerCase()))) {
             console.error("Author usernames aren't in alphabetical order")
             process.exit(1)
           }
