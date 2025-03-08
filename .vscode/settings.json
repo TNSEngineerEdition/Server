@@ -1,0 +1,23 @@
+{
+    "terminal.integrated.env.linux": {
+        "PYTHONPATH": "${workspaceFolder}/server:${env:PYTHONPATH}"
+    },
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/server"
+    ],
+    "python.testing.pytestArgs": [
+        "-vv",
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "python.testing.cwd": "${workspaceFolder}/server",
+    "cSpell.words": [
+        "compresslevel",
+        "GTFS",
+        "iloc",
+        "iterrows",
+        "overpy",
+        "timespec"
+    ]
+}

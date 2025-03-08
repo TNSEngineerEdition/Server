@@ -1,0 +1,4 @@
+overpy>=0.7
+pandas>=2.2.3
+pydantic>=2.10.6
+requests>=2.32.3
