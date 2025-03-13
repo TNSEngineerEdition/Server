@@ -4,6 +4,22 @@ import networkx as nx
 
 
 class NetworkGraph:
+    """
+    NetworkGraph class creta a directed graph from OpenStreetMap data.
+    To run this class and create a graph you need to provide two files:
+    - ways_file: json file with ways data
+    - stops_file: json file with stops data
+    Those files you can download from notebook download_data.ipynb
+    Then you can create a graph by calling create_graph method.
+
+    find_main_nodes method returns a list of main nodes in the graph -> crossroads and stops.
+    create_graph method creates a graph from ways and stops data:
+    remove_unnecessary_nodes method removes nodes that are not crossroads or stops from the graph:
+    -first for loop iterarate through nodes that are not main nodes, but they are first at path
+    so we can't remove them and connect them with main nodes
+    -second for loop iterarate through main nodes and connect them with next main node
+    """
+
     def __init__(self, ways_file, stops_file):
         self.graph = nx.DiGraph()
         try:
@@ -81,14 +97,6 @@ class NetworkGraph:
                 self.graph.add_edge(node, successor)
 
         return self.graph
-
-    def map_graph_edges_to_localization(self):
-        node_location = {}
-
-        for way in self.ways:
-            for node in way["nodes"]:
-                if node not in node_location:
-                    node_location[node] = (way["lat"], way["lon"])
 
 
 g = NetworkGraph("tram_ways.json", "tram_stops.json")
