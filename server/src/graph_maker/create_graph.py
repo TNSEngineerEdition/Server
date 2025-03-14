@@ -54,6 +54,9 @@ class NetworkGraph:
             nodes = way["nodes"]
             for i in range(len(nodes) - 1):
                 self.graph.add_edge(nodes[i], nodes[i + 1])
+                if way["tags"].get("oneway") == "no":
+                    self.graph.add_edge(nodes[i + 1], nodes[i])
+                    print(way)
         self.main_nodes = self.find_main_nodes()
         self.remove_unnecessary_nodes()
 
