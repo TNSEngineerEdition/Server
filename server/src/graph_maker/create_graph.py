@@ -12,12 +12,15 @@ class NetworkGraph:
     Those files you can download from notebook download_data.ipynb
     Then you can create a graph by calling create_graph method.
 
-    find_main_nodes method returns a list of main nodes in the graph -> crossroads and stops.
-    create_graph method creates a graph from ways and stops data:
-    remove_unnecessary_nodes method removes nodes that are not crossroads or stops from the graph:
-    -first for loop iterarate through nodes that are not main nodes, but they are first at path
-    so we can't remove them and connect them with main nodes
-    -second for loop iterarate through main nodes and connect them with next main node
+    *find_main_nodes method returns a list of main nodes in the graph -> crossroads and stops.
+    *create_graph method creates a graph from ways and stops data:
+    *remove_unnecessary_nodes method removes nodes that are not crossroads or stops from the graph:
+        -first for loop iterarate through nodes that are not main nodes, but they are first at path
+            so we can't remove them and connect them with main nodes
+        -second for loop iterarate through main nodes and connect them with next main node
+    *add_two_way_edges method adds two way edges to the graph if way is not one way :
+        -we are looking for way where node and successor are in the same way
+        -then we check if way is not one way and add edge from successor to node
     """
 
     def __init__(self, ways_file, stops_file):
@@ -54,11 +57,10 @@ class NetworkGraph:
             nodes = way["nodes"]
             for i in range(len(nodes) - 1):
                 self.graph.add_edge(nodes[i], nodes[i + 1])
-                if way["tags"].get("oneway") == "no":
-                    self.graph.add_edge(nodes[i + 1], nodes[i])
-                    print(way)
+
         self.main_nodes = self.find_main_nodes()
         self.remove_unnecessary_nodes()
+        self.add_two_way_edges()
 
     def remove_unnecessary_nodes(self):
         start_nodes = [
@@ -99,7 +101,14 @@ class NetworkGraph:
                     self.graph.remove_node(i)
                 self.graph.add_edge(node, successor)
 
-        return self.graph
+    def add_two_way_edges(self):
+        for node in self.graph.nodes:
+            for successor in self.graph.successors(node):
+                for way in self.ways:
+                    if node in way["nodes"] and successor in way["nodes"]:
+                        if way["tags"].get("oneway") != "yes":
+                            self.graph.add_edge(successor, node)
+                        break
 
 
 g = NetworkGraph("tram_ways.json", "tram_stops.json")
