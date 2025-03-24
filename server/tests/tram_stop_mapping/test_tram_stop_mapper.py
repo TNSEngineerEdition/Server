@@ -16,6 +16,7 @@ TRAM_STOP_MAPPING_DIRECTORY = Path(__file__).parents[1] / "assets" / "tram_stop_
 class TestTramStopMapper:
     FILES_WITH_CORRECT_MAPPING = [
         "2025-03-01T20-02-24.zip",
+        "2025-03-24T19-09-23.zip",
     ]
 
     FILES_WITH_INCORRECT_MAPPING = [
@@ -23,6 +24,7 @@ class TestTramStopMapper:
         "2025-03-02T22-06-42.zip",
         "2025-03-03T08-31-48.zip",
         "2025-03-03T16-20-24.zip",
+        "2025-03-23T19-15-39.zip",
     ]
 
     @staticmethod
