@@ -198,7 +198,7 @@ class NetworkGraph:
             "EPSG:4326", "EPSG:3857", always_xy=True
         ).transform
         processed = set()
-
+        next_way_id = max(self.ways_dict) + 1
         for way_id, geom in list(self.ways_dict.items()):
             if way_id in processed:
                 continue
@@ -247,8 +247,8 @@ class NetworkGraph:
                     merged_geom = linemerge([g1, g2])
                     if isinstance(merged_geom, MultiLineString):
                         merged_geom = list(merged_geom.geoms)[0]
-                    new_way_id = f"merged_{way_id}_{other_id}"
-
+                    new_way_id = next_way_id
+                    next_way_id += 1
                     self.ways_dict[new_way_id] = merged_geom
                     del self.ways_dict[way_id]
                     del self.ways_dict[other_id]
@@ -293,7 +293,7 @@ class NetworkGraph:
         transformer_to_wgs = pyproj.Transformer.from_crs(
             "EPSG:3857", "EPSG:4326", always_xy=True
         ).transform
-
+        next_node_id = max(self.graph.nodes) + 1
         for way_id, geometry in self.ways_dict.items():
             if not isinstance(geometry, LineString):
                 continue
@@ -358,7 +358,8 @@ class NetworkGraph:
                         ip_wgs = transform(transformer_to_wgs, ip_3857)
                         lat_new, lon_new = ip_wgs.y, ip_wgs.x
 
-                        new_node_id = f"geo_{way_id}_{i}_{dist_current:.2f}"
+                        new_node_id = next_node_id
+                        next_node_id += 1
                         existing = find_existing_node_by_coords(lat_new, lon_new)
                         if existing:
                             new_node_id = existing
@@ -426,7 +427,7 @@ class NetworkGraph:
                 ).add_to(fmap)
 
         for node in self.graph.nodes:
-            if node in node_positions and str(node).startswith("geo_"):
+            if node in node_positions and node not in self.main_nodes:
                 lat, lon = node_positions[node]
                 folium.CircleMarker(
                     location=(lat, lon),
@@ -435,20 +436,6 @@ class NetworkGraph:
                     fill=True,
                     fill_opacity=0.6,
                     popup=f"New node: {node}",
-                ).add_to(fmap)
-            if (
-                node in node_positions
-                and node not in self.main_nodes
-                and not str(node).startswith("geo_")
-            ):
-                lat, lon = node_positions[node]
-                folium.CircleMarker(
-                    location=(lat, lon),
-                    radius=2,
-                    color="green",
-                    fill=True,
-                    fill_opacity=0.3,
-                    popup=f"Node: {node}",
                 ).add_to(fmap)
         fmap.save(map_filename)
         print(f"Map saved as: {map_filename}")
