@@ -217,19 +217,22 @@ class TramStopMapper:
         route_number: str,
         gtfs_route_id: str,
     ):
+        gtfs_trips_for_route = self._gtfs_package.trips[
+            self._gtfs_package.trips["route_id"] == gtfs_route_id
+        ]
+
         line_relations = [
             item
             for item in self._stops_by_osm_relation
             if item.tags.get("ref") == route_number
         ]
 
-        if not line_relations:
+        if len(gtfs_trips_for_route) and not line_relations:
             self._mapping_errors.missing_relations_for_lines.add(route_number)
-            return
 
-        gtfs_trips_for_route = self._gtfs_package.trips[
-            self._gtfs_package.trips["route_id"] == gtfs_route_id
-        ]
+        has_data_to_process = bool(len(gtfs_trips_for_route) and line_relations)
+        if not has_data_to_process:
+            return
 
         for gtfs_trip_id in gtfs_trips_for_route.index:
             longest_match_size, longest_relation = self._add_trip_to_mapping(
