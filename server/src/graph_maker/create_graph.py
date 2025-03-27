@@ -1,6 +1,11 @@
 import json
+import math
 
+import folium
 import networkx as nx
+import pyproj
+from shapely.geometry import LineString, MultiLineString, Point
+from shapely.ops import linemerge, transform
 
 
 class NetworkGraph:
@@ -21,9 +26,25 @@ class NetworkGraph:
     *add_two_way_edges method adds two way edges to the graph if way is not one way :
         -we are looking for way where node and successor are in the same way
         -then we check if way is not one way and add edge from successor to node
+    *add_coordinates_from_file method adds coordinates to the graph nodes from file
+    *tag_nodes_with_way_ids method adds way ids to the nodes:
+        -we are iterating through ways and nodes in way
+        -then we are adding way id to the node
+    *build_dict method creates a dictionary with ways ids as keys and geometry as values
+    *is_there_any_ways_to_merge method checks if there are any ways to merge
+    *merge_ways method merges ways that are close to each other:
+        -we are iterating through ways and checking if there are ways that are close to each other
+        -if there are we are merging them and updating nodes
+    *update_nodes_after_merge method updates nodes after merge
+    *subdivide_ways method divides ways into smaller parts:
+        -we are iterating through ways and checking if there are nodes in the way
+        -if there are we are dividing way into smaller parts
+    *visualize_graph method visualizes the graph on the map
     """
 
-    def __init__(self, ways_file, stops_file):
+    def __init__(
+        self, ways_file, stops_file, coords_file, geometry_file, max_distance=25.0
+    ):
         self.graph = nx.DiGraph()
         try:
             with open(ways_file, "r", encoding="utf-8") as f:
@@ -32,7 +53,9 @@ class NetworkGraph:
                 self.stops = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError) as e:
             raise ValueError(f"Error loading files: {e}")
-
+        self.geometry_file = geometry_file
+        self.coords_file = coords_file
+        self.max_distance = max_distance
         self.main_nodes = []
 
     def find_main_nodes(self):
@@ -61,6 +84,12 @@ class NetworkGraph:
         self.main_nodes = self.find_main_nodes()
         self.remove_unnecessary_nodes()
         self.add_two_way_edges()
+        self.add_coordinates_from_file()
+        self.tag_nodes_with_way_ids()
+        self.build_dict()
+        while self.is_there_any_ways_to_merge():
+            self.merge_ways(tolerance=2.0)
+        self.subdivide_ways(max_distance=self.max_distance)
 
     def remove_unnecessary_nodes(self):
         start_nodes = [
@@ -110,6 +139,327 @@ class NetworkGraph:
                             self.graph.add_edge(successor, node)
                         break
 
+    def is_there_any_ways_to_merge(self):
+        for way_id in self.ways_dict:
+            count = sum(
+                1
+                for _, data in self.graph.nodes(data=True)
+                if way_id in data.get("ways", [])
+            )
+            if count < 2:
+                return True
+        return False
 
-g = NetworkGraph("tram_ways.json", "tram_stops.json")
+    def add_coordinates_from_file(self):
+        try:
+            with open(self.coords_file, "r", encoding="utf-8") as f:
+                nodes_data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            raise ValueError(f"Error loading nodes file: {e}")
+        nodes_dict = {node["id"]: (node["lat"], node["lon"]) for node in nodes_data}
+        for node in self.graph.nodes:
+            if node in nodes_dict:
+                lat, lon = nodes_dict[node]
+                self.graph.nodes[node]["lat"] = lat
+                self.graph.nodes[node]["lon"] = lon
+
+    def tag_nodes_with_way_ids(self):
+        for way in self.ways:
+            way_id = way.get("id")
+            for node_id in way["nodes"]:
+                if node_id in self.graph.nodes:
+                    if "ways" not in self.graph.nodes[node_id]:
+                        self.graph.nodes[node_id]["ways"] = []
+                    self.graph.nodes[node_id]["ways"].append(way_id)
+
+    def build_dict(self):
+        try:
+            with open(self.geometry_file, "r") as f:
+                data = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            raise ValueError(f"Error loading geometry file: {e}")
+        self.ways_dict = {}
+        for feature in data["features"]:
+            properties = feature["properties"]
+            geometry = feature["geometry"]
+            way_id = int(properties["id"])
+            if geometry["type"] == "LineString":
+                linestring = LineString(geometry["coordinates"])
+            else:
+                continue
+            if way_id in self.ways_dict:
+                existing = self.ways_dict[way_id]
+                self.ways_dict[way_id] = linemerge([existing, linestring])
+            else:
+                self.ways_dict[way_id] = linestring
+
+    def merge_ways(self, tolerance=2.0):
+        transformer = pyproj.Transformer.from_crs(
+            "EPSG:4326", "EPSG:3857", always_xy=True
+        ).transform
+        processed = set()
+
+        for way_id, geom in list(self.ways_dict.items()):
+            if way_id in processed:
+                continue
+
+            start_pt = Point(geom.coords[0])
+            end_pt = Point(geom.coords[-1])
+
+            has_start = False
+            has_end = False
+
+            for node_id, data in self.graph.nodes(data=True):
+                if way_id not in data.get("ways", []):
+                    continue
+
+                node_pt = Point(data["lon"], data["lat"])
+                if node_pt.distance(start_pt) < 1e-6:
+                    has_start = True
+                if node_pt.distance(end_pt) < 1e-6:
+                    has_end = True
+
+            if has_start == has_end:
+                continue
+
+            free_end = end_pt if has_start else start_pt
+            free_end_3857 = transform(transformer, free_end)
+
+            for other_id, other_geom in self.ways_dict.items():
+                if other_id == way_id or other_id in processed:
+                    continue
+
+                other_start = Point(other_geom.coords[0])
+                other_end = Point(other_geom.coords[-1])
+                other_start_3857 = transform(transformer, other_start)
+                other_end_3857 = transform(transformer, other_end)
+
+                dist_start = free_end_3857.distance(other_start_3857)
+                dist_end = free_end_3857.distance(other_end_3857)
+
+                if dist_start < tolerance or dist_end < tolerance:
+                    g1 = geom.reverse() if not has_start else geom
+                    g2 = other_geom
+
+                    if dist_end < tolerance:
+                        g2 = g2.reverse()
+
+                    merged_geom = linemerge([g1, g2])
+                    if isinstance(merged_geom, MultiLineString):
+                        merged_geom = list(merged_geom.geoms)[0]
+                    new_way_id = f"merged_{way_id}_{other_id}"
+
+                    self.ways_dict[new_way_id] = merged_geom
+                    del self.ways_dict[way_id]
+                    del self.ways_dict[other_id]
+
+                    self.update_nodes_after_merge(way_id, other_id, new_way_id)
+
+                    processed.update({way_id, other_id})
+                    break
+
+    def update_nodes_after_merge(self, old_way_id_1, old_way_id_2, new_way_id):
+        for node_id, data in self.graph.nodes(data=True):
+            ways = data.get("ways", [])
+
+            changed = False
+            if old_way_id_1 in ways:
+                ways.remove(old_way_id_1)
+                changed = True
+            if old_way_id_2 in ways:
+                ways.remove(old_way_id_2)
+                changed = True
+
+            if changed:
+                if new_way_id not in ways:
+                    ways.append(new_way_id)
+                data["ways"] = ways
+
+    def subdivide_ways(self, max_distance=25.0):
+        edges_to_remove = set()
+
+        def find_existing_node_by_coords(lat, lon, tolerance=1e-6):
+            for node_id, data in self.graph.nodes(data=True):
+                if (
+                    abs(data.get("lat", 0) - lat) < tolerance
+                    and abs(data.get("lon", 0) - lon) < tolerance
+                ):
+                    return node_id
+            return None
+
+        transformer_to_3857 = pyproj.Transformer.from_crs(
+            "EPSG:4326", "EPSG:3857", always_xy=True
+        ).transform
+        transformer_to_wgs = pyproj.Transformer.from_crs(
+            "EPSG:3857", "EPSG:4326", always_xy=True
+        ).transform
+
+        for way_id, geometry in self.ways_dict.items():
+            if not isinstance(geometry, LineString):
+                continue
+
+            line_3857 = transform(transformer_to_3857, geometry)
+
+            existing_points = []
+            for node_id, data in self.graph.nodes(data=True):
+                if way_id in data.get("ways", []):
+                    pt = transform(transformer_to_3857, Point(data["lon"], data["lat"]))
+                    dist = line_3857.project(pt)
+                    existing_points.append((node_id, dist))
+
+            if len(existing_points) < 2:
+                continue
+
+            existing_points.sort(key=lambda x: x[1])
+            for i in range(len(existing_points) - 1):
+                node_1, dist_1 = existing_points[i]
+                node_2, dist_2 = existing_points[i + 1]
+
+                if dist_1 < dist_2:
+                    node_a, dist_a = node_1, dist_1
+                    node_b, dist_b = node_2, dist_2
+                else:
+                    node_a, dist_a = node_2, dist_2
+                    node_b, dist_b = node_1, dist_1
+
+                def ensure_node(node_id, dist):
+                    if self.graph.has_node(node_id):
+                        return node_id
+                    pt = line_3857.interpolate(dist)
+                    pt_wgs = transform(transformer_to_wgs, pt)
+                    lat, lon = pt_wgs.y, pt_wgs.x
+                    existing = find_existing_node_by_coords(lat, lon)
+                    if existing:
+                        return existing
+                    self.graph.add_node(node_id, lat=lat, lon=lon, ways=[way_id])
+                    return node_id
+
+                node_a = ensure_node(node_a, dist_a)
+                node_b = ensure_node(node_b, dist_b)
+
+                was_ab = self.graph.has_edge(node_a, node_b)
+                was_ba = self.graph.has_edge(node_b, node_a)
+
+                segment_len = dist_b - dist_a
+                n = math.ceil(segment_len / max_distance)
+                if n == 1:
+                    continue
+                else:
+                    step = segment_len / n
+                    prev_node = node_a
+                    interpolated_nodes = []
+                    for k in range(1, n):
+                        dist_current = dist_a + k * step
+                        if dist_current >= dist_b:
+                            self.graph.add_edge(prev_node, node_b)
+                            break
+
+                        ip_3857 = line_3857.interpolate(dist_current)
+                        ip_wgs = transform(transformer_to_wgs, ip_3857)
+                        lat_new, lon_new = ip_wgs.y, ip_wgs.x
+
+                        new_node_id = f"geo_{way_id}_{i}_{dist_current:.2f}"
+                        existing = find_existing_node_by_coords(lat_new, lon_new)
+                        if existing:
+                            new_node_id = existing
+                        else:
+                            self.graph.add_node(
+                                new_node_id, lat=lat_new, lon=lon_new, ways=[way_id]
+                            )
+                        interpolated_nodes.append(new_node_id)
+                    interpolated_nodes_ab = interpolated_nodes
+                    interpolated_nodes_ba = interpolated_nodes[::-1]
+
+                    if was_ab:
+                        edges_to_remove.add((node_a, node_b))
+                        prev = node_a
+                        for node in interpolated_nodes_ab:
+                            self.graph.add_edge(prev, node, ways=[way_id])
+                            prev = node
+                        self.graph.add_edge(prev, node_b, ways=[way_id])
+
+                    if was_ba:
+                        edges_to_remove.add((node_b, node_a))
+                        prev = node_b
+                        for node in interpolated_nodes_ba:
+                            self.graph.add_edge(prev, node, ways=[way_id])
+                            prev = node
+                        self.graph.add_edge(prev, node_a, ways=[way_id])
+        self.graph.remove_edges_from(edges_to_remove)
+
+    def visualize_graph(self, map_filename="graph_map.html"):
+        node_positions = {
+            node: (data["lat"], data["lon"])
+            for node, data in self.graph.nodes(data=True)
+            if "lat" in data and "lon" in data
+        }
+
+        if not node_positions:
+            raise ValueError("No node positions found")
+
+        avg_lat = sum(pos[0] for pos in node_positions.values()) / len(node_positions)
+        avg_lon = sum(pos[1] for pos in node_positions.values()) / len(node_positions)
+
+        fmap = folium.Map(
+            location=[avg_lat, avg_lon], zoom_start=14, min_zoom=2, control_scale=True
+        )
+
+        for u, v in self.graph.edges:
+            if u in node_positions and v in node_positions:
+                latlngs = [
+                    (node_positions[u][0], node_positions[u][1]),
+                    (node_positions[v][0], node_positions[v][1]),
+                ]
+                folium.PolyLine(
+                    locations=latlngs, color="blue", weight=2, opacity=0.7
+                ).add_to(fmap)
+        for node in self.main_nodes:
+            if node in node_positions:
+                lat, lon = node_positions[node]
+                folium.CircleMarker(
+                    location=(lat, lon),
+                    radius=4,
+                    color="red",
+                    fill=True,
+                    fill_opacity=0.9,
+                    popup=f"Main node: {node}",
+                ).add_to(fmap)
+
+        for node in self.graph.nodes:
+            if node in node_positions and str(node).startswith("geo_"):
+                lat, lon = node_positions[node]
+                folium.CircleMarker(
+                    location=(lat, lon),
+                    radius=3,
+                    color="blue",
+                    fill=True,
+                    fill_opacity=0.6,
+                    popup=f"New node: {node}",
+                ).add_to(fmap)
+            if (
+                node in node_positions
+                and node not in self.main_nodes
+                and not str(node).startswith("geo_")
+            ):
+                lat, lon = node_positions[node]
+                folium.CircleMarker(
+                    location=(lat, lon),
+                    radius=2,
+                    color="green",
+                    fill=True,
+                    fill_opacity=0.3,
+                    popup=f"Node: {node}",
+                ).add_to(fmap)
+        fmap.save(map_filename)
+        print(f"Map saved as: {map_filename}")
+
+
+g = NetworkGraph(
+    "tram_ways.json",
+    "tram_stops.json",
+    "tram_stops_crossroads_coords.json",
+    "track_geometry.json",
+    max_distance=25,
+)
 g.create_graph()
+g.visualize_graph(map_filename="graph_map_krk.html")

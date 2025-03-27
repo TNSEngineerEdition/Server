@@ -3,3 +3,6 @@ pandas>=2.2.3
 pydantic>=2.10.6
 requests>=2.32.3
 networkx>=3.4.2
+pyproj >= 3.7.1
+folium >= 0.19.5
+shapely >= 2.0.7
