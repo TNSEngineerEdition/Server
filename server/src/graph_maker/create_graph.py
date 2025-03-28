@@ -1,9 +1,9 @@
-import json
 import math
 
 import folium
 import networkx as nx
 import pyproj
+from model import NodeCoordinate, TrackGeometry, TramStop, Way
 from shapely.geometry import LineString, MultiLineString, Point
 from shapely.ops import linemerge, transform
 
@@ -43,29 +43,28 @@ class NetworkGraph:
     """
 
     def __init__(
-        self, ways_file, stops_file, coords_file, geometry_file, max_distance=25.0
+        self,
+        ways_data: list[Way],
+        stops_data: list[TramStop],
+        coords_data: list[NodeCoordinate],
+        geometry_data: TrackGeometry,
+        max_distance=25.0,
     ):
         self.graph = nx.DiGraph()
-        try:
-            with open(ways_file, "r", encoding="utf-8") as f:
-                self.ways = json.load(f)
-            with open(stops_file, "r", encoding="utf-8") as f:
-                self.stops = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError) as e:
-            raise ValueError(f"Error loading files: {e}")
-        self.geometry_file = geometry_file
-        self.coords_file = coords_file
+        self.ways = ways_data
+        self.stops = stops_data
+        self.coords_data = coords_data
+        self.geometry_data = geometry_data
         self.max_distance = max_distance
         self.main_nodes = []
 
     def find_main_nodes(self):
         result = [
-            stop["id"]
+            stop.id
             for stop in self.stops
-            if stop["id"] in self.graph.nodes
+            if stop.id in self.graph.nodes
             and (
-                self.graph.out_degree(stop["id"]) > 0
-                or self.graph.in_degree(stop["id"]) > 0
+                self.graph.out_degree(stop.id) > 0 or self.graph.in_degree(stop.id) > 0
             )
         ]
 
@@ -77,14 +76,14 @@ class NetworkGraph:
 
     def create_graph(self):
         for way in self.ways:
-            nodes = way["nodes"]
+            nodes = way.nodes
             for i in range(len(nodes) - 1):
                 self.graph.add_edge(nodes[i], nodes[i + 1])
 
         self.main_nodes = self.find_main_nodes()
         self.remove_unnecessary_nodes()
         self.add_two_way_edges()
-        self.add_coordinates_from_file()
+        self.add_coordinates_from_data()
         self.tag_nodes_with_way_ids()
         self.build_dict()
         while self.is_there_any_ways_to_merge():
@@ -134,8 +133,8 @@ class NetworkGraph:
         for node in self.graph.nodes:
             for successor in self.graph.successors(node):
                 for way in self.ways:
-                    if node in way["nodes"] and successor in way["nodes"]:
-                        if way["tags"].get("oneway") != "yes":
+                    if node in way.nodes and successor in way.nodes:
+                        if way.tags.get("oneway") != "yes":
                             self.graph.add_edge(successor, node)
                         break
 
@@ -150,13 +149,8 @@ class NetworkGraph:
                 return True
         return False
 
-    def add_coordinates_from_file(self):
-        try:
-            with open(self.coords_file, "r", encoding="utf-8") as f:
-                nodes_data = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError) as e:
-            raise ValueError(f"Error loading nodes file: {e}")
-        nodes_dict = {node["id"]: (node["lat"], node["lon"]) for node in nodes_data}
+    def add_coordinates_from_data(self):
+        nodes_dict = {node.id: (node.lat, node.lon) for node in self.coords_data}
         for node in self.graph.nodes:
             if node in nodes_dict:
                 lat, lon = nodes_dict[node]
@@ -165,23 +159,18 @@ class NetworkGraph:
 
     def tag_nodes_with_way_ids(self):
         for way in self.ways:
-            way_id = way.get("id")
-            for node_id in way["nodes"]:
+            way_id = way.id
+            for node_id in way.nodes:
                 if node_id in self.graph.nodes:
                     if "ways" not in self.graph.nodes[node_id]:
                         self.graph.nodes[node_id]["ways"] = []
                     self.graph.nodes[node_id]["ways"].append(way_id)
 
     def build_dict(self):
-        try:
-            with open(self.geometry_file, "r") as f:
-                data = json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError) as e:
-            raise ValueError(f"Error loading geometry file: {e}")
         self.ways_dict = {}
-        for feature in data["features"]:
-            properties = feature["properties"]
-            geometry = feature["geometry"]
+        for feature in self.geometry_data.features:
+            properties = feature.properties
+            geometry = feature.geometry
             way_id = int(properties["id"])
             if geometry["type"] == "LineString":
                 linestring = LineString(geometry["coordinates"])
@@ -439,14 +428,3 @@ class NetworkGraph:
                 ).add_to(fmap)
         fmap.save(map_filename)
         print(f"Map saved as: {map_filename}")
-
-
-g = NetworkGraph(
-    "tram_ways.json",
-    "tram_stops.json",
-    "tram_stops_crossroads_coords.json",
-    "track_geometry.json",
-    max_distance=25,
-)
-g.create_graph()
-g.visualize_graph(map_filename="graph_map_krk.html")
