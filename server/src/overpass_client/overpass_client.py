@@ -25,7 +25,7 @@ class OverpassClient:
     out geom;
     """
 
-    _GET_TRAM_STOPS_AND_CROSSROADS_TEMPLATE = """
+    _GET_TRAM_STOPS_AND_RAILWAYS_TEMPLATE = """
     [out:json];
     area["name"="{area_name}"]->.search_area;
     (
@@ -35,7 +35,7 @@ class OverpassClient:
     out geom;
     """
 
-    _GET_TRAM_STOPs_AND_CROSSROADS_COORDINATE = """
+    _GET_TRAM_STOPs_AND_RAILWAYS_COORDINATE = """
     [out:json];
     area["name"="{area_name}"]->.search_area;
     way["railway"="tram"](area.search_area)->.tram_ways;
@@ -69,14 +69,12 @@ class OverpassClient:
 
     @classmethod
     def get_tram_stops_and_crossroads(cls, area_name: str):
-        query = cls._GET_TRAM_STOPS_AND_CROSSROADS_TEMPLATE.format(area_name=area_name)
+        query = cls._GET_TRAM_STOPS_AND_RAILWAYS_TEMPLATE.format(area_name=area_name)
         return cls._OVERPASS.query(query)
 
     @classmethod
     def get_tram_stops_and_crossroads_coordinate(cls, area_name: str):
-        query = cls._GET_TRAM_STOPs_AND_CROSSROADS_COORDINATE.format(
-            area_name=area_name
-        )
+        query = cls._GET_TRAM_STOPs_AND_RAILWAYS_COORDINATE.format(area_name=area_name)
         return cls._OVERPASS.query(query)
 
     @classmethod
