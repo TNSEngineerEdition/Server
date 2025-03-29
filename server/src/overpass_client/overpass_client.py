@@ -35,6 +35,7 @@ class OverpassClient:
     (._; >;);
     out geom;
     """
+
     @classmethod
     def get_relations_and_stops(cls, area_name: str, custom_node_ids: list[int]):
         if custom_node_ids:
