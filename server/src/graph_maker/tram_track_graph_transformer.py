@@ -48,7 +48,7 @@ class TramTrackGraphTransformer:
         return graph
 
     def _find_permanent_tram_stops(self):
-        result = set(
+        return {
             stop.id
             for stop in self._stops
             if stop.id in self._graph.nodes
@@ -56,9 +56,7 @@ class TramTrackGraphTransformer:
                 self._graph.out_degree(stop.id) > 0
                 or self._graph.in_degree(stop.id) > 0
             )
-        )
-
-        return result
+        }
 
     def _find_permanent_crossing(self):
         result = set()
