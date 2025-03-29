@@ -1,8 +1,8 @@
 import math
 
 import networkx as nx
+import overpy
 import pyproj
-from model import NodeCoordinate, TrackGeometry, TramStop, Way
 from shapely.geometry import LineString, MultiLineString, Point
 from shapely.ops import linemerge, transform
 
@@ -17,18 +17,20 @@ class TramRailwayGraphTransformer:
 
     def __init__(
         self,
-        ways_data: list[Way],
-        stops_data: list[TramStop],
-        coords_data: list[NodeCoordinate],
-        geometry_data: TrackGeometry,
-        max_distance=25.0,
+        tram_stops_and_tracks: overpy.Result,
+        max_distance_in_meters: float,
     ):
+        if max_distance_in_meters <= 0:
+            raise ValueError("max_distance_in_meters must be a positive float value")
         self.graph = nx.DiGraph()
-        self.max_distance = max_distance
-        self._ways = ways_data
-        self._stops = stops_data
-        self._coords_data = coords_data
-        self._geometry_data = geometry_data
+        self.max_distance_in_meters = max_distance_in_meters
+        self._ways = tram_stops_and_tracks.ways
+        self._stops = [
+            node
+            for node in tram_stops_and_tracks.nodes
+            if node.tags.get("railway") == "tram_stop"
+        ]
+        self._coords_data = tram_stops_and_tracks.nodes
         self._main_nodes = []
 
     def find_main_nodes(self):
@@ -55,9 +57,9 @@ class TramRailwayGraphTransformer:
 
     def create_graph(self):
         for way in self._ways:
-            nodes = way.nodes
-            for i in range(len(nodes) - 1):
-                self.graph.add_edge(nodes[i], nodes[i + 1])
+            node_ids = [node.id for node in way.nodes]
+            for i in range(len(node_ids) - 1):
+                self.graph.add_edge(node_ids[i], node_ids[i + 1])
 
         self._main_nodes = self.find_main_nodes()
         self.remove_unnecessary_nodes()
@@ -67,7 +69,7 @@ class TramRailwayGraphTransformer:
         self.build_dict()
         while self.is_there_any_ways_to_merge():
             self.merge_ways(tolerance=2.0)
-        self.subdivide_ways(max_distance=self.max_distance)
+        self.subdivide_ways(max_distance=self.max_distance_in_meters)
 
     def remove_unnecessary_nodes(self):
         start_nodes = [
@@ -112,7 +114,8 @@ class TramRailwayGraphTransformer:
         for node in self.graph.nodes:
             for successor in self.graph.successors(node):
                 for way in self._ways:
-                    if node in way.nodes and successor in way.nodes:
+                    way_node_ids = [n.id for n in way.nodes]
+                    if node in way_node_ids and successor in way_node_ids:
                         if way.tags.get("oneway") != "yes":
                             self.graph.add_edge(successor, node)
                         break
@@ -129,37 +132,52 @@ class TramRailwayGraphTransformer:
         return False
 
     def add_coordinates_from_data(self):
-        nodes_dict = {node.id: (node.lat, node.lon) for node in self._coords_data}
+        nodes_dict = {
+            int(node.id): (float(node.lat), float(node.lon))
+            for node in self._coords_data
+            if node.lat is not None and node.lon is not None
+        }
+
         for node in self.graph.nodes:
-            if node in nodes_dict:
-                lat, lon = nodes_dict[node]
+            node_id = int(node)
+            if node_id in nodes_dict:
+                lat, lon = nodes_dict[node_id]
                 self.graph.nodes[node]["lat"] = lat
                 self.graph.nodes[node]["lon"] = lon
 
     def tag_nodes_with_way_ids(self):
         for way in self._ways:
             way_id = way.id
-            for node_id in way.nodes:
+            for node in way.nodes:
+                node_id = node.id
                 if node_id in self.graph.nodes:
+
                     if "ways" not in self.graph.nodes[node_id]:
                         self.graph.nodes[node_id]["ways"] = []
                     self.graph.nodes[node_id]["ways"].append(way_id)
 
     def build_dict(self):
         self._ways_dict = {}
-        for feature in self._geometry_data.features:
-            properties = feature.properties
-            geometry = feature.geometry
-            way_id = int(properties["id"])
-            if geometry["type"] == "LineString":
-                linestring = LineString(geometry["coordinates"])
-            else:
+        # słownik node_id -> (lon, lat)
+        nodes_dict = {
+            node.id: (float(node.lon), float(node.lat)) for node in self._coords_data
+        }
+
+        for way in self._ways:
+            coords = []
+            for node_id in way._node_ids:
+                if node_id in nodes_dict:
+                    coords.append(nodes_dict[node_id])
+            if len(coords) < 2:
                 continue
-            if way_id in self._ways_dict:
-                existing = self._ways_dict[way_id]
-                self._ways_dict[way_id] = linemerge([existing, linestring])
+
+            linestring = LineString(coords)
+
+            if way.id in self._ways_dict:
+                existing = self._ways_dict[way.id]
+                self._ways_dict[way.id] = linemerge([existing, linestring])
             else:
-                self._ways_dict[way_id] = linestring
+                self._ways_dict[way.id] = linestring
 
     def merge_ways(self, tolerance=2.0):
         transformer = pyproj.Transformer.from_crs(
