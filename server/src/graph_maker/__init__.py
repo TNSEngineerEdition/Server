@@ -1,3 +1,3 @@
-from .create_graph import TramRailwayGraphTransformer
+from .tram_truck_graph_transformer import TramTrackGraphTransformer
 
-__all__ = ["TramRailwayGraphTransformer"]
+__all__ = ["TramTrackGraphTransformer"]
