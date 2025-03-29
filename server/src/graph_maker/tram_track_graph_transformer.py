@@ -26,49 +26,29 @@ class TramTrackGraphTransformer:
             if node.tags.get("railway") == "tram_stop"
         ]
         self._coords_data = tram_stops_and_tracks.nodes
-        self._graph = nx.DiGraph()
-        self._pernament_nodes = []
+        self._permanent_nodes = set()
         self._ways_dict = {}
 
-        self._build_skeleton_graph()
+        self._initialize_graph()
 
-    def _build_skeleton_graph(self):
+    def _build_initial_graph(self):
+        """
+        Builds a directed graph from tram track ways.
+        Only forward edges are added; reverse edges (for two-way tracks)
+        are handled later in a separate method.
+        """
+        graph = nx.DiGraph()
+
         for way in self._ways:
             node_ids = [node.id for node in way.nodes]
+
             for i in range(len(node_ids) - 1):
-                self._graph.add_edge(node_ids[i], node_ids[i + 1])
+                graph.add_edge(node_ids[i], node_ids[i + 1])
 
-        self._pernament_nodes = self._find_pernament_nodes()
-        self._remove_unnecessary_nodes()
-        self._add_two_way_edges()
-        self._add_coordinates_from_data()
-        self._tag_nodes_with_way_ids()
-        self._build_dict()
-        while self._is_there_any_ways_to_merge():
-            self._merge_ways(tolerance=2.0)
+        return graph
 
-    @property
-    def permanent_node_ids(self):
-        return list(self._pernament_nodes)
-
-    def densify_graph_by_max_distance(
-        self, max_distance_in_meters: float
-    ) -> nx.DiGraph:
-        if max_distance_in_meters <= 0:
-            raise ValueError("max_distance_in_meters must be a positive float value")
-
-        graph_copy = self._graph.copy()
-        self._subdivide_ways(graph_copy, max_distance=max_distance_in_meters)
-        return graph_copy
-
-    def _find_pernament_nodes(self):
-        """
-        Identifies main nodes in the _graph — nodes representing tram stops or railway crossings.
-        These nodes form the basis for the initial _graph skeleton.
-        They are essential for filtering out unnecessary nodes before the second stage of _graph creation,
-        which involves densifying the network between main nodes.
-        """
-        result = [
+    def _find_permanent_tram_stops(self):
+        result = set(
             stop.id
             for stop in self._stops
             if stop.id in self._graph.nodes
@@ -76,13 +56,28 @@ class TramTrackGraphTransformer:
                 self._graph.out_degree(stop.id) > 0
                 or self._graph.in_degree(stop.id) > 0
             )
-        ]
-
-        for node in self._graph.nodes:
-            if self._graph.in_degree(node) > 1 or self._graph.out_degree(node) > 1:
-                result.append(node)
+        )
 
         return result
+
+    def _find_permanent_crossing(self):
+        result = set()
+        for node in self._graph.nodes:
+            if self._graph.in_degree(node) > 1 or self._graph.out_degree(node) > 1:
+                result.add(node)
+
+        return result
+
+    def _find_permanent_nodes(self):
+        """
+        Identifies main nodes in the _graph — nodes representing tram stops or railway crossings.
+        These nodes form the basis for the initial _graph skeleton.
+        They are essential for filtering out unnecessary nodes before the second stage of _graph creation,
+        which involves densifying the network between main nodes.
+        """
+        tram_stops = self._find_permanent_tram_stops()
+        crossings = self._find_permanent_crossing()
+        return tram_stops | crossings
 
     def _remove_unnecessary_nodes(self):
         start_nodes = [
@@ -91,10 +86,10 @@ class TramTrackGraphTransformer:
         for node in start_nodes:
             to_remove = []
             successors = list(self._graph.successors(node))
-            if node not in self._pernament_nodes:
+            if node not in self._permanent_nodes:
                 for successor in successors:
                     while (
-                        successor not in self._pernament_nodes
+                        successor not in self._permanent_nodes
                         and self._graph.out_degree(successor) > 0
                     ):
                         to_remove.append(successor)
@@ -106,12 +101,12 @@ class TramTrackGraphTransformer:
                         self._graph.remove_node(i)
                     self._graph.add_edge(node, successor)
 
-        for node in self._pernament_nodes:
+        for node in self._permanent_nodes:
             successors = list(self._graph.successors(node))
             for successor in successors:
                 to_remove = []
                 while (
-                    successor not in self._pernament_nodes
+                    successor not in self._permanent_nodes
                     and self._graph.out_degree(successor) > 0
                 ):
                     to_remove.append(successor)
@@ -192,6 +187,23 @@ class TramTrackGraphTransformer:
             else:
                 self._ways_dict[way.id] = linestring
 
+    def _update_nodes_after_merge(self, old_way_id_1, old_way_id_2, new_way_id):
+        for node_id, data in self._graph.nodes(data=True):
+            ways = data.get("ways", [])
+
+            changed = False
+            if old_way_id_1 in ways:
+                ways.remove(old_way_id_1)
+                changed = True
+            if old_way_id_2 in ways:
+                ways.remove(old_way_id_2)
+                changed = True
+
+            if changed:
+                if new_way_id not in ways:
+                    ways.append(new_way_id)
+                data["ways"] = ways
+
     def _merge_ways(self, tolerance=2.0):
         transformer = pyproj.Transformer.from_crs(
             "EPSG:4326", "EPSG:3857", always_xy=True
@@ -256,23 +268,6 @@ class TramTrackGraphTransformer:
 
                     processed.update({way_id, other_id})
                     break
-
-    def _update_nodes_after_merge(self, old_way_id_1, old_way_id_2, new_way_id):
-        for node_id, data in self._graph.nodes(data=True):
-            ways = data.get("ways", [])
-
-            changed = False
-            if old_way_id_1 in ways:
-                ways.remove(old_way_id_1)
-                changed = True
-            if old_way_id_2 in ways:
-                ways.remove(old_way_id_2)
-                changed = True
-
-            if changed:
-                if new_way_id not in ways:
-                    ways.append(new_way_id)
-                data["ways"] = ways
 
     def _subdivide_ways(self, _graph: nx.DiGraph, max_distance: float):
         edges_to_remove = set()
@@ -364,3 +359,28 @@ class TramTrackGraphTransformer:
                         _graph.add_edge(u, v, ways=[way_id])
 
         _graph.remove_edges_from(edges_to_remove)
+
+    def _initialize_graph(self):
+        self._graph = self._build_initial_graph()
+        self._permanent_nodes = self._find_permanent_nodes()
+        self._remove_unnecessary_nodes()
+        self._add_two_way_edges()
+        self._add_coordinates_from_data()
+        self._tag_nodes_with_way_ids()
+        self._build_dict()
+        while self._is_there_any_ways_to_merge():
+            self._merge_ways(tolerance=2.0)
+
+    def densify_graph_by_max_distance(
+        self, max_distance_in_meters: float
+    ) -> nx.DiGraph:
+        if max_distance_in_meters <= 0:
+            raise ValueError("max_distance_in_meters must be a positive float value")
+
+        graph_copy = self._graph.copy()
+        self._subdivide_ways(graph_copy, max_distance=max_distance_in_meters)
+        return graph_copy
+
+    @property
+    def permanent_node_ids(self):
+        return list(self._permanent_nodes)
