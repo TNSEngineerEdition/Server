@@ -37,13 +37,6 @@ class TramTrackGraphTransformer:
         while self._is_there_any_ways_to_merge():
             self._merge_ways(tolerance=2.0)
 
-    def get_initial_graph(self):
-        """
-        Zwraca kopię grafu zbudowanego na podstawie tramwajowych torów i przystanków,
-        przed zagęszczeniem (densyfikacją).
-        """
-        return self._tram_track_graph.copy()
-
     def _build_initial_graph(self):
         """
         Builds a directed graph from tram track ways.
