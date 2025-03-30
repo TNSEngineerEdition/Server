@@ -19,118 +19,121 @@ class TramTrackGraphTransformer:
     """
 
     def __init__(self, tram_stops_and_tracks: overpy.Result):
-        self._ways = tram_stops_and_tracks.ways
+        self._ways = tram_stops_and_tracks.get_ways()
         self._stops = [
             node
-            for node in tram_stops_and_tracks.nodes
+            for node in tram_stops_and_tracks.get_nodes()
             if node.tags.get("railway") == "tram_stop"
         ]
-        self._coords_data = tram_stops_and_tracks.nodes
+        self._coords_data = tram_stops_and_tracks.get_nodes()
         self._ways_dict = {}
 
-        self._tram_track_graph = self._build_initial_graph()
+        self._tram_track_graph = self._build_tram_track_graph_from_osm_ways()
         self._permanent_nodes = self._find_permanent_nodes()
-        self._build_graph_with_permanent_nodes()
+        self._minified_tram_track_graph = self._build_minified_tram_track_graph()
         self._add_coordinates_from_data()
         self._tag_nodes_with_way_ids()
         self._build_dict()
         while self._is_there_any_ways_to_merge():
             self._merge_ways(tolerance=2.0)
 
-    def _build_initial_graph(self):
-        """
-        Builds a directed graph from tram track ways.
-        Only forward edges are added; reverse edges (for two-way tracks)
-        are handled later in a separate method, because the graph is first built and then _permanent_nodes are identified.
-        Adding two-way edges before cleaning up unnecessary nodes breaks the logic for detecting crossings — a regular node that's not a real crossing but belongs to a two-way edge ends up with multiple incoming/outgoing edges. In this graph-building approach, that would incorrectly classify it as a crossing.
-        """
+    def _build_tram_track_graph_from_osm_ways(self):
         graph = nx.DiGraph()
 
         for way in self._ways:
-            node_ids = [node.id for node in way.nodes]
+            node_ids = [node.id for node in way.get_nodes()]
             is_oneway = way.tags.get("oneway") == "yes"
 
             for i in range(len(node_ids) - 1):
-                from_node = node_ids[i]
-                to_node = node_ids[i + 1]
+                source_node = node_ids[i]
+                destination_node = node_ids[i + 1]
 
-                graph.add_edge(from_node, to_node)
+                graph.add_edge(source_node, destination_node)
                 if not is_oneway:
-                    graph.add_edge(to_node, from_node)
+                    graph.add_edge(destination_node, source_node)
 
         return graph
 
     def _get_tram_stop_node_ids_in_graph(self):
         """
-        This if statement is important when tram tracks are out of service but tram stops are still present in the OSM data. We want to exclude such tram stops.
+        Returns tram stop node IDs which are on the tram tracks provided by OSM.
+        In case a track is out of service, the tram stops won't be used but
+        will still be present in `self._stops`, so we want to exclude them.
         """
+
         return {
             stop.id for stop in self._stops if stop.id in self._tram_track_graph.nodes
         }
 
-    def _get_track_crossing_and_buffer_node_ids(self):
+    def _get_track_crossing_and_endpoint_node_ids(self):
         """
-        Returns nodes that are endpoints — i.e., have fewer than 2 total distinct neighbors and crossing. Those nodes are crucial for removing non-permanent nodes when creating graph from _permament_nodes.
+        Returns node IDs which serve the function of track crossings or endpoints.
+        A node is a crossing if it has more than 2 distinct neighbors.
+        A node is a track endpoint when it has exactly 1 distinct neighbor.
+        In case a node doesn't have any neighbors (which shouldn't happen),
+        it's treated as an endpoint as well. Node A is a neighbor of node B
+        when in a directed graph there exists an edge (A, B) or (B, A).
         """
-        return {
-            node
-            for node in self._tram_track_graph.nodes
-            if len(
-                set(self._tram_track_graph.predecessors(node))
-                | set(self._tram_track_graph.successors(node))
-            )
-            != 2
-        }
+
+        result: set[int] = set()
+        for node in self._tram_track_graph:
+            predecessors = set(self._tram_track_graph.predecessors(node))
+            successors = set(self._tram_track_graph.successors(node))
+            if len(predecessors | successors) != 2:
+                result.add(node)
+
+        return result
 
     def _find_permanent_nodes(self):
         """
-        These nodes form the basis for the initial _tram_track_graph skeleton.
-        They are essential for filtering out unnecessary nodes before the second stage of _tram_track_graph creation,
-        which involves densifying the network between main nodes.
+        Permanent nodes form the basis for the `_minified_tram_track_graph`.
+        These nodes cannot be removed during the graph transformation process.
         """
+
         tram_stops = self._get_tram_stop_node_ids_in_graph()
-        crossings = self._get_track_crossing_and_buffer_node_ids()
+        crossings = self._get_track_crossing_and_endpoint_node_ids()
+
         return tram_stops | crossings
 
-    def _build_graph_with_permanent_nodes(self):
-        new_graph = nx.DiGraph()
+    def _reachable_permanent_nodes_dfs(self, source_node_id: int):
+        result: set[int] = set()
+        visited: set[int] = {source_node_id}
 
-        for start_node in self._permanent_nodes:
-            for neighbor in self._tram_track_graph.successors(start_node):
-                if neighbor in self._permanent_nodes:
-                    new_graph.add_edge(start_node, neighbor)
-                    continue
+        stack: list[int] = list(self._tram_track_graph.successors(source_node_id))
+        while stack:
+            node = stack.pop()
+            visited.add(node)
 
-                path = [start_node, neighbor]
-                visited = {start_node}
-                current = neighbor
-                previous = start_node
+            if node in self._permanent_nodes:
+                result.add(node)
+                continue
 
-                while current not in self._permanent_nodes:
-                    visited.add(current)
-                    successors = list(self._tram_track_graph.successors(current))
-                    next_nodes = [n for n in successors if n != previous]
+            for item in filter(
+                lambda x: x not in visited, self._tram_track_graph.successors(node)
+            ):
+                stack.append(item)
 
-                    if len(next_nodes) != 1:
-                        break
+        return result
 
-                    previous = current
-                    current = next_nodes[0]
-                    path.append(current)
+    def _build_minified_tram_track_graph(self):
+        """
+        Minified tram track graph contains only permanent nodes. If there exists
+        an edge between two nodes in this graph, that means there is a path between
+        two permanent nodes in the `_tram_track_graph`, which doesn't contain any
+        other permanent nodes.
+        """
 
-                if current in self._permanent_nodes:
-                    new_graph.add_edge(start_node, current)
-
-                    if self._tram_track_graph.has_edge(current, start_node):
-                        new_graph.add_edge(current, start_node)
-
-        self._tram_track_graph = new_graph
+        return nx.DiGraph(
+            (source_node, destination_node)
+            for source_node in self._permanent_nodes
+            for destination_node in self._reachable_permanent_nodes_dfs(source_node)
+        )
 
     def _is_there_any_ways_to_merge(self):
         for way_id in self._ways_dict:
             count = sum(
                 1
-                for _, data in self._tram_track_graph.nodes(data=True)
+                for _, data in self._minified_tram_track_graph.nodes(data=True)
                 if way_id in data.get("ways", [])
             )
             if count < 2:
@@ -144,23 +147,25 @@ class TramTrackGraphTransformer:
             if node.lat is not None and node.lon is not None
         }
 
-        for node in self._tram_track_graph.nodes:
+        for node in self._minified_tram_track_graph.nodes:
             node_id = int(node)
             if node_id in nodes_dict:
                 lat, lon = nodes_dict[node_id]
-                self._tram_track_graph.nodes[node]["lat"] = lat
-                self._tram_track_graph.nodes[node]["lon"] = lon
+                self._minified_tram_track_graph.nodes[node]["lat"] = lat
+                self._minified_tram_track_graph.nodes[node]["lon"] = lon
 
     def _tag_nodes_with_way_ids(self):
         for way in self._ways:
             way_id = way.id
             for node in way.nodes:
                 node_id = node.id
-                if node_id in self._tram_track_graph.nodes:
+                if node_id in self._minified_tram_track_graph.nodes:
 
-                    if "ways" not in self._tram_track_graph.nodes[node_id]:
-                        self._tram_track_graph.nodes[node_id]["ways"] = []
-                    self._tram_track_graph.nodes[node_id]["ways"].append(way_id)
+                    if "ways" not in self._minified_tram_track_graph.nodes[node_id]:
+                        self._minified_tram_track_graph.nodes[node_id]["ways"] = []
+                    self._minified_tram_track_graph.nodes[node_id]["ways"].append(
+                        way_id
+                    )
 
     def _build_dict(self):
         self._ways_dict = {}
@@ -186,7 +191,7 @@ class TramTrackGraphTransformer:
                 self._ways_dict[way.id] = linestring
 
     def _update_nodes_after_merge(self, old_way_id_1, old_way_id_2, new_way_id):
-        for node_id, data in self._tram_track_graph.nodes(data=True):
+        for node_id, data in self._minified_tram_track_graph.nodes(data=True):
             ways = data.get("ways", [])
 
             changed = False
@@ -218,7 +223,7 @@ class TramTrackGraphTransformer:
             has_start = False
             has_end = False
 
-            for node_id, data in self._tram_track_graph.nodes(data=True):
+            for node_id, data in self._minified_tram_track_graph.nodes(data=True):
                 if way_id not in data.get("ways", []):
                     continue
 
@@ -266,16 +271,6 @@ class TramTrackGraphTransformer:
 
                     processed.update({way_id, other_id})
                     break
-
-    def densify_graph_by_max_distance(
-        self, max_distance_in_meters: float
-    ) -> nx.DiGraph:
-        if max_distance_in_meters <= 0:
-            raise ValueError("max_distance_in_meters must be a positive float value")
-
-        graph_copy = self._tram_track_graph.copy()
-        self._subdivide_ways(graph_copy, max_distance=max_distance_in_meters)
-        return graph_copy
 
     @property
     def permanent_node_ids(self):
@@ -373,3 +368,13 @@ class TramTrackGraphTransformer:
                         _tram_track_graph.add_edge(u, v, ways=[way_id])
 
         _tram_track_graph.remove_edges_from(edges_to_remove)
+
+    def densify_graph_by_max_distance(
+        self, max_distance_in_meters: float
+    ) -> nx.DiGraph:
+        if max_distance_in_meters <= 0:
+            raise ValueError("max_distance_in_meters must be a positive float value")
+
+        graph_copy = self._minified_tram_track_graph.copy()
+        self._subdivide_ways(graph_copy, max_distance=max_distance_in_meters)
+        return graph_copy
