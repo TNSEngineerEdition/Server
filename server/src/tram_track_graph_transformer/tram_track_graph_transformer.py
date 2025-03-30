@@ -26,6 +26,11 @@ class TramTrackGraphTransformer:
             if node.tags.get("railway") == "tram_stop"
         ]
         self._coords_data = tram_stops_and_tracks.get_nodes()
+        self._node_coordinates_by_id = {
+            int(node.id): (float(node.lat), float(node.lon))
+            for node in self._coords_data
+            if node.lat is not None and node.lon is not None
+        }
         self._ways_dict = {}
 
         self._tram_track_graph = self._build_tram_track_graph_from_osm_ways()
@@ -141,16 +146,10 @@ class TramTrackGraphTransformer:
         return False
 
     def _add_coordinates_from_data(self):
-        nodes_dict = {
-            int(node.id): (float(node.lat), float(node.lon))
-            for node in self._coords_data
-            if node.lat is not None and node.lon is not None
-        }
-
         for node in self._minified_tram_track_graph.nodes:
             node_id = int(node)
-            if node_id in nodes_dict:
-                lat, lon = nodes_dict[node_id]
+            if node_id in self._node_coordinates_by_id:
+                lat, lon = self._node_coordinates_by_id[node_id]
                 self._minified_tram_track_graph.nodes[node]["lat"] = lat
                 self._minified_tram_track_graph.nodes[node]["lon"] = lon
 
