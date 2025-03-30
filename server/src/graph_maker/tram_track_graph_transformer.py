@@ -26,18 +26,23 @@ class TramTrackGraphTransformer:
             if node.tags.get("railway") == "tram_stop"
         ]
         self._coords_data = tram_stops_and_tracks.nodes
-        self._permanent_nodes = set()
         self._ways_dict = {}
 
         self._tram_track_graph = self._build_initial_graph()
         self._permanent_nodes = self._find_permanent_nodes()
-        self._remove_unnecessary_nodes()
-        self._add_two_way_edges()
+        self._remove_non_permanent_nodes()
         self._add_coordinates_from_data()
         self._tag_nodes_with_way_ids()
         self._build_dict()
         while self._is_there_any_ways_to_merge():
             self._merge_ways(tolerance=2.0)
+
+    def get_initial_graph(self):
+        """
+        Zwraca kopię grafu zbudowanego na podstawie tramwajowych torów i przystanków,
+        przed zagęszczeniem (densyfikacją).
+        """
+        return self._tram_track_graph.copy()
 
     def _build_initial_graph(self):
         """
@@ -50,29 +55,35 @@ class TramTrackGraphTransformer:
 
         for way in self._ways:
             node_ids = [node.id for node in way.nodes]
+            is_oneway = way.tags.get("oneway") == "yes"
 
             for i in range(len(node_ids) - 1):
-                graph.add_edge(node_ids[i], node_ids[i + 1])
+                from_node = node_ids[i]
+                to_node = node_ids[i + 1]
+
+                graph.add_edge(from_node, to_node, oneway=is_oneway)
+                if not is_oneway:
+                    graph.add_edge(to_node, from_node, oneway=False)
 
         return graph
 
     def _get_tram_stop_node_ids_in_graph(self):
         return {
-            stop.id
-            for stop in self._stops
-            if stop.id in self._tram_track_graph.nodes
-            and (
-                self._tram_track_graph.out_degree(stop.id) > 0
-                or self._tram_track_graph.in_degree(stop.id) > 0
-            )
+            stop.id for stop in self._stops if stop.id in self._tram_track_graph.nodes
         }
 
-    def _get_track_crossing_node_ids_in_graph(self):
+    def _get_track_crossing_and_buffer_node_ids(self):
+        """
+        Returns nodes that are endpoints — i.e., have fewer than 2 total distinct neighbors and crossing. Those nodes are crucial for removing non-permanent nodes when creating graph from _permament_nodes.
+        """
         return {
             node
             for node in self._tram_track_graph.nodes
-            if self._tram_track_graph.in_degree(node) > 1
-            or self._tram_track_graph.out_degree(node) > 1
+            if len(
+                set(self._tram_track_graph.predecessors(node))
+                | set(self._tram_track_graph.successors(node))
+            )
+            != 2
         }
 
     def _find_permanent_nodes(self):
@@ -82,59 +93,56 @@ class TramTrackGraphTransformer:
         which involves densifying the network between main nodes.
         """
         tram_stops = self._get_tram_stop_node_ids_in_graph()
-        crossings = self._get_track_crossing_node_ids_in_graph()
+        crossings = self._get_track_crossing_and_buffer_node_ids()
         return tram_stops | crossings
 
-    def _remove_unnecessary_nodes(self):
-        start_nodes = [
-            node
-            for node in self._tram_track_graph.nodes
-            if self._tram_track_graph.in_degree(node) == 0
-        ]
-        for node in start_nodes:
-            to_remove = []
-            successors = list(self._tram_track_graph.successors(node))
-            if node not in self._permanent_nodes:
-                for successor in successors:
+    def _remove_non_permanent_nodes(self):
+        """
+        Removes non-permanent intermediate nodes between permanent nodes.
+        """
+
+        def remove_intermediate_nodes_from(permanent_nodes):
+            for node in permanent_nodes:
+                for successor in list(self._tram_track_graph.successors(node)):
+                    if successor in self._permanent_nodes:
+                        continue
+
+                    path = []
+                    current = successor
+                    previous = node
+
+                    edge_data = self._tram_track_graph.get_edge_data(successor, node)
+                    is_bidirectional = edge_data is not None and not edge_data.get(
+                        "oneway", False
+                    )
+
                     while (
-                        successor not in self._permanent_nodes
-                        and self._tram_track_graph.out_degree(successor) > 0
+                        current not in self._permanent_nodes
+                        and self._tram_track_graph.out_degree(current) > 0
                     ):
-                        to_remove.append(successor)
-                        successor = list(self._tram_track_graph.successors(successor))
-                        if len(successor) > 1:
+                        path.append(current)
+                        next_successors = list(
+                            self._tram_track_graph.successors(current)
+                        )
+
+                        next_candidates = [n for n in next_successors if n != previous]
+
+                        if len(next_candidates) != 1:
                             break
-                        successor = successor[0]
-                    for i in to_remove:
-                        self._tram_track_graph.remove_node(i)
-                    self._tram_track_graph.add_edge(node, successor)
 
-        for node in self._permanent_nodes:
-            successors = list(self._tram_track_graph.successors(node))
-            for successor in successors:
-                to_remove = []
-                while (
-                    successor not in self._permanent_nodes
-                    and self._tram_track_graph.out_degree(successor) > 0
-                ):
-                    to_remove.append(successor)
-                    successor = list(self._tram_track_graph.successors(successor))
-                    if len(successor) > 1:
-                        break
-                    successor = successor[0]
-                for i in to_remove:
-                    self._tram_track_graph.remove_node(i)
-                self._tram_track_graph.add_edge(node, successor)
+                        previous = current
+                        current = next_candidates[0]
 
-    def _add_two_way_edges(self):
-        for node in self._tram_track_graph.nodes:
-            for successor in self._tram_track_graph.successors(node):
-                for way in self._ways:
-                    way_node_ids = [n.id for n in way.nodes]
-                    if node in way_node_ids and successor in way_node_ids:
-                        if way.tags.get("oneway") != "yes":
-                            self._tram_track_graph.add_edge(successor, node)
-                        break
+                    if current in self._tram_track_graph.nodes and current != node:
+                        for mid in path:
+                            self._tram_track_graph.remove_node(mid)
+
+                        self._tram_track_graph.add_edge(node, current)
+
+                        if is_bidirectional:
+                            self._tram_track_graph.add_edge(current, node)
+
+        remove_intermediate_nodes_from(self._permanent_nodes)
 
     def _is_there_any_ways_to_merge(self):
         for way_id in self._ways_dict:
