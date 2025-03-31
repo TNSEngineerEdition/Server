@@ -31,14 +31,13 @@ class TramTrackGraphTransformer:
             for node in self._coords_data
             if node.lat is not None and node.lon is not None
         }
-        self._ways_dict = {}
+        self._ways_dict = self._build_ways_dict()
 
         self._tram_track_graph = self._build_tram_track_graph_from_osm_ways()
         self._permanent_nodes = self._find_permanent_nodes()
         self._minified_tram_track_graph = self._build_minified_tram_track_graph()
         self._add_coordinates_from_data()
         self._tag_nodes_with_way_ids()
-        self._build_dict()
         while self._is_there_any_ways_to_merge():
             self._merge_ways(tolerance=2.0)
 
@@ -134,17 +133,6 @@ class TramTrackGraphTransformer:
             for destination_node in self._reachable_permanent_nodes_dfs(source_node)
         )
 
-    def _is_there_any_ways_to_merge(self):
-        for way_id in self._ways_dict:
-            count = sum(
-                1
-                for _, data in self._minified_tram_track_graph.nodes(data=True)
-                if way_id in data.get("ways", [])
-            )
-            if count < 2:
-                return True
-        return False
-
     def _add_coordinates_from_data(self):
         for node in self._minified_tram_track_graph.nodes:
             node_id = int(node)
@@ -166,8 +154,11 @@ class TramTrackGraphTransformer:
                         way_id
                     )
 
-    def _build_dict(self):
-        self._ways_dict = {}
+    def _build_ways_dict(self):
+        """
+        Builds a dictionary mapping way IDs to LineString geometries using node coordinates.
+        """
+        ways_dict = {}
         # słownik node_id -> (lon, lat)
         nodes_dict = {
             node.id: (float(node.lon), float(node.lat)) for node in self._coords_data
@@ -183,11 +174,23 @@ class TramTrackGraphTransformer:
 
             linestring = LineString(coords)
 
-            if way.id in self._ways_dict:
-                existing = self._ways_dict[way.id]
-                self._ways_dict[way.id] = linemerge([existing, linestring])
+            if way.id in ways_dict:
+                existing = ways_dict[way.id]
+                ways_dict[way.id] = linemerge([existing, linestring])
             else:
-                self._ways_dict[way.id] = linestring
+                ways_dict[way.id] = linestring
+        return ways_dict
+
+    def _is_there_any_ways_to_merge(self):
+        for way_id in self._ways_dict:
+            count = sum(
+                1
+                for _, data in self._minified_tram_track_graph.nodes(data=True)
+                if way_id in data.get("ways", [])
+            )
+            if count < 2:
+                return True
+        return False
 
     def _update_nodes_after_merge(self, old_way_id_1, old_way_id_2, new_way_id):
         for node_id, data in self._minified_tram_track_graph.nodes(data=True):
