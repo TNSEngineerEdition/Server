@@ -27,7 +27,7 @@ class TramTrackGraphTransformer:
         ]
         self._coords_data = tram_stops_and_tracks.get_nodes()
         self._node_coordinates_by_id = {
-            int(node.id): (float(node.lat), float(node.lon))
+            node.id: (float(node.lat), float(node.lon))
             for node in self._coords_data
             if node.lat is not None and node.lon is not None
         }
