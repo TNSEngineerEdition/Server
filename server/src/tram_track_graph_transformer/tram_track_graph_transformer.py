@@ -2,9 +2,8 @@ import math
 
 import networkx as nx
 import overpy
-import pyproj
-from shapely.geometry import LineString, MultiLineString, Point
-from shapely.ops import linemerge, transform
+from pyproj import Transformer
+from shapely.geometry import LineString
 
 
 class TramTrackGraphTransformer:
@@ -31,15 +30,10 @@ class TramTrackGraphTransformer:
             for node in self._coords_data
             if node.lat is not None and node.lon is not None
         }
-        self._ways_dict = self._build_ways_dict()
 
         self._tram_track_graph = self._build_tram_track_graph_from_osm_ways()
         self._permanent_nodes = self._find_permanent_nodes()
         self._minified_tram_track_graph = self._build_minified_tram_track_graph()
-        self._add_coordinates_from_data()
-        self._tag_nodes_with_way_ids()
-        while self._is_there_any_ways_to_merge():
-            self._merge_ways(tolerance=2.0)
 
     def _build_tram_track_graph_from_osm_ways(self):
         graph = nx.DiGraph()
@@ -154,229 +148,94 @@ class TramTrackGraphTransformer:
                         way_id
                     )
 
-    def _build_ways_dict(self):
-        """
-        Builds a dictionary mapping way IDs to LineString geometries using node coordinates.
-        """
-        ways_dict = {}
-        # słownik node_id -> (lon, lat)
-        nodes_dict = {
-            node.id: (float(node.lon), float(node.lat)) for node in self._coords_data
-        }
-
-        for way in self._ways:
-            coords = []
-            for node_id in way._node_ids:
-                if node_id in nodes_dict:
-                    coords.append(nodes_dict[node_id])
-            if len(coords) < 2:
-                continue
-
-            linestring = LineString(coords)
-
-            if way.id in ways_dict:
-                existing = ways_dict[way.id]
-                ways_dict[way.id] = linemerge([existing, linestring])
-            else:
-                ways_dict[way.id] = linestring
-        return ways_dict
-
-    def _is_there_any_ways_to_merge(self):
-        for way_id in self._ways_dict:
-            count = sum(
-                1
-                for _, data in self._minified_tram_track_graph.nodes(data=True)
-                if way_id in data.get("ways", [])
-            )
-            if count < 2:
-                return True
-        return False
-
-    def _update_nodes_after_merge(self, old_way_id_1, old_way_id_2, new_way_id):
-        for node_id, data in self._minified_tram_track_graph.nodes(data=True):
-            ways = data.get("ways", [])
-
-            changed = False
-            if old_way_id_1 in ways:
-                ways.remove(old_way_id_1)
-                changed = True
-            if old_way_id_2 in ways:
-                ways.remove(old_way_id_2)
-                changed = True
-
-            if changed:
-                if new_way_id not in ways:
-                    ways.append(new_way_id)
-                data["ways"] = ways
-
-    def _merge_ways(self, tolerance=2.0):
-        transformer = pyproj.Transformer.from_crs(
-            "EPSG:4326", "EPSG:3857", always_xy=True
-        ).transform
-        processed = set()
-        next_way_id = max(self._ways_dict) + 1
-        for way_id, geom in list(self._ways_dict.items()):
-            if way_id in processed:
-                continue
-
-            start_pt = Point(geom.coords[0])
-            end_pt = Point(geom.coords[-1])
-
-            has_start = False
-            has_end = False
-
-            for node_id, data in self._minified_tram_track_graph.nodes(data=True):
-                if way_id not in data.get("ways", []):
-                    continue
-
-                node_pt = Point(data["lon"], data["lat"])
-                if node_pt.distance(start_pt) < 1e-6:
-                    has_start = True
-                if node_pt.distance(end_pt) < 1e-6:
-                    has_end = True
-
-            if has_start == has_end:
-                continue
-
-            free_end = end_pt if has_start else start_pt
-            free_end_3857 = transform(transformer, free_end)
-
-            for other_id, other_geom in self._ways_dict.items():
-                if other_id == way_id or other_id in processed:
-                    continue
-
-                other_start = Point(other_geom.coords[0])
-                other_end = Point(other_geom.coords[-1])
-                other_start_3857 = transform(transformer, other_start)
-                other_end_3857 = transform(transformer, other_end)
-
-                dist_start = free_end_3857.distance(other_start_3857)
-                dist_end = free_end_3857.distance(other_end_3857)
-
-                if dist_start < tolerance or dist_end < tolerance:
-                    g1 = geom.reverse() if not has_start else geom
-                    g2 = other_geom
-
-                    if dist_end < tolerance:
-                        g2 = g2.reverse()
-
-                    merged_geom = linemerge([g1, g2])
-                    if isinstance(merged_geom, MultiLineString):
-                        merged_geom = list(merged_geom.geoms)[0]
-                    new_way_id = next_way_id
-                    next_way_id += 1
-                    self._ways_dict[new_way_id] = merged_geom
-                    del self._ways_dict[way_id]
-                    del self._ways_dict[other_id]
-
-                    self._update_nodes_after_merge(way_id, other_id, new_way_id)
-
-                    processed.update({way_id, other_id})
-                    break
-
     @property
     def permanent_node_ids(self):
         return self._permanent_nodes.copy()
 
-    def _subdivide_ways(self, _tram_track_graph: nx.DiGraph, max_distance: float):
-        edges_to_remove = set()
-
-        def find_existing_node_by_coords(lat, lon, tolerance=1e-6):
-            for node_id, data in _tram_track_graph.nodes(data=True):
-                if (
-                    abs(data.get("lat", 0) - lat) < tolerance
-                    and abs(data.get("lon", 0) - lon) < tolerance
-                ):
-                    return node_id
-            return None
-
-        transformer_to_3857 = pyproj.Transformer.from_crs(
-            "EPSG:4326", "EPSG:3857", always_xy=True
-        ).transform
-        transformer_to_wgs = pyproj.Transformer.from_crs(
-            "EPSG:3857", "EPSG:4326", always_xy=True
-        ).transform
-
-        next_node_id = (
-            max(_tram_track_graph.nodes) + 1 if _tram_track_graph.nodes else 1
-        )
-
-        for way_id, geometry in self._ways_dict.items():
-            if not isinstance(geometry, LineString):
-                continue
-
-            line_3857 = transform(transformer_to_3857, geometry)
-            existing_points = []
-
-            for node_id, data in _tram_track_graph.nodes(data=True):
-                if way_id in data.get("ways", []):
-                    pt = transform(transformer_to_3857, Point(data["lon"], data["lat"]))
-                    dist = line_3857.project(pt)
-                    existing_points.append((node_id, dist))
-
-            if len(existing_points) < 2:
-                continue
-
-            existing_points.sort(key=lambda x: x[1])
-
-            for i in range(len(existing_points) - 1):
-                node_a, dist_a = existing_points[i]
-                node_b, dist_b = existing_points[i + 1]
-
-                if dist_a > dist_b:
-                    node_a, dist_a, node_b, dist_b = node_b, dist_b, node_a, dist_a
-
-                segment_len = dist_b - dist_a
-                n = math.ceil(segment_len / max_distance)
-
-                if n == 1:
-                    continue
-
-                step = segment_len / n
-                prev_node = node_a
-                interpolated_nodes = []
-
-                for k in range(1, n):
-                    dist_current = dist_a + k * step
-                    if dist_current >= dist_b:
-                        _tram_track_graph.add_edge(prev_node, node_b)
-                        break
-
-                    ip_3857 = line_3857.interpolate(dist_current)
-                    ip_wgs = transform(transformer_to_wgs, ip_3857)
-                    lat_new, lon_new = ip_wgs.y, ip_wgs.x
-
-                    existing = find_existing_node_by_coords(lat_new, lon_new)
-                    if existing:
-                        new_node_id = existing
-                    else:
-                        new_node_id = next_node_id
-                        next_node_id += 1
-                        _tram_track_graph.add_node(
-                            new_node_id, lat=lat_new, lon=lon_new, ways=[way_id]
-                        )
-                    interpolated_nodes.append(new_node_id)
-
-                all_nodes = [node_a] + interpolated_nodes + [node_b]
-
-                if _tram_track_graph.has_edge(node_a, node_b):
-                    edges_to_remove.add((node_a, node_b))
-                    for u, v in zip(all_nodes, all_nodes[1:]):
-                        _tram_track_graph.add_edge(u, v, ways=[way_id])
-
-                if _tram_track_graph.has_edge(node_b, node_a):
-                    edges_to_remove.add((node_b, node_a))
-                    for u, v in zip(reversed(all_nodes), list(reversed(all_nodes))[1:]):
-                        _tram_track_graph.add_edge(u, v, ways=[way_id])
-
-        _tram_track_graph.remove_edges_from(edges_to_remove)
-
     def densify_graph_by_max_distance(
         self, max_distance_in_meters: float
     ) -> nx.DiGraph:
+
         if max_distance_in_meters <= 0:
             raise ValueError("max_distance_in_meters must be a positive float value")
 
-        graph_copy = self._minified_tram_track_graph.copy()
-        self._subdivide_ways(graph_copy, max_distance=max_distance_in_meters)
-        return graph_copy
+        def interpolate_between_first_and_last_node(
+            path_with_coords, max_distance_in_meters
+        ):
+            latlon = [(lat, lon) for _, lat, lon in path_with_coords]
+
+            transformer = Transformer.from_crs("EPSG:4326", "EPSG:2180", always_xy=True)
+            inverse = Transformer.from_crs("EPSG:2180", "EPSG:4326", always_xy=True)
+
+            meter_coords = [transformer.transform(lon, lat) for lat, lon in latlon]
+            line = LineString(meter_coords)
+            length = line.length
+
+            if length <= max_distance_in_meters:
+                return [latlon[0], latlon[-1]]
+
+            num_segments = max(1, math.ceil(length / max_distance_in_meters))
+            distances = [i * (length / num_segments) for i in range(1, num_segments)]
+
+            interpolated_points = [line.interpolate(d) for d in distances]
+            interpolated_latlon = [
+                inverse.transform(p.x, p.y)[::-1] for p in interpolated_points
+            ]
+
+            return [latlon[0]] + interpolated_latlon + [latlon[-1]]
+
+        new_graph = nx.DiGraph()
+        new_id_counter = max(self._tram_track_graph.nodes) + 1
+
+        for u in self._permanent_nodes:
+            for v in self._tram_track_graph.successors(u):
+
+                if self._tram_track_graph.has_edge(v, u):
+                    continue
+
+                path = [
+                    (
+                        u,
+                        self._node_coordinates_by_id[u][0],
+                        self._node_coordinates_by_id[u][1],
+                    )
+                ]
+                node = v
+
+                while node not in self._permanent_nodes:
+                    path.append(
+                        (
+                            node,
+                            self._node_coordinates_by_id[node][0],
+                            self._node_coordinates_by_id[node][1],
+                        )
+                    )
+                    node = list(self._tram_track_graph.successors(node))[0]
+
+                path.append(
+                    (
+                        node,
+                        self._node_coordinates_by_id[node][0],
+                        self._node_coordinates_by_id[node][1],
+                    )
+                )
+                interpolated_nodes = interpolate_between_first_and_last_node(
+                    path, max_distance_in_meters
+                )
+
+                for i in range(len(interpolated_nodes)):
+                    lat, lon = interpolated_nodes[i]
+                    if i == 0:
+                        new_graph.add_node(u, lat=lat, lon=lon, permanent=True)
+                        prev_node = u
+                    elif i == len(interpolated_nodes) - 1:
+                        new_graph.add_node(node, lat=lat, lon=lon, permanent=True)
+                        new_graph.add_edge(prev_node, node)
+                    else:
+                        new_graph.add_node(
+                            new_id_counter, lat=lat, lon=lon, permanent=False
+                        )
+                        new_graph.add_edge(prev_node, new_id_counter)
+                        prev_node = new_id_counter
+                        new_id_counter += 1
+        return new_graph
