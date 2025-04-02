@@ -26,14 +26,11 @@ class TramTrackGraphTransformer:
         ]
         self._coords_data = tram_stops_and_tracks.get_nodes()
         self._node_coordinates_by_id = {
-            node.id: (float(node.lat), float(node.lon))
-            for node in self._coords_data
-            if node.lat is not None and node.lon is not None
+            node.id: (float(node.lat), float(node.lon)) for node in self._coords_data
         }
 
         self._tram_track_graph = self._build_tram_track_graph_from_osm_ways()
         self._permanent_nodes = self._find_permanent_nodes()
-        self._minified_tram_track_graph = self._build_minified_tram_track_graph()
 
     def _build_tram_track_graph_from_osm_ways(self):
         graph = nx.DiGraph()
@@ -113,129 +110,108 @@ class TramTrackGraphTransformer:
 
         return result
 
-    def _build_minified_tram_track_graph(self):
-        """
-        Minified tram track graph contains only permanent nodes. If there exists
-        an edge between two nodes in this graph, that means there is a path between
-        two permanent nodes in the `_tram_track_graph`, which doesn't contain any
-        other permanent nodes.
-        """
-
-        return nx.DiGraph(
-            (source_node, destination_node)
-            for source_node in self._permanent_nodes
-            for destination_node in self._reachable_permanent_nodes_dfs(source_node)
-        )
-
-    def _add_coordinates_from_data(self):
-        for node in self._minified_tram_track_graph.nodes:
-            node_id = int(node)
-            if node_id in self._node_coordinates_by_id:
-                lat, lon = self._node_coordinates_by_id[node_id]
-                self._minified_tram_track_graph.nodes[node]["lat"] = lat
-                self._minified_tram_track_graph.nodes[node]["lon"] = lon
-
-    def _tag_nodes_with_way_ids(self):
-        for way in self._ways:
-            way_id = way.id
-            for node in way.nodes:
-                node_id = node.id
-                if node_id in self._minified_tram_track_graph.nodes:
-
-                    if "ways" not in self._minified_tram_track_graph.nodes[node_id]:
-                        self._minified_tram_track_graph.nodes[node_id]["ways"] = []
-                    self._minified_tram_track_graph.nodes[node_id]["ways"].append(
-                        way_id
-                    )
-
     @property
     def permanent_node_ids(self):
         return self._permanent_nodes.copy()
 
-    def densify_graph_by_max_distance(
-        self, max_distance_in_meters: float
-    ) -> nx.DiGraph:
+    def _interpolate_between_first_and_last_node(self, latlon, max_distance_in_meters):
+        transformer = Transformer.from_crs("EPSG:4326", "EPSG:2180", always_xy=True)
+        inverse = Transformer.from_crs("EPSG:2180", "EPSG:4326", always_xy=True)
 
-        if max_distance_in_meters <= 0:
-            raise ValueError("max_distance_in_meters must be a positive float value")
+        meter_coords = [transformer.transform(lon, lat) for lat, lon in latlon]
+        line = LineString(meter_coords)
+        length = line.length
 
-        def interpolate_between_first_and_last_node(
-            path_with_coords, max_distance_in_meters
-        ):
-            latlon = [(lat, lon) for _, lat, lon in path_with_coords]
+        if length <= max_distance_in_meters:
+            return [latlon[0], latlon[-1]]
 
-            transformer = Transformer.from_crs("EPSG:4326", "EPSG:2180", always_xy=True)
-            inverse = Transformer.from_crs("EPSG:2180", "EPSG:4326", always_xy=True)
+        num_segments = max(1, math.ceil(length / max_distance_in_meters))
+        distances = [i * (length / num_segments) for i in range(1, num_segments)]
 
-            meter_coords = [transformer.transform(lon, lat) for lat, lon in latlon]
-            line = LineString(meter_coords)
-            length = line.length
+        interpolated_points = [line.interpolate(d) for d in distances]
+        interpolated_latlon = [
+            inverse.transform(p.x, p.y)[::-1] for p in interpolated_points
+        ]
 
-            if length <= max_distance_in_meters:
-                return [latlon[0], latlon[-1]]
+        return [latlon[0]] + interpolated_latlon + [latlon[-1]]
 
-            num_segments = max(1, math.ceil(length / max_distance_in_meters))
-            distances = [i * (length / num_segments) for i in range(1, num_segments)]
+    def _densify_graph_by_max_distance(self, max_distance_in_meters):
+        """
+        Builds a new directed graph where each segment between permanent nodes is split
+        into smaller segments according to the specified distance limit.
 
-            interpolated_points = [line.interpolate(d) for d in distances]
-            interpolated_latlon = [
-                inverse.transform(p.x, p.y)[::-1] for p in interpolated_points
-            ]
+        Args:
+            max_distance_in_meters (float):
+                The maximum allowed distance between consecutive points after interpolation.
 
-            return [latlon[0]] + interpolated_latlon + [latlon[-1]]
-
+        Returns:
+            networkx.DiGraph:
+                The newly built, interpolated directed graph.
+        """
         new_graph = nx.DiGraph()
-        new_id_counter = max(self._tram_track_graph.nodes) + 1
+        new_node_id_counter = max(self._permanent_nodes) + 1
+        coord_map = {}
 
-        for u in self._permanent_nodes:
-            for v in self._tram_track_graph.successors(u):
+        for permanent_node in self._permanent_nodes:
+            for successor in self._tram_track_graph.successors(permanent_node):
+                path_coordinates = [self._node_coordinates_by_id[permanent_node]]
 
-                if self._tram_track_graph.has_edge(v, u):
+                current_node = successor
+                previous_node = permanent_node
+                path_found = True
+
+                while current_node not in self._permanent_nodes:
+                    path_coordinates.append(self._node_coordinates_by_id[current_node])
+                    successors_list = list(
+                        self._tram_track_graph.successors(current_node)
+                    )
+
+                    for next_candidate in successors_list:
+                        if next_candidate != previous_node:
+                            previous_node = current_node
+                            current_node = next_candidate
+                            break
+                    else:
+                        path_found = False
+                        break
+
+                if not path_found:
                     continue
 
-                path = [
-                    (
-                        u,
-                        self._node_coordinates_by_id[u][0],
-                        self._node_coordinates_by_id[u][1],
-                    )
-                ]
-                node = v
+                path_coordinates.append(self._node_coordinates_by_id[current_node])
 
-                while node not in self._permanent_nodes:
-                    path.append(
-                        (
-                            node,
-                            self._node_coordinates_by_id[node][0],
-                            self._node_coordinates_by_id[node][1],
-                        )
-                    )
-                    node = list(self._tram_track_graph.successors(node))[0]
-
-                path.append(
-                    (
-                        node,
-                        self._node_coordinates_by_id[node][0],
-                        self._node_coordinates_by_id[node][1],
-                    )
-                )
-                interpolated_nodes = interpolate_between_first_and_last_node(
-                    path, max_distance_in_meters
+                interpolated_nodes = self._interpolate_between_first_and_last_node(
+                    path_coordinates, max_distance_in_meters
                 )
 
-                for i in range(len(interpolated_nodes)):
-                    lat, lon = interpolated_nodes[i]
-                    if i == 0:
-                        new_graph.add_node(u, lat=lat, lon=lon, permanent=True)
-                        prev_node = u
-                    elif i == len(interpolated_nodes) - 1:
-                        new_graph.add_node(node, lat=lat, lon=lon, permanent=True)
-                        new_graph.add_edge(prev_node, node)
+                previous_graph_node = None
+                for i, (lat, lon) in enumerate(interpolated_nodes):
+                    is_first = i == 0
+                    is_last = i == len(interpolated_nodes) - 1
+
+                    if is_first:
+                        new_graph.add_node(permanent_node, lat=lat, lon=lon)
+                        previous_graph_node = permanent_node
+
+                    elif is_last:
+                        if (lat, lon) in coord_map:
+                            last_graph_node = coord_map[(lat, lon)]
+                        else:
+                            last_graph_node = current_node
+                            new_graph.add_node(last_graph_node, lat=lat, lon=lon)
+
+                        new_graph.add_edge(previous_graph_node, last_graph_node)
+
                     else:
-                        new_graph.add_node(
-                            new_id_counter, lat=lat, lon=lon, permanent=False
-                        )
-                        new_graph.add_edge(prev_node, new_id_counter)
-                        prev_node = new_id_counter
-                        new_id_counter += 1
+                        if (lat, lon) in coord_map:
+                            new_node = coord_map[(lat, lon)]
+                            new_graph.add_node(new_node, lat=lat, lon=lon)
+                        else:
+                            new_node = new_node_id_counter
+                            coord_map[(lat, lon)] = new_node
+                            new_graph.add_node(new_node, lat=lat, lon=lon)
+                            new_node_id_counter += 1
+
+                        new_graph.add_edge(previous_graph_node, new_node)
+                        previous_graph_node = new_node
         return new_graph
