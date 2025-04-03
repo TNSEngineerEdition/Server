@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Any, Self
 
 
 class NodeType(Enum):
@@ -13,3 +14,10 @@ class NodeType(Enum):
     POWER_SUPPLY = "power_supply"
     BUFFER_STOP = "buffer_stop"
     INTERPOLATED = "interpolated"
+
+    @classmethod
+    def get_by_value_safe(cls, value: Any) -> Self:
+        try:
+            return cls(value)
+        except ValueError:
+            return cls.UNKNOWN
