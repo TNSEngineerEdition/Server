@@ -174,14 +174,14 @@ class TramTrackGraphTransformer:
     def _add_interpolated_nodes_path(
         self,
         densified_graph: nx.DiGraph,
-        interpolated_nodes: list[tuple[float, float]],
+        interpolated_node_coordinates: list[tuple[float, float]],
         nodes_by_coordinates: dict[tuple[float, float], Node],
         first_node: Node,
         last_node: Node,
     ):
         previous_graph_node = first_node
 
-        for lat, lon in interpolated_nodes[1:-1]:
+        for lat, lon in interpolated_node_coordinates[1:-1]:
             if (lat, lon) in nodes_by_coordinates:
                 new_node = nodes_by_coordinates[(lat, lon)]
             else:
@@ -196,6 +196,7 @@ class TramTrackGraphTransformer:
             densified_graph.add_edge(previous_graph_node, new_node)
             previous_graph_node = new_node
 
+        lat, lon = interpolated_node_coordinates[-1]
         if (lat, lon) in nodes_by_coordinates:
             last_node = nodes_by_coordinates[(lat, lon)]
 
@@ -228,13 +229,13 @@ class TramTrackGraphTransformer:
                     errors.append(e)
                     continue
 
-                interpolated_nodes = self._interpolate_path_nodes(
+                interpolated_node_coordinates = self._interpolate_path_nodes(
                     path_nodes, max_distance_in_meters
                 )
 
                 self._add_interpolated_nodes_path(
                     densified_graph,
-                    interpolated_nodes,
+                    interpolated_node_coordinates,
                     nodes_by_coordinates,
                     permanent_node,
                     path_nodes[-1],
