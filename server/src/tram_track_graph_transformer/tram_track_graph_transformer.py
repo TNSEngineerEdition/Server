@@ -4,9 +4,11 @@ import networkx as nx
 import overpy
 from pyproj import Transformer
 from shapely.geometry import LineString
-
-from .exceptions import TrackDirectionChangeError
-from .model import Node
+from src.tram_track_graph_transformer.exceptions import (
+    TrackDirectionChangeError,
+)
+from src.tram_track_graph_transformer.node import Node
+from src.tram_track_graph_transformer.node_type import NodeType
 
 
 class TramTrackGraphTransformer:
@@ -36,12 +38,15 @@ class TramTrackGraphTransformer:
                 id=node.id,
                 lat=float(node.lat),
                 lon=float(node.lon),
-                type=node.tags.get("railway", ""),
+                type=NodeType._value2member_map_.get(
+                    node.tags.get("railway", ""), NodeType.UNKNOWN
+                ),
             )
             for node in tram_stops_and_tracks.get_nodes()
         }
         self._tram_track_graph = self._build_tram_track_graph_from_osm_ways()
         self._permanent_nodes = self._find_permanent_nodes()
+        self._next_node_id = max(node.id for node in self._permanent_nodes) + 1
 
     def _build_tram_track_graph_from_osm_ways(self):
         graph = nx.DiGraph()
@@ -70,7 +75,7 @@ class TramTrackGraphTransformer:
         return {
             node
             for node in self._nodes_by_id.values()
-            if node.type == "tram_stop" and node in self._tram_track_graph.nodes
+            if node.type == NodeType.TRAM_STOP and node in self._tram_track_graph.nodes
         }
 
     def _get_track_crossing_and_endpoint_node_ids(self):
@@ -106,41 +111,40 @@ class TramTrackGraphTransformer:
 
     def _find_path_between_permenent_nodes(
         self, permanent_node: Node, successor: Node
-    ) -> tuple[list[int], Node]:
-        path_coordinates = [(permanent_node.lat, permanent_node.lon)]
+    ) -> list[Node]:
+        path_coordinates = [permanent_node]
         current_node = successor
         previous_node = permanent_node
 
         while current_node not in self._permanent_nodes:
-            path_coordinates.append((current_node.lat, current_node.lon))
+            path_coordinates.append(current_node)
 
             for next_candidate in self._tram_track_graph.successors(current_node):
                 if next_candidate != previous_node:
-                    previous_node = current_node
-                    current_node = next_candidate
+                    previous_node, current_node = current_node, next_candidate
                     break
             else:
                 raise TrackDirectionChangeError(current_node.id)
 
-        path_coordinates.append((current_node.lat, current_node.lon))
+        path_coordinates.append(current_node)
 
-        return path_coordinates, current_node
+        return path_coordinates
 
     def _interpolate_between_first_and_last_node(
-        self, node_coordinates: list[tuple[float, float]], max_distance_in_meters: float
+        self, node_coordinates: list[Node], max_distance_in_meters: float
     ) -> list[tuple[float, float]]:
 
         transformer = Transformer.from_crs("EPSG:4326", "EPSG:2180", always_xy=True)
         inverse = Transformer.from_crs("EPSG:2180", "EPSG:4326", always_xy=True)
 
         meter_coords = [
-            transformer.transform(lon, lat) for lat, lon in node_coordinates
+            transformer.transform(node.lon, node.lat) for node in node_coordinates
         ]
         line = LineString(meter_coords)
         length = line.length
 
         if length <= max_distance_in_meters:
-            return [node_coordinates[0], node_coordinates[-1]]
+            return [node_coordinates[0].coordinates, node_coordinates[-1].coordinates]
 
         num_segments = max(1, math.ceil(length / max_distance_in_meters))
         distances = [i * (length / num_segments) for i in range(1, num_segments)]
@@ -150,17 +154,25 @@ class TramTrackGraphTransformer:
             inverse.transform(p.x, p.y)[::-1] for p in interpolated_points
         ]
 
-        return [node_coordinates[0]] + interpolated_latlon + [node_coordinates[-1]]
+        return [
+            node_coordinates[0].coordinates,
+            *interpolated_latlon,
+            node_coordinates[-1].coordinates,
+        ]
+
+    def _get_new_node_id(self):
+        node_id = self._next_node_id
+        self._next_node_id += 1
+        return node_id
 
     def _add_interpolated_nodes_with_edges(
         self,
         densified_graph: nx.DiGraph,
         interpolated_nodes: list[tuple[float, float]],
-        coord_map: dict[tuple[float, float], Node],
-        new_node_id_counter: int,
+        nodes_by_coordinates: dict[tuple[float, float], Node],
         first_node: Node,
         last_node: Node,
-    ) -> int:
+    ):
 
         previous_graph_node = None
         for i, (lat, lon) in enumerate(interpolated_nodes):
@@ -172,8 +184,8 @@ class TramTrackGraphTransformer:
                 previous_graph_node = first_node
 
             elif is_last:
-                if (lat, lon) in coord_map:
-                    last_graph_node = coord_map[(lat, lon)]
+                if (lat, lon) in nodes_by_coordinates:
+                    last_graph_node = nodes_by_coordinates[(lat, lon)]
                 else:
                     last_graph_node = last_node
                     densified_graph.add_node(last_graph_node)
@@ -181,21 +193,21 @@ class TramTrackGraphTransformer:
                 densified_graph.add_edge(previous_graph_node, last_graph_node)
 
             else:
-                if (lat, lon) in coord_map:
-                    new_node = coord_map[(lat, lon)]
+                if (lat, lon) in nodes_by_coordinates:
+                    new_node = nodes_by_coordinates[(lat, lon)]
                     densified_graph.add_node(new_node)
                 else:
                     new_node = Node(
-                        id=new_node_id_counter, lat=lat, lon=lon, type="interpolated"
+                        id=self._get_new_node_id(),
+                        lat=lat,
+                        lon=lon,
+                        type=NodeType.INTERPOLATED,
                     )
-                    coord_map[(lat, lon)] = new_node
+                    nodes_by_coordinates[(lat, lon)] = new_node
                     densified_graph.add_node(new_node)
-                    new_node_id_counter += 1
 
                 densified_graph.add_edge(previous_graph_node, new_node)
                 previous_graph_node = new_node
-
-        return new_node_id_counter
 
     def densify_graph_by_max_distance(
         self, max_distance_in_meters: float
@@ -203,44 +215,37 @@ class TramTrackGraphTransformer:
         """
         Builds a new directed graph by splitting edges between permanent nodes
         into smaller segments based on max_distance_in_meters.
-        Nodes: instances of the Node class with the following attributes:
-            - id (int): unique node identifier.
-            - lat (float): geographic latitude.
-            - lon (float): geographic longitude.
-            - type (str): type of the node, e.g., "tram_stop", "switch", etc.
-
+        Nodes: instances of the Node class
         Edges: no attributes.
         """
         if max_distance_in_meters <= 0:
             raise ValueError("max_distance_in_meters must be greater than 0.")
 
-        densified_graph: nx.DiGraph = nx.DiGraph()
-        new_node_id_counter: int = max(node.id for node in self._permanent_nodes) + 1
-        coord_map: dict[tuple[float, float], Node] = {}
+        densified_graph = nx.DiGraph()
+        nodes_by_coordinates: dict[tuple[float, float], Node] = {}
         errors: list[TrackDirectionChangeError] = []
 
         for permanent_node in self._permanent_nodes:
             for successor in self._tram_track_graph.successors(permanent_node):
                 try:
-                    path_coordinates, last_node = (
-                        self._find_path_between_permenent_nodes(
-                            permanent_node, successor
-                        )
-                    )
-
-                    interpolated_nodes = self._interpolate_between_first_and_last_node(
-                        path_coordinates, max_distance_in_meters
-                    )
-                    new_node_id_counter = self._add_interpolated_nodes_with_edges(
-                        densified_graph,
-                        interpolated_nodes,
-                        coord_map,
-                        new_node_id_counter,
-                        permanent_node,
-                        last_node,
+                    path_coordinates = self._find_path_between_permenent_nodes(
+                        permanent_node, successor
                     )
                 except TrackDirectionChangeError as e:
                     errors.append(e)
+                    continue
+
+                interpolated_nodes = self._interpolate_between_first_and_last_node(
+                    path_coordinates, max_distance_in_meters
+                )
+                self._add_interpolated_nodes_with_edges(
+                    densified_graph,
+                    interpolated_nodes,
+                    nodes_by_coordinates,
+                    permanent_node,
+                    path_coordinates[-1],
+                )
+
         if errors:
             raise ExceptionGroup("Track direction errors during densification", errors)
 
