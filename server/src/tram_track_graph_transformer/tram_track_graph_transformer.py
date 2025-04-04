@@ -128,7 +128,7 @@ class TramTrackGraphTransformer:
             )
 
             if next_candidate is None:
-                raise TrackDirectionChangeError(current_node.id)
+                raise TrackDirectionChangeError(permanent_node.id, current_node.id)
 
             previous_node, current_node = current_node, next_candidate
 
