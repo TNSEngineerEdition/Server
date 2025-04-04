@@ -63,7 +63,7 @@ class TramTrackGraphTransformer:
 
     def _get_tram_stop_node_ids_in_graph(self):
         """
-        Returns set of tram stop node which are on the tram tracks provided by OSM.
+        Returns set of tram stop nodes which are on the tram tracks provided by OSM.
         In case a track is out of service, the tram stops won't be used but
         will still be present in `self._stops`, so we want to exclude them.
         """
