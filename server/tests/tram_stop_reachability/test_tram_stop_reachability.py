@@ -19,6 +19,11 @@ KRAKOW_CONFIG = Path(__file__).parents[2] / "config" / "cities" / "krakow.json"
 
 
 class TestTramStopGraphReachability:
+    """
+    This class check if all tram stops are reachable from each other.
+    All variables which are signed as "base" are from configuration where all tram stops are reachable.
+    """
+
     FILES_WITH_NO_PATH = [
         "PlacWszystkichSwietych_Filharmonia.zip",
         "Biprostal02_Urzednicza02.zip",
@@ -77,6 +82,11 @@ class TestTramStopGraphReachability:
         return self.geod.line_length(lons, lats)
 
     def test_graph_reachability(self):
+        """
+        Test if all pairs of tram stops are reachable within the allowed distance.
+        Special pairs are pairs which are close but path goes through a longer route e.g Suche Stawy 01 to Bardosa 02.
+        Those pairs have a special ratio which is higher than the default one.
+        """
         graph, nodes_by_id, pairs = self._load_base_data()
         max_ratio, special_ratio, special_pairs = self._load_config(KRAKOW_CONFIG)
 
@@ -98,6 +108,9 @@ class TestTramStopGraphReachability:
 
     @pytest.mark.parametrize("file_name", FILES_WITH_NO_PATH)
     def test_no_path_found(self, file_name: str):
+        """
+        Instaed of checking all  pairs of tram stops, we check only the ones which should be not reachable.
+        """
         graph, expected_msg, (start_id, end_id) = self._load_test_data(file_name)
         _, nodes_by_id, _ = self._load_base_data()
 
