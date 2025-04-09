@@ -1,4 +1,3 @@
-import json
 import pickle
 from pathlib import Path
 from zipfile import ZipFile
@@ -19,10 +18,12 @@ from src.tram_track_graph_transformer.tram_track_graph_transformer import (
 )
 
 ASSETS = Path(__file__).parents[1] / "assets"
-BASE_GRAPH_DATA = ASSETS / "tram_stop_reachability" / "base_graph_full_krakow.pickle"
+FULL_TRAM_NETWORK_GRAPH_DATA = (
+    ASSETS / "tram_stop_reachability" / "full_tram_network_graph.pickle"
+)
 TRAM_STOP_REACHABILITY_FILES = ASSETS / "tram_stop_reachability"
 KRAKOW_CONFIG = Path(__file__).parents[2] / "config" / "cities" / "krakow.json"
-TRAM_STOP_MAPPING_FILE = ASSETS / "tram_stop_mapping" / "2025-03-01T20-02-24.zip"
+TRAM_STOP_MAPPING_FILE = ASSETS / "frozen_data" / "2025-03-01T20-02-24.zip"
 
 
 class TestTramStopGraphReachability:
@@ -41,24 +42,11 @@ class TestTramStopGraphReachability:
     ]
 
     @staticmethod
-    def _load_base_graph():
-        with open(BASE_GRAPH_DATA, "rb") as f:
+    def _full_tram_network_graph():
+        with open(FULL_TRAM_NETWORK_GRAPH_DATA, "rb") as f:
             graph = pickle.load(f)
 
         return graph
-
-    # to bedzie do usuniecia, konfiguracje biore z gotowego configa/przerobienia
-    @staticmethod
-    def _load_config(path: Path):
-        with open(path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-        return (
-            config["max_distance_ratio"],
-            {
-                (p["from"], p["to"], p["ratio"])
-                for p in config["custom_tram_stop_pair_max_distance_checks"]
-            },
-        )
 
     @staticmethod
     def _load_test_data(file_name: str):
@@ -116,27 +104,35 @@ class TestTramStopGraphReachability:
         )
 
     def test_graph_reachability(self):
-        graph = self._load_base_graph()
+        with ZipFile(TRAM_STOP_MAPPING_FILE) as zip_file:
+            city_configuration, _, _ = self._get_tram_stop_mapping_data(zip_file)
+        graph = self._full_tram_network_graph()
         pairs = self._get_tram_stop_pairs()
-        max_ratio, special_pairs = self._load_config(KRAKOW_CONFIG)
+        max_ratio = city_configuration.max_distance_ratio
         custom_nodes_dict = {
-            (start, end): ratio for (start, end, ratio) in special_pairs
+            (item.from_, item.to): item.ratio
+            for item in city_configuration.custom_tram_stop_pair_max_distance_checks
         }
+
         for start_id, end_id in pairs:
-            if end_id == 3114829955:
-                end_id = 2375524420
             ratio = custom_nodes_dict.get((start_id, end_id), max_ratio)
             TramTrackGraphTransformer.check_path_viability(
                 graph, start_id, end_id, ratio
             )
 
-    @pytest.mark.parametrize("file_name", FILES_WITH_NO_NODE + FILES_WITH_NO_PATH)
+    @pytest.mark.parametrize(
+        "file_name", FILES_WITH_NO_NODE + FILES_WITH_NO_PATH + FILES_WITH_TOO_LONG_PATHS
+    )
     def test_graph_unreachability(self, file_name: str):
-        max_ratio, special_pairs = self._load_config(KRAKOW_CONFIG)
+        with ZipFile(TRAM_STOP_MAPPING_FILE) as zip_file:
+            city_configuration, _, _ = self._get_tram_stop_mapping_data(zip_file)
         graph, expected_msg, (start_id, end_id) = self._load_test_data(file_name)
+        max_ratio = city_configuration.max_distance_ratio
         custom_nodes_dict = {
-            (start, end): ratio for (start, end, ratio) in special_pairs
+            (item.from_, item.to): item.ratio
+            for item in city_configuration.custom_tram_stop_pair_max_distance_checks
         }
+
         ratio = custom_nodes_dict.get((start_id, end_id), max_ratio)
 
         with pytest.raises(
@@ -149,12 +145,10 @@ class TestTramStopGraphReachability:
         assert str(exc_info.value).strip() == expected_msg
 
     def test_astar_returns_same_path_as_dijkstra(self):
-        graph = self._load_base_graph()
+        graph = self._full_tram_network_graph()
         nodes_by_id = {node.id: node for node in graph.nodes}
         pairs = self._get_tram_stop_pairs()
         for start_id, end_id in pairs:
-            if end_id == 3114829955:
-                end_id = 2375524420
             start, end = nodes_by_id[start_id], nodes_by_id[end_id]
             dijkstra_path = self._dijkstra_path(graph, start, end)
             astar_path = TramTrackGraphTransformer.shortest_path_between_nodes(
