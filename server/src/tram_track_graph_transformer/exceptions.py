@@ -15,7 +15,7 @@ class TrackDirectionChangeError(Exception):
 
 class NoPathFoundError(Exception):
     def __init__(self, start, end):
-        super().__init__(f"No path found between stops: {start.id} -> {end.id}")
+        super().__init__(f"No path found between stops: {start} -> {end}")
 
 
 class PathTooLongError(Exception):
@@ -24,3 +24,8 @@ class PathTooLongError(Exception):
             f"Path too long: {start} -> {end}\r\n"
             f"length: {actual:.1f} > allowed: {allowed:.1f}"
         )
+
+
+class NodeNotFoundError(Exception):
+    def __init__(self, node_id: int):
+        super().__init__(f"Node with id {node_id} not found in the graph.")

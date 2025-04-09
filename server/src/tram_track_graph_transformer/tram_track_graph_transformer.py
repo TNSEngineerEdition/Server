@@ -2,9 +2,14 @@ import math
 
 import networkx as nx
 import overpy
-from pyproj import Transformer
+from networkx.exception import NetworkXNoPath
+from pyproj import Geod, Transformer
 from shapely.geometry import LineString
+from src.model.city_configuration import CityConfiguration
 from src.tram_track_graph_transformer.exceptions import (
+    NodeNotFoundError,
+    NoPathFoundError,
+    PathTooLongError,
     TrackDirectionChangeError,
 )
 from src.tram_track_graph_transformer.node import Node
@@ -29,14 +34,19 @@ class TramTrackGraphTransformer:
     on the called method.
     """
 
-    def __init__(self, tram_stops_and_tracks: overpy.Result):
+    def __init__(
+        self,
+        tram_stops_and_tracks: overpy.Result,
+        city_configuration: CityConfiguration,
+    ):
+        self._city_configuration = city_configuration
         self._ways = tram_stops_and_tracks.get_ways()
         self._nodes_by_id = {
             node.id: Node(
                 id=node.id,
                 lat=float(node.lat),
                 lon=float(node.lon),
-                type=NodeType.get_by_value_safe(node.tags.get("railway")),
+                type=self._set_type(node),
             )
             for node in tram_stops_and_tracks.get_nodes()
         }
@@ -60,6 +70,14 @@ class TramTrackGraphTransformer:
                     graph.add_edge(destination_node, source_node)
 
         return graph
+
+    def _get_custom_stop(self):
+        return list(self._city_configuration.custom_stop_mapping.values())
+
+    def _set_type(self, node: Node):
+        if node.id in self._get_custom_stop():
+            return NodeType.TRAM_STOP
+        return NodeType.get_by_value_safe(node.tags.get("railway"))
 
     def _get_tram_stop_node_ids_in_graph(self):
         """
@@ -245,3 +263,47 @@ class TramTrackGraphTransformer:
             raise ExceptionGroup("Track direction errors during densification", errors)
 
         return densified_graph
+
+    @classmethod
+    def shortest_path_between_nodes(
+        cls, graph: nx.DiGraph, start_node: Node, end_node: Node
+    ) -> list[Node]:
+        geod = Geod(ellps="WGS84")
+        path = nx.astar_path(
+            graph,
+            start_node,
+            end_node,
+            heuristic=lambda u, v: geod.inv(u.lon, u.lat, v.lon, v.lat)[2],
+            weight=lambda u, v, _: geod.inv(u.lon, u.lat, v.lon, v.lat)[2],
+        )
+        return path
+
+    @classmethod
+    def check_path_viability(
+        cls, graph: nx.DiGraph, start_id: int, end_id: int, ratio: float
+    ) -> bool:
+        geod = Geod(ellps="WGS84")
+        start_node = next((n for n in graph.nodes if n.id == start_id), None)
+        end_node = next((n for n in graph.nodes if n.id == end_id), None)
+
+        for node_id, node in [(start_id, start_node), (end_id, end_node)]:
+            if node is None:
+                raise NodeNotFoundError(node_id)
+
+        try:
+            path = cls.shortest_path_between_nodes(graph, start_node, end_node)
+        except NetworkXNoPath:
+            raise NoPathFoundError(start_id, end_id)
+
+        straight_line_distance = geod.inv(
+            start_node.lon, start_node.lat, end_node.lon, end_node.lat
+        )[2]
+
+        lons = [node.lon for node in path]
+        lats = [node.lat for node in path]
+        path_length = geod.line_length(lons, lats)
+        if path_length > straight_line_distance * ratio:
+            raise PathTooLongError(
+                start_id, end_id, path_length, straight_line_distance * ratio
+            )
+        return True

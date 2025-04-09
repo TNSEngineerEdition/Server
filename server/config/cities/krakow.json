@@ -12,19 +12,21 @@
     "99"
   ],
   "max_distance_ratio": 2,
-  "special_max_distance_ratio": 3,
-  "special_tram_stop_pairs": {
-    "Suche_Stawy_02_to_Bardosa_02": {
+  "custom_tram_stop_pair_max_distance_checks": [
+    {
       "from": 10757365408,
-      "to": 773635753
+      "to": 773635753,
+      "ratio": 3
     },
-    "Bardosa_02_to_Kopiec_Wandy_02": {
+    {
       "from": 2194801607,
-      "to": 2426893478
+      "to": 2426893478,
+      "ratio": 3
     },
-    "Kopiec_Wandy_02_to_Bardosa_02": {
+    {
       "from": 1318766524,
-      "to": 773635753
+      "to": 773635753,
+      "ratio": 3
     }
-  }
+  ]
 }
