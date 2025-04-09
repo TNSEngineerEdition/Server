@@ -5,9 +5,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from src.model import CityConfiguration, GTFSPackage
 from src.overpass_client import OverpassClient
-from tests.tram_stop_mapping.test_tram_stop_mapper import (
-    TRAM_STOP_MAPPING_DIRECTORY,
-)
+from tests.constants import FROZEN_DATA_DIRECTORY
 
 
 def main(city_configuration_path: str):
@@ -23,7 +21,7 @@ def main(city_configuration_path: str):
     current_date_iso = datetime.now().isoformat(timespec="seconds").replace(":", "-")
 
     with ZipFile(
-        TRAM_STOP_MAPPING_DIRECTORY / (current_date_iso + ".zip"), "w", ZIP_DEFLATED
+        FROZEN_DATA_DIRECTORY / (current_date_iso + ".zip"), "w", ZIP_DEFLATED
     ) as zip_file:
         with zip_file.open("city_configuration.pickle", "w") as file:
             pickle.dump(city_configuration, file)

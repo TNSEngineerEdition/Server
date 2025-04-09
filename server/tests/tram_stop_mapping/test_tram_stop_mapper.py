@@ -1,7 +1,6 @@
 import json
 import pickle
 from collections.abc import Hashable
-from pathlib import Path
 from zipfile import ZipFile
 
 import overpy
@@ -9,8 +8,7 @@ import pytest
 from src.model import CityConfiguration, GTFSPackage
 from src.tram_stop_mapper import TramStopMapper
 from src.tram_stop_mapper.exceptions import TramStopMappingBuildError
-
-TRAM_STOP_MAPPING_DIRECTORY = Path(__file__).parents[1] / "assets" / "tram_stop_mapping"
+from tests.constants import FROZEN_DATA_DIRECTORY
 
 
 class TestTramStopMapper:
@@ -80,7 +78,7 @@ class TestTramStopMapper:
     @pytest.mark.parametrize("file_name", FILES_WITH_CORRECT_MAPPING)
     def test_tram_stop_mapper(self, file_name: str):
         # Arrange
-        with ZipFile(TRAM_STOP_MAPPING_DIRECTORY / file_name) as zip_file:
+        with ZipFile(FROZEN_DATA_DIRECTORY / file_name) as zip_file:
             (
                 city_configuration,
                 gtfs_package,
@@ -117,7 +115,7 @@ class TestTramStopMapper:
     @pytest.mark.parametrize("file_name", FILES_WITH_INCORRECT_MAPPING)
     def test_tram_stop_mapper_exception(self, file_name: str):
         # Arrange
-        with ZipFile(TRAM_STOP_MAPPING_DIRECTORY / file_name) as zip_file:
+        with ZipFile(FROZEN_DATA_DIRECTORY / file_name) as zip_file:
             (
                 city_configuration,
                 gtfs_package,
@@ -139,9 +137,7 @@ class TestTramStopMapper:
 
     def test_get_stop_nodes_by_gtfs_trip_id(self):
         # Arrange
-        with ZipFile(
-            TRAM_STOP_MAPPING_DIRECTORY / "2025-03-01T20-02-24.zip"
-        ) as zip_file:
+        with ZipFile(FROZEN_DATA_DIRECTORY / "2025-03-01T20-02-24.zip") as zip_file:
             (
                 city_configuration,
                 gtfs_package,
