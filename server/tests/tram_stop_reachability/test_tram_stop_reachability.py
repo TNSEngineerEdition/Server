@@ -16,14 +16,16 @@ from src.tram_track_graph_transformer.exceptions import (
 from src.tram_track_graph_transformer.tram_track_graph_transformer import (
     TramTrackGraphTransformer,
 )
+from tests.constants import FROZEN_DATA_DIRECTORY
 
-ASSETS = Path(__file__).parents[1] / "assets"
-FULL_TRAM_NETWORK_GRAPH_DATA = (
-    ASSETS / "tram_stop_reachability" / "full_tram_network_graph.pickle"
+TRAM_STOP_REACHABILITY_DATA = (
+    Path(__file__).parents[1] / "assets" / "tram_stop_reachability"
 )
-TRAM_STOP_REACHABILITY_FILES = ASSETS / "tram_stop_reachability"
-KRAKOW_CONFIG = Path(__file__).parents[2] / "config" / "cities" / "krakow.json"
-TRAM_STOP_MAPPING_FILE = ASSETS / "frozen_data" / "2025-03-01T20-02-24.zip"
+FULL_TRAM_NETWORK_GRAPH_DATA = (
+    TRAM_STOP_REACHABILITY_DATA / "full_tram_network_graph.pickle"
+)
+# TRAM_STOP_REACHABILITY_FILES = ASSETS / "tram_stop_reachability"
+TRAM_STOP_MAPPING_FILE = FROZEN_DATA_DIRECTORY / "2025-03-01T20-02-24.zip"
 
 
 class TestTramStopGraphReachability:
@@ -50,7 +52,7 @@ class TestTramStopGraphReachability:
 
     @staticmethod
     def _load_test_data(file_name: str):
-        with ZipFile(TRAM_STOP_REACHABILITY_FILES / file_name) as zip_file:
+        with ZipFile(TRAM_STOP_REACHABILITY_DATA / file_name) as zip_file:
             with zip_file.open("graph.pickle") as f:
                 graph = pickle.load(f)
             with zip_file.open("expected_error_message.txt") as f:
