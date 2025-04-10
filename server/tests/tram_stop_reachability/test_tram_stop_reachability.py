@@ -8,12 +8,10 @@ import pytest
 from pyproj import Geod
 from src.model import CityConfiguration, GTFSPackage
 from src.tram_stop_mapper import TramStopMapper
-from src.tram_track_graph_transformer.exceptions import (
+from src.tram_track_graph_transformer import (
     NodeNotFoundError,
     NoPathFoundError,
     PathTooLongError,
-)
-from src.tram_track_graph_transformer.tram_track_graph_inspector import (
     TramTrackGraphInspector,
 )
 from tests.constants import FROZEN_DATA_DIRECTORY
