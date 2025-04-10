@@ -13,8 +13,8 @@ from src.tram_track_graph_transformer.exceptions import (
     NoPathFoundError,
     PathTooLongError,
 )
-from src.tram_track_graph_transformer.tram_track_graph_transformer import (
-    TramTrackGraphTransformer,
+from src.tram_track_graph_transformer.tram_track_graph_inspector import (
+    TramTrackGraphInspector,
 )
 from tests.constants import FROZEN_DATA_DIRECTORY
 
@@ -111,15 +111,14 @@ class TestTramStopGraphReachability:
         pairs = self._get_tram_stop_pairs()
         max_ratio = city_configuration.max_distance_ratio
         custom_nodes_dict = {
-            (item.from_, item.to): item.ratio
+            (item.source, item.destination): item.ratio
             for item in city_configuration.custom_tram_stop_pair_max_distance_checks
         }
 
         for start_id, end_id in pairs:
             ratio = custom_nodes_dict.get((start_id, end_id), max_ratio)
-            TramTrackGraphTransformer.check_path_viability(
-                graph, start_id, end_id, ratio
-            )
+            tram_graph_insector = TramTrackGraphInspector(graph)
+            tram_graph_insector.check_path_viability(start_id, end_id, ratio)
 
     @pytest.mark.parametrize(
         "file_name", FILES_WITH_NO_NODE + FILES_WITH_NO_PATH + FILES_WITH_TOO_LONG_PATHS
@@ -130,30 +129,27 @@ class TestTramStopGraphReachability:
         graph, expected_msg, (start_id, end_id) = self._load_test_data(file_name)
         max_ratio = city_configuration.max_distance_ratio
         custom_nodes_dict = {
-            (item.from_, item.to): item.ratio
+            (item.source, item.destination): item.ratio
             for item in city_configuration.custom_tram_stop_pair_max_distance_checks
         }
-
+        tram_graph_insector = TramTrackGraphInspector(graph)
         ratio = custom_nodes_dict.get((start_id, end_id), max_ratio)
 
         with pytest.raises(
             (NodeNotFoundError, NoPathFoundError, PathTooLongError)
         ) as exc_info:
-            TramTrackGraphTransformer.check_path_viability(
-                graph, start_id, end_id, ratio
-            )
-
+            tram_graph_insector.check_path_viability(start_id, end_id, ratio)
         assert str(exc_info.value).strip() == expected_msg
 
     def test_astar_returns_same_path_as_dijkstra(self):
         graph = self._full_tram_network_graph()
         nodes_by_id = {node.id: node for node in graph.nodes}
         pairs = self._get_tram_stop_pairs()
+        tram_graph_insector = TramTrackGraphInspector(graph)
+
         for start_id, end_id in pairs:
             start, end = nodes_by_id[start_id], nodes_by_id[end_id]
             dijkstra_path = self._dijkstra_path(graph, start, end)
-            astar_path = TramTrackGraphTransformer.shortest_path_between_nodes(
-                graph, start, end
-            )
+            astar_path = tram_graph_insector.shortest_path_between_nodes(start, end)
 
             assert astar_path == dijkstra_path

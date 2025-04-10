@@ -11,22 +11,62 @@
   "ignored_gtfs_lines": [
     "99"
   ],
-  "max_distance_ratio": 2,
+  "max_distance_ratio": 1.5,
   "custom_tram_stop_pair_max_distance_checks": [
     {
-      "from": 10757365408,
-      "to": 773635753,
-      "ratio": 3
+      "source": 10757365408,
+      "destination": 773635753,
+      "ratio": 3.1
     },
     {
-      "from": 2194801607,
-      "to": 2426893478,
-      "ratio": 3
+      "source": 2194801607,
+      "destination": 2426893478,
+      "ratio": 2.9
     },
     {
-      "from": 1318766524,
-      "to": 773635753,
-      "ratio": 3
+      "source": 1318766524,
+      "destination": 773635753,
+      "ratio": 2.4
+    },
+    {
+      "source": 11884770962,
+      "destination": 10727973614,
+      "ratio": 1.8
+    },
+    {
+      "source": 10727973597,
+      "destination": 11884770961,
+      "ratio": 1.9
+    },
+    {
+      "source": 2421485635,
+      "destination": 629106153,
+      "ratio": 1.9
+    },
+    {
+      "source": 321429867,
+      "destination": 2422538507,
+      "ratio": 1.7
+    },
+    {
+      "source": 9955186237,
+      "destination": 9955186239,
+      "ratio": 2.0
+    },
+    {
+      "source": 2163355807,
+      "destination": 655410587,
+      "ratio": 1.8
+    },
+    {
+      "source": 2163355807,
+      "destination": 321437391,
+      "ratio": 1.9
+    },
+    {
+      "source": 11872059166,
+      "destination": 10180183264,
+      "ratio": 2.1
     }
   ]
 }

@@ -14,15 +14,17 @@ class TrackDirectionChangeError(Exception):
 
 
 class NoPathFoundError(Exception):
-    def __init__(self, start, end):
+    def __init__(self, start: int, end: int):
         super().__init__(f"No path found between stops: {start} -> {end}")
 
 
 class PathTooLongError(Exception):
-    def __init__(self, start, end, actual, allowed):
+    def __init__(
+        self, start: int, end: int, actual_length: float, allowed_length: float
+    ):
         super().__init__(
-            f"Path too long: {start} -> {end}\r\n"
-            f"length: {actual:.1f} > allowed: {allowed:.1f}"
+            f"Path too long: {start} -> {end} "
+            f"length: {actual_length:.1f} > allowed: {allowed_length:.1f}"
         )
 
 
