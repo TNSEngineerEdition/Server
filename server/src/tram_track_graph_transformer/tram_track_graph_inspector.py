@@ -23,14 +23,13 @@ class TramTrackGraphInspector:
     def shortest_path_between_nodes(
         self, start_node: Node, end_node: Node
     ) -> list[Node]:
-        path = nx.astar_path(
+        return nx.astar_path(
             self.graph,
             start_node,
             end_node,
             heuristic=lambda u, v: self.geod.inv(u.lon, u.lat, v.lon, v.lat)[2],
             weight=lambda u, v, _: self.geod.inv(u.lon, u.lat, v.lon, v.lat)[2],
         )
-        return path
 
     def check_path_viability(self, start_id: int, end_id: int, ratio: float):
         if (start_node := self._nodes_by_id.get(start_id)) is None:
@@ -47,9 +46,9 @@ class TramTrackGraphInspector:
             start_node.lon, start_node.lat, end_node.lon, end_node.lat
         )[2]
 
-        lons = [node.lon for node in path]
-        lats = [node.lat for node in path]
-        path_length = self.geod.line_length(lons, lats)
+        path_length = self.geod.line_length(
+            lons=[node.lon for node in path], lats=[node.lat for node in path],
+        )
         if path_length > straight_line_distance * ratio:
             raise PathTooLongError(
                 start_id, end_id, path_length, straight_line_distance * ratio
