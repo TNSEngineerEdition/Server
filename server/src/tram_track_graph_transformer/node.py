@@ -20,3 +20,15 @@ class Node(BaseModel, frozen=True):
     @property
     def coordinates(self):
         return (self.lat, self.lon)
+
+    def __eq__(self, other):
+        match other:
+            case Node():
+                return self.id == other.id
+            case int():
+                return self.id == other
+            case _:
+                return False
+
+    def __hash__(self):
+        return hash(self.id)
