@@ -58,13 +58,13 @@ class TestOverpassClient:
     def test_get_relations_and_stops(
         self,
         query_mock: MagicMock,
-        overpass_query_result: overpy.Result,
+        relations_and_stops_overpass_query_result: overpy.Result,
         area_name: str,
         custom_node_ids: list[int],
         expected_query: str,
     ):
         # Arrange
-        query_mock.return_value = overpass_query_result
+        query_mock.return_value = relations_and_stops_overpass_query_result
 
         # Act
         query_result = OverpassClient.get_relations_and_stops(
@@ -72,5 +72,5 @@ class TestOverpassClient:
         )
 
         # Assert
-        assert query_result is overpass_query_result
+        assert query_result is relations_and_stops_overpass_query_result
         query_mock.assert_called_once_with(expected_query.replace(" " * 16, " " * 4))

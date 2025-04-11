@@ -4,6 +4,7 @@ import networkx as nx
 import overpy
 from pyproj import Transformer
 from shapely.geometry import LineString
+from src.model import CityConfiguration
 from src.tram_track_graph_transformer.exceptions import (
     TrackDirectionChangeError,
 )
@@ -29,14 +30,19 @@ class TramTrackGraphTransformer:
     on the called method.
     """
 
-    def __init__(self, tram_stops_and_tracks: overpy.Result):
+    def __init__(
+        self,
+        tram_stops_and_tracks: overpy.Result,
+        city_configuration: CityConfiguration,
+    ):
+        self._city_configuration = city_configuration
         self._ways = tram_stops_and_tracks.get_ways()
         self._nodes_by_id = {
             node.id: Node(
                 id=node.id,
                 lat=float(node.lat),
                 lon=float(node.lon),
-                type=NodeType.get_by_value_safe(node.tags.get("railway")),
+                type=self._get_node_type(node),
             )
             for node in tram_stops_and_tracks.get_nodes()
         }
@@ -60,6 +66,20 @@ class TramTrackGraphTransformer:
                     graph.add_edge(destination_node, source_node)
 
         return graph
+
+    def _get_node_type(self, node: Node):
+        """
+        OSM node IDs mentioned in `custom_stop_mapping` field of `CityConfiguration`
+        should always have a type of `NodeType.TRAM_STOP`. This is due to these nodes
+        being used for tram stop mapping between GTFS and OSM, which means that
+        each node can potentially act as a tram stop, even when it has a different type
+        assigned to it by OSM.
+        """
+        return (
+            NodeType.TRAM_STOP
+            if node.id in self._city_configuration.custom_stop_mapping.values()
+            else NodeType.get_by_value_safe(node.tags.get("railway"))
+        )
 
     def _get_tram_stop_node_ids_in_graph(self):
         """
