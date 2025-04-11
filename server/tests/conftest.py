@@ -1,5 +1,6 @@
 import json
 import pickle
+import zipfile
 
 import networkx as nx
 import overpy
@@ -23,8 +24,9 @@ def krakow_tram_network_graph() -> nx.DiGraph:
 
 @pytest.fixture
 def tram_trips_by_id() -> dict[str, list[int]]:
-    with open("tests/assets/tram_trips_by_id.json") as file:
-        return json.load(file)
+    with zipfile.ZipFile("tests/assets/tram_trips_by_id.zip", "r") as zip_file:
+        with zip_file.open("tram_trips_by_id.json") as file:
+            return json.load(file)
 
 
 @pytest.fixture
