@@ -65,7 +65,6 @@ class TestTramStopGraphReachability:
         tram_stop_pairs: set[tuple[int, int]],
     ):
         # Arrange
-
         krakow_tram_network_graph.remove_node(node_id)
         tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
 
