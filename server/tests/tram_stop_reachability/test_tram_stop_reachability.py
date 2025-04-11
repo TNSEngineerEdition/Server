@@ -12,6 +12,7 @@ from src.tram_track_graph_transformer import (
 
 
 class TestTramStopGraphReachability:
+    geod = Geod(ellps="WGS84")
 
     @pytest.fixture
     def tram_stop_pairs(self, tram_trips_by_id: dict[str, list[int]]):
@@ -22,12 +23,11 @@ class TestTramStopGraphReachability:
         }
 
     def _get_dijkstra_path(self, graph: nx.DiGraph, start_node: Node, end_node: Node):
-        geod = Geod(ellps="WGS84")
         return nx.dijkstra_path(
             graph,
             start_node,
             end_node,
-            weight=lambda u, v, _: geod.inv(u.lon, u.lat, v.lon, v.lat)[2],
+            weight=lambda u, v, _: self.geod.inv(u.lon, u.lat, v.lon, v.lat)[2],
         )
 
     def test_check_path_viability(
@@ -52,9 +52,9 @@ class TestTramStopGraphReachability:
     @pytest.mark.parametrize(
         "node_id",
         [
-            pytest.param(2419986542, id="node_not_found_2419986542"),
-            pytest.param(2419986544, id="node_not_found_2419986544"),
-            pytest.param(651848336, id="node_not_found_651848336"),
+            pytest.param(2419986542, id="Glowackiego 02"),
+            pytest.param(2419986544, id="UKEN 02"),
+            pytest.param(651848336, id="Rondo Mogilskie 05"),
         ],
     )
     def test_check_path_viability_node_not_found(
@@ -92,19 +92,19 @@ class TestTramStopGraphReachability:
                 (6738229788, 6738229790),
                 2419959769,
                 2420069703,
-                id="path_too_long_6738229788_to_6738229790",
+                id="Teatr Bagatela 03 -> Stary Kleparz 02",
             ),
             pytest.param(
                 (2420200294, 8551858404),
                 2420200261,
                 2420233975,
-                id="path_too_long_2420200294_to_8551858404",
+                id="Lubicz 02 -> Uniwersytet Ekonomiczny 01",
             ),
             pytest.param(
                 (2419367476, 8551888613),
                 11271425380,
                 2419894822,
-                id="path_too_long_2419367476_to_8551888613",
+                id="UJ / AST 02 -> Teatr Bagatela 01",
             ),
         ],
     )
@@ -146,19 +146,19 @@ class TestTramStopGraphReachability:
                 (12685345137, 12685345138),
                 1768224703,
                 1768224656,
-                id="no_path_found_12685345137_to_12685345138",
+                id="Bialucha 02 -> Cystersow 02",
             ),
             pytest.param(
                 (12685345293, 12685345294),
                 2420286331,
                 2423789750,
-                id="no_path_found_12685345293_to_12685345294",
+                id="Nowy Kleparz 02 -> Pędzichow 02",
             ),
             pytest.param(
                 (12685341641, 12685341642),
                 2419986545,
                 2419986538,
-                id="no_path_found_12685341641_to_12685341642",
+                id="Urzednicza 01 -> Biprostal 01",
             ),
         ],
     )
