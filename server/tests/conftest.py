@@ -6,6 +6,12 @@ import networkx as nx
 import overpy
 import pytest
 from src.model.city_configuration import CityConfiguration
+from src.model.gtfs_package import GTFSPackage
+
+
+@pytest.fixture
+def gtfs_package():
+    return GTFSPackage.from_file("tests/assets/gtfs_schedule.zip")
 
 
 @pytest.fixture
