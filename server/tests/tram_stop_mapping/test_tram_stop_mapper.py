@@ -1,5 +1,4 @@
 import json
-import pickle
 from collections.abc import Hashable
 from zipfile import ZipFile
 
@@ -8,142 +7,274 @@ import pytest
 from src.model import CityConfiguration, GTFSPackage
 from src.tram_stop_mapper import TramStopMapper
 from src.tram_stop_mapper.exceptions import TramStopMappingBuildError
-from tests.constants import FROZEN_DATA_DIRECTORY
 
 
 class TestTramStopMapper:
-    FILES_WITH_CORRECT_MAPPING = [
-        "2025-03-01T20-02-24.zip",
-        "2025-03-24T19-09-23.zip",
-    ]
+    @pytest.fixture
+    def tram_stop_mapping(self):
+        with ZipFile("tests/assets/tram_stop_mapping.zip") as zip_file:
+            with zip_file.open(
+                "expected_gtfs_stop_id_to_osm_node_id_mapping.json"
+            ) as file:
+                single_mapping: dict[str, int] = json.load(file)
 
-    FILES_WITH_INCORRECT_MAPPING = [
-        "2025-03-02T21-34-51.zip",
-        "2025-03-02T22-06-42.zip",
-        "2025-03-03T08-31-48.zip",
-        "2025-03-03T16-20-24.zip",
-        "2025-03-23T19-15-39.zip",
-    ]
+            with zip_file.open(
+                "expected_first_gtfs_stop_id_to_osm_node_id_mapping.json"
+            ) as file:
+                first_mapping: dict[str, list[int]] = json.load(file)
 
-    @staticmethod
-    def _get_tram_stop_mapping_test_data(zip_file: ZipFile):
-        with zip_file.open("city_configuration.pickle") as file:
-            city_configuration: CityConfiguration = pickle.load(file)
+            with zip_file.open(
+                "expected_last_gtfs_stop_id_to_osm_node_id_mapping.json"
+            ) as file:
+                last_mapping: dict[str, list[int]] = json.load(file)
 
-        with zip_file.open("gtfs_package.pickle") as file:
-            gtfs_package: GTFSPackage = pickle.load(file)
+        return single_mapping, first_mapping, last_mapping
 
-        with zip_file.open("osm_relations_and_stops.pickle") as file:
-            osm_relations_and_stops: overpy.Result = pickle.load(file)
-
-        return (
-            city_configuration,
-            gtfs_package,
-            osm_relations_and_stops,
-        )
-
-    @staticmethod
-    def _get_expected_tram_stop_mapping(zip_file: ZipFile):
-        with zip_file.open("expected_gtfs_stop_id_to_osm_node_id_mapping.json") as file:
-            expected_gtfs_stop_id_to_osm_node_id_mapping: dict[str, int] = json.load(
-                file
-            )
-
-        with zip_file.open(
-            "expected_first_gtfs_stop_id_to_osm_node_id_mapping.json"
-        ) as file:
-            expected_first_gtfs_stop_id_to_osm_node_id_mapping: dict[str, list[int]] = (
-                json.load(file)
-            )
-
-        with zip_file.open(
-            "expected_last_gtfs_stop_id_to_osm_node_id_mapping.json"
-        ) as file:
-            expected_last_gtfs_stop_id_to_osm_node_id_mapping: dict[str, list[int]] = (
-                json.load(file)
-            )
-
-        return (
-            expected_gtfs_stop_id_to_osm_node_id_mapping,
-            expected_first_gtfs_stop_id_to_osm_node_id_mapping,
-            expected_last_gtfs_stop_id_to_osm_node_id_mapping,
-        )
-
-    def _get_expected_error_message(self, zip_file: ZipFile):
-        with zip_file.open("expected_error_message.txt") as file:
-            expected_error_message = file.read().decode()
-
-        return expected_error_message
-
-    @pytest.mark.parametrize("file_name", FILES_WITH_CORRECT_MAPPING)
-    def test_tram_stop_mapper(self, file_name: str):
-        # Arrange
-        with ZipFile(FROZEN_DATA_DIRECTORY / file_name) as zip_file:
-            (
-                city_configuration,
-                gtfs_package,
-                osm_relations_and_stops,
-            ) = self._get_tram_stop_mapping_test_data(zip_file)
-
-            (
-                expected_gtfs_stop_id_to_osm_node_id_mapping,
-                expected_first_gtfs_stop_id_to_osm_node_id_mapping,
-                expected_last_gtfs_stop_id_to_osm_node_id_mapping,
-            ) = self._get_expected_tram_stop_mapping(zip_file)
-
+    def test_tram_stop_mapper(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        gtfs_package: GTFSPackage,
+        relations_and_stops_overpass_query_result: overpy.Result,
+        tram_stop_mapping: tuple[
+            dict[str, int], dict[str, list[int]], dict[str, list[int]]
+        ],
+    ):
         # Act
         tram_stop_mapper = TramStopMapper(
-            city_configuration, gtfs_package, osm_relations_and_stops
+            krakow_city_configuration,
+            gtfs_package,
+            relations_and_stops_overpass_query_result,
         )
 
         # Assert
         assert (
-            tram_stop_mapper.gtfs_stop_id_to_osm_node_id_mapping
-            == expected_gtfs_stop_id_to_osm_node_id_mapping
+            tram_stop_mapper.gtfs_stop_id_to_osm_node_id_mapping == tram_stop_mapping[0]
         )
 
         assert (
-            tram_stop_mapper.first_gtfs_stop_id_to_osm_node_ids
-            == expected_first_gtfs_stop_id_to_osm_node_id_mapping
+            tram_stop_mapper.first_gtfs_stop_id_to_osm_node_ids == tram_stop_mapping[1]
         )
 
         assert (
-            tram_stop_mapper.last_gtfs_stop_id_to_osm_node_ids
-            == expected_last_gtfs_stop_id_to_osm_node_id_mapping
+            tram_stop_mapper.last_gtfs_stop_id_to_osm_node_ids == tram_stop_mapping[2]
         )
 
-    @pytest.mark.parametrize("file_name", FILES_WITH_INCORRECT_MAPPING)
-    def test_tram_stop_mapper_exception(self, file_name: str):
+    def test_tram_stop_mapper_missing_relations_for_lines_exception(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        gtfs_package: GTFSPackage,
+        relations_and_stops_overpass_query_result: overpy.Result,
+    ):
         # Arrange
-        with ZipFile(FROZEN_DATA_DIRECTORY / file_name) as zip_file:
-            (
-                city_configuration,
-                gtfs_package,
-                osm_relations_and_stops,
-            ) = self._get_tram_stop_mapping_test_data(zip_file)
+        gtfs_package.routes.loc["route_12345"] = [
+            "agency_1",
+            12345,
+            12345,
+            None,
+            900,
+            None,
+            "B60000",
+            "FFFFFF",
+        ]
+        gtfs_package.trips.loc["block_12345_trip_12345_service_12345"] = [
+            "route_12345",
+            "service_4",
+            "Some stop",
+            None,
+            1,
+            "block_5",
+            "shape_23347",
+            0,
+        ]
 
-            expected_error_message = self._get_expected_error_message(zip_file)
+        expected_exception_message = (
+            "Unable to build correct mapping of GTFS stops to OSM nodes.\n"
+            "Missing relations for lines: 12345"
+        )
 
         # Act
         with pytest.raises(TramStopMappingBuildError) as exc_info:
-            TramStopMapper(city_configuration, gtfs_package, osm_relations_and_stops)
+            TramStopMapper(
+                krakow_city_configuration,
+                gtfs_package,
+                relations_and_stops_overpass_query_result,
+            )
 
         # Assert
-        assert str(exc_info.value) == expected_error_message.strip()
+        assert str(exc_info.value) == expected_exception_message
+
+    def test_tram_stop_mapper_nodes_with_conflict_exception(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        gtfs_package: GTFSPackage,
+        relations_and_stops_overpass_query_result: overpy.Result,
+    ):
+        # Arrange
+        krakow_city_configuration.custom_stop_mapping["stop_386_285919"] = 2419732952
+
+        expected_exception_message = (
+            "Unable to build correct mapping of GTFS stops to OSM nodes.\n"
+            "Nodes with conflict:\n"
+            "stop_386_285919: Salwator 01 (2419732952), Teatr Variété 01 (2426058893)"
+        )
+
+        # Act
+        with pytest.raises(TramStopMappingBuildError) as exc_info:
+            TramStopMapper(
+                krakow_city_configuration,
+                gtfs_package,
+                relations_and_stops_overpass_query_result,
+            )
+
+        # Assert
+        assert str(exc_info.value) == expected_exception_message
+
+    def test_tram_stop_mapper_stops_without_mapping_exception(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        gtfs_package: GTFSPackage,
+        relations_and_stops_overpass_query_result: overpy.Result,
+    ):
+        # Arrange
+        gtfs_package.stops.loc["stop_12345_12345"] = [
+            None,
+            "Grodzki Urząd Pracy",
+            None,
+            50,
+            20,
+            None,
+            None,
+            0,
+            None,
+            None,
+            None,
+            None,
+        ]
+
+        expected_exception_message = (
+            "Unable to build correct mapping of GTFS stops to OSM nodes.\n"
+            "Stops without mapping: stop_12345_12345"
+        )
+
+        # Act
+        with pytest.raises(TramStopMappingBuildError) as exc_info:
+            TramStopMapper(
+                krakow_city_configuration,
+                gtfs_package,
+                relations_and_stops_overpass_query_result,
+            )
+
+        # Assert
+        assert str(exc_info.value) == expected_exception_message
+
+    def test_tram_stop_mapper_underutilized_relations_exception(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        gtfs_package: GTFSPackage,
+        relations_and_stops_overpass_query_result: overpy.Result,
+    ):
+        # Arrange
+        gtfs_package.routes.drop("route_698", inplace=True)
+
+        expected_exception_message_start = (
+            "Unable to build correct mapping of GTFS stops to OSM nodes.\n"
+            "Underutilized relations:\n"
+        )
+
+        # Act
+        with pytest.raises(TramStopMappingBuildError) as exc_info:
+            TramStopMapper(
+                krakow_city_configuration,
+                gtfs_package,
+                relations_and_stops_overpass_query_result,
+            )
+
+        # Assert
+        exception_message = str(exc_info.value)
+
+        assert exception_message.startswith(expected_exception_message_start)
+        assert "Relation ID: 968203" in exception_message
+        assert "Relation ID: 3155965" in exception_message
+
+    def test_tram_stop_mapper_all_exceptions(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        gtfs_package: GTFSPackage,
+        relations_and_stops_overpass_query_result: overpy.Result,
+    ):
+        # Arrange
+        krakow_city_configuration.custom_stop_mapping["stop_386_285919"] = 2419732952
+
+        gtfs_package.routes.loc["route_12345"] = [
+            "agency_1",
+            12345,
+            12345,
+            None,
+            900,
+            None,
+            "B60000",
+            "FFFFFF",
+        ]
+        gtfs_package.routes.drop("route_698", inplace=True)
+
+        gtfs_package.trips.loc["block_12345_trip_12345_service_12345"] = [
+            "route_12345",
+            "service_4",
+            "Some stop",
+            None,
+            1,
+            "block_5",
+            "shape_23347",
+            0,
+        ]
+
+        gtfs_package.stops.loc["stop_12345_12345"] = [
+            None,
+            "Grodzki Urząd Pracy",
+            None,
+            50,
+            20,
+            None,
+            None,
+            0,
+            None,
+            None,
+            None,
+            None,
+        ]
+
+        expected_exception_message_start = (
+            "Unable to build correct mapping of GTFS stops to OSM nodes.\n"
+        )
+
+        # Act
+        with pytest.raises(TramStopMappingBuildError) as exc_info:
+            TramStopMapper(
+                krakow_city_configuration,
+                gtfs_package,
+                relations_and_stops_overpass_query_result,
+            )
+
+        # Assert
+        exception_message = str(exc_info.value)
+
+        assert exception_message.startswith(expected_exception_message_start)
+        assert "Stops without mapping: " in exception_message
+        assert "Nodes with conflict:\n" in exception_message
+        assert "Missing relations for lines: " in exception_message
+        assert "Underutilized relations:\n" in exception_message
 
     @staticmethod
     def _get_unique_trips_from_stop_nodes(stop_nodes: list[list[Hashable]]):
         return set(map(tuple, stop_nodes))
 
-    def test_get_stop_nodes_by_gtfs_trip_id(self):
+    def test_get_stop_nodes_by_gtfs_trip_id(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        gtfs_package: GTFSPackage,
+        relations_and_stops_overpass_query_result: overpy.Result,
+    ):
         # Arrange
-        with ZipFile(FROZEN_DATA_DIRECTORY / "2025-03-01T20-02-24.zip") as zip_file:
-            (
-                city_configuration,
-                gtfs_package,
-                osm_relations_and_stops,
-            ) = self._get_tram_stop_mapping_test_data(zip_file)
-
         expected_trip_stop_count = gtfs_package.stop_times.value_counts("trip_id")
 
         unique_trips_from_gtfs = self._get_unique_trips_from_stop_nodes(
@@ -151,7 +282,9 @@ class TestTramStopMapper:
         )
 
         tram_stop_mapper = TramStopMapper(
-            city_configuration, gtfs_package, osm_relations_and_stops
+            krakow_city_configuration,
+            gtfs_package,
+            relations_and_stops_overpass_query_result,
         )
 
         # Act

@@ -152,7 +152,7 @@ class TestTramStopGraphReachability:
                 (12685345293, 12685345294),
                 2420286331,
                 2423789750,
-                id="Nowy Kleparz 02 -> Pędzichow 02",
+                id="Nowy Kleparz 02 -> Pedzichow 02",
             ),
             pytest.param(
                 (12685341641, 12685341642),
