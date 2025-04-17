@@ -30,6 +30,10 @@ class TramTrackGraphTransformer:
     on the called method.
     """
 
+    _geod = Geod(ellps="WGS84")
+    _transformer = Transformer.from_crs("EPSG:4326", "EPSG:2180", always_xy=True)
+    _inverse = Transformer.from_crs("EPSG:2180", "EPSG:4326", always_xy=True)
+
     def __init__(
         self,
         tram_stops_and_tracks: overpy.Result,
@@ -50,6 +54,46 @@ class TramTrackGraphTransformer:
         self._tram_track_graph = self._build_tram_track_graph_from_osm_ways()
         self._permanent_nodes = self._find_permanent_nodes()
         self._max_node_id = max(node.id for node in self._permanent_nodes)
+
+    @classmethod
+    def _interpolate_path_nodes(
+        cls, path_nodes: list[Node], max_distance_in_meters: float
+    ) -> list[tuple[float, float]]:
+
+        meter_coords = [
+            cls._transformer.transform(node.lon, node.lat) for node in path_nodes
+        ]
+        line = LineString(meter_coords)
+
+        if line.length <= max_distance_in_meters:
+            return [path_nodes[0].coordinates, path_nodes[-1].coordinates]
+
+        segment_count = math.ceil(line.length / max_distance_in_meters)
+        segment_size = line.length / segment_count
+
+        interpolated_points = [
+            line.interpolate(i * segment_size) for i in range(1, segment_count)
+        ]
+
+        interpolated_lat_lon = [
+            cls._inverse.transform(p.x, p.y)[::-1] for p in interpolated_points
+        ]
+
+        return [
+            path_nodes[0].coordinates,
+            *interpolated_lat_lon,
+            path_nodes[-1].coordinates,
+        ]
+
+    @classmethod
+    def _add_geodetic_edge(cls, graph: nx.DiGraph, source_node: Node, dest_node: Node):
+        azimuth, _, length = cls._geod.inv(
+            source_node.lon,
+            source_node.lat,
+            dest_node.lon,
+            dest_node.lat,
+        )
+        graph.add_edge(source_node, dest_node, azimuth=azimuth, length=length)
 
     def _build_tram_track_graph_from_osm_ways(self):
         graph = nx.DiGraph()
@@ -157,50 +201,9 @@ class TramTrackGraphTransformer:
 
         return path_coordinates
 
-    def _interpolate_path_nodes(
-        self, path_nodes: list[Node], max_distance_in_meters: float
-    ) -> list[tuple[float, float]]:
-        transformer = Transformer.from_crs("EPSG:4326", "EPSG:2180", always_xy=True)
-        inverse = Transformer.from_crs("EPSG:2180", "EPSG:4326", always_xy=True)
-
-        meter_coords = [
-            transformer.transform(node.lon, node.lat) for node in path_nodes
-        ]
-        line = LineString(meter_coords)
-
-        if line.length <= max_distance_in_meters:
-            return [path_nodes[0].coordinates, path_nodes[-1].coordinates]
-
-        segment_count = math.ceil(line.length / max_distance_in_meters)
-        segment_size = line.length / segment_count
-
-        interpolated_points = [
-            line.interpolate(i * segment_size) for i in range(1, segment_count)
-        ]
-
-        interpolated_lat_lon = [
-            inverse.transform(p.x, p.y)[::-1] for p in interpolated_points
-        ]
-
-        return [
-            path_nodes[0].coordinates,
-            *interpolated_lat_lon,
-            path_nodes[-1].coordinates,
-        ]
-
     def _get_new_node_id(self):
         self._max_node_id += 1
         return self._max_node_id
-
-    def _add_edge(self, graph: nx.DiGraph, first_node: Node, second_node: Node):
-        geod = Geod(ellps="WGS84")
-        azimuth, _, length = geod.inv(
-            first_node.lon,
-            first_node.lat,
-            second_node.lon,
-            second_node.lat,
-        )
-        graph.add_edge(first_node, second_node, azimuth=azimuth, length=length)
 
     def _add_interpolated_nodes_path(
         self,
@@ -224,14 +227,18 @@ class TramTrackGraphTransformer:
                 )
                 nodes_by_coordinates[(lat, lon)] = new_node
 
-            self._add_edge(densified_graph, previous_graph_node, new_node)
+            self.__class__._add_geodetic_edge(
+                densified_graph, previous_graph_node, new_node
+            )
             previous_graph_node = new_node
 
         lat, lon = interpolated_node_coordinates[-1]
         if (lat, lon) in nodes_by_coordinates:
             last_node = nodes_by_coordinates[(lat, lon)]
 
-        self._add_edge(densified_graph, previous_graph_node, last_node)
+        self.__class__._add_geodetic_edge(
+            densified_graph, previous_graph_node, last_node
+        )
 
     def densify_graph_by_max_distance(
         self, max_distance_in_meters: float
@@ -260,7 +267,7 @@ class TramTrackGraphTransformer:
                     errors.append(e)
                     continue
 
-                interpolated_node_coordinates = self._interpolate_path_nodes(
+                interpolated_node_coordinates = self.__class__._interpolate_path_nodes(
                     path_nodes, max_distance_in_meters
                 )
 

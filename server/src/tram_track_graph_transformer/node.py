@@ -1,10 +1,10 @@
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from src.tram_track_graph_transformer.node_type import NodeType
 
 
-class Node(BaseModel, frozen=True):
+class Node(BaseModel):
     """
     Represents a node in tram network graph.
     Attributes:
@@ -15,7 +15,7 @@ class Node(BaseModel, frozen=True):
         name (Optional[str]): The name of the tram stop, set only when type == NodeType.TRAM_STOP.
     """
 
-    id: int
+    id: int = Field(..., frozen=True)
     lat: float
     lon: float
     type: NodeType
