@@ -192,6 +192,16 @@ class TramTrackGraphTransformer:
         self._max_node_id += 1
         return self._max_node_id
 
+    def _add_edge(self, graph: nx.DiGraph, first_node: Node, second_node: Node):
+        geod = Geod(ellps="WGS84")
+        azimuth, _, length = geod.inv(
+            first_node.lon,
+            first_node.lat,
+            second_node.lon,
+            second_node.lat,
+        )
+        graph.add_edge(first_node, second_node, azimuth=azimuth, length=length)
+
     def _add_interpolated_nodes_path(
         self,
         densified_graph: nx.DiGraph,
@@ -201,7 +211,6 @@ class TramTrackGraphTransformer:
         last_node: Node,
     ):
         previous_graph_node = first_node
-        geod = Geod(ellps="WGS84")
 
         for lat, lon in interpolated_node_coordinates[1:-1]:
             if (lat, lon) in nodes_by_coordinates:
@@ -215,30 +224,14 @@ class TramTrackGraphTransformer:
                 )
                 nodes_by_coordinates[(lat, lon)] = new_node
 
-            azimuth, _, length = geod.inv(
-                previous_graph_node.lon,
-                previous_graph_node.lat,
-                new_node.lon,
-                new_node.lat,
-            )
-            densified_graph.add_edge(
-                previous_graph_node, new_node, azimuth=azimuth, length=length
-            )
+            self._add_edge(densified_graph, previous_graph_node, new_node)
             previous_graph_node = new_node
 
         lat, lon = interpolated_node_coordinates[-1]
         if (lat, lon) in nodes_by_coordinates:
             last_node = nodes_by_coordinates[(lat, lon)]
 
-        azimuth, _, length = geod.inv(
-            previous_graph_node.lon,
-            previous_graph_node.lat,
-            last_node.lon,
-            last_node.lat,
-        )
-        densified_graph.add_edge(
-            previous_graph_node, last_node, azimuth=azimuth, length=length
-        )
+        self._add_edge(densified_graph, previous_graph_node, last_node)
 
     def densify_graph_by_max_distance(
         self, max_distance_in_meters: float
