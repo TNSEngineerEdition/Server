@@ -3,8 +3,7 @@ import os
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException
 from pydantic import ValidationError
 from src.model import CityConfiguration
 
@@ -17,18 +16,18 @@ logger = logging.getLogger(__name__)
 
 @app.get("/cities")
 def cities():
-    city_configurations: list[CityConfiguration] = []
+    city_configuration_by_id: dict[str, CityConfiguration] = {}
 
     for file in filter(lambda x: x.is_file(), CONFIG_DIRECTORY_PATH.iterdir()):
         try:
-            city_configurations.append(
-                CityConfiguration.model_validate_json(file.read_text())
+            city_configuration_by_id[file.stem] = CityConfiguration.model_validate_json(
+                file.read_text()
             )
         except ValidationError as exc:
             logger.exception(f"Invalid configuration file: {file.name}", exc_info=exc)
-            return JSONResponse("Invalid configuration files", 500)
+            raise HTTPException(500, "Invalid configuration files")
 
-    return city_configurations
+    return city_configuration_by_id
 
 
 if __name__ == "__main__":

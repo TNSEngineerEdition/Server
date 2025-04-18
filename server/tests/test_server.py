@@ -15,14 +15,17 @@ class TestServer:
         cities = response.json()
 
         assert response.status_code == 200
-        assert isinstance(cities, list)
+        assert isinstance(cities, dict)
 
-        for city in cities:
-            osm_area_name = city["osm_area_name"]
+        for city_id, city_configuration in cities.items():
+            assert city_id
+            assert isinstance(city_id, str)
+
+            osm_area_name = city_configuration["osm_area_name"]
             assert osm_area_name
             assert isinstance(osm_area_name, str)
 
-            gtfs_url = city["gtfs_url"]
+            gtfs_url = city_configuration["gtfs_url"]
             assert gtfs_url
             assert isinstance(gtfs_url, str)
 
@@ -30,12 +33,12 @@ class TestServer:
             assert url_parse_result.scheme
             assert url_parse_result.netloc
 
-            ignored_gtfs_lines = city["ignored_gtfs_lines"]
+            ignored_gtfs_lines = city_configuration["ignored_gtfs_lines"]
             assert isinstance(ignored_gtfs_lines, list)
             assert all(isinstance(line, str) for line in ignored_gtfs_lines)
             assert len(set(ignored_gtfs_lines)) == len(ignored_gtfs_lines)
 
-            custom_stop_mapping = city["custom_stop_mapping"]
+            custom_stop_mapping = city_configuration["custom_stop_mapping"]
             assert isinstance(custom_stop_mapping, dict)
             assert all(
                 isinstance(gtfs_stop_id, str) for gtfs_stop_id in custom_stop_mapping
@@ -45,7 +48,10 @@ class TestServer:
                 for osm_node_id in custom_stop_mapping.values()
             )
 
-        assert any(city["osm_area_name"] == "Kraków" for city in cities)
+        assert any(
+            city_configuration["osm_area_name"] == "Kraków"
+            for city_configuration in cities.values()
+        )
 
     @patch("pathlib.Path.read_text", return_value="{Malformed json")
     def test_cities_validation_error(
@@ -55,7 +61,7 @@ class TestServer:
             response = self.client.get("/cities")
 
         assert response.status_code == 500
-        assert response.json() == "Invalid configuration files"
+        assert response.json()["detail"] == "Invalid configuration files"
 
         assert "Invalid configuration file: " in caplog.text
         assert "ValidationError" in caplog.text

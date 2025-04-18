@@ -1,6 +1,7 @@
 import pickle
 import sys
 from datetime import datetime
+from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from src.model import CityConfiguration
@@ -9,12 +10,10 @@ from src.tram_stop_mapper import GTFSPackage
 from tests.constants import FROZEN_DATA_DIRECTORY
 
 
-def main(city_configuration_path: str):
-    with open(city_configuration_path) as file:
-        city_configuration = CityConfiguration.model_validate_json(file.read())
-
+def main(city_configuration_path: Path):
     current_date_iso = datetime.now().isoformat(timespec="seconds").replace(":", "-")
 
+    city_configuration = CityConfiguration.from_path(city_configuration_path)
     gtfs_package = GTFSPackage.from_url(city_configuration.gtfs_url)
 
     relations_and_stops_query_result = OverpassClient.get_relations_and_stops(
@@ -47,4 +46,4 @@ if __name__ == "__main__":
     Example usage: python3 tests/_utils/add_frozen_data_test_case.py config/cities/krakow.json
     """
 
-    main(sys.argv[1])
+    main(Path.cwd() / sys.argv[1])

@@ -1,6 +1,7 @@
 import json
 import pickle
 import zipfile
+from pathlib import Path
 
 import networkx as nx
 import overpy
@@ -39,5 +40,6 @@ def tram_trips_by_id() -> dict[str, list[int]]:
 
 @pytest.fixture
 def krakow_city_configuration():
-    with open("tests/assets/krakow_city_configuration.json") as file:
-        return CityConfiguration.model_validate_json(file.read())
+    return CityConfiguration.from_path(
+        Path.cwd() / "tests" / "assets" / "krakow_city_configuration.json"
+    )
