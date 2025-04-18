@@ -20,6 +20,14 @@ class TramTrackGraphInspector:
     def _nodes_by_id(self) -> dict[int, Node]:
         return {node.id: node for node in self._graph.nodes}
 
+    @staticmethod
+    def get_unique_tram_stop_pairs(stop_nodes_by_gtfs_trip_id: dict[str, list[int]]):
+        return {
+            (stop_ids[i], stop_ids[i + 1])
+            for stop_ids in stop_nodes_by_gtfs_trip_id.values()
+            for i in range(len(stop_ids) - 1)
+        }
+
     def shortest_path_between_nodes(
         self, start_node: Node, end_node: Node
     ) -> list[Node]:
