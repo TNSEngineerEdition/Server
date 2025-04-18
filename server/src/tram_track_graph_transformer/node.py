@@ -15,7 +15,7 @@ class Node(BaseModel):
         name (Optional[str]): The name of the tram stop, set only when type == NodeType.TRAM_STOP.
     """
 
-    id: int = Field(..., frozen=True)
+    id: int = Field(frozen=True)
     lat: float
     lon: float
     type: NodeType
