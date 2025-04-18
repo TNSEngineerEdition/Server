@@ -1,9 +1,10 @@
 from collections import defaultdict
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
-from src.model import GTFSPackage
+from src.tram_stop_mapper import GTFSPackage
 
 
 class TestGTFSPackage:
@@ -60,7 +61,7 @@ class TestGTFSPackage:
         "timepoint",
     ]
 
-    GTFS_FILE_PATH = "tests/assets/gtfs_schedule.zip"
+    GTFS_FILE_PATH = Path.cwd() / "tests" / "assets" / "gtfs_schedule.zip"
 
     @staticmethod
     def _assert_data_frame_content(
@@ -111,9 +112,7 @@ class TestGTFSPackage:
         # Arrange
         url = "http://example.com/gtfs.zip"
 
-        get_mock.return_value = MagicMock()
-        with open(self.GTFS_FILE_PATH, "rb") as file:
-            get_mock.return_value.content = file.read()
+        get_mock.return_value = MagicMock(content=self.GTFS_FILE_PATH.read_bytes())
 
         # Act
         gtfs_package = GTFSPackage.from_url(url)

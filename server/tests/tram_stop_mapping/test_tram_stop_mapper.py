@@ -4,9 +4,12 @@ from zipfile import ZipFile
 
 import overpy
 import pytest
-from src.model import CityConfiguration, GTFSPackage
-from src.tram_stop_mapper import TramStopMapper
-from src.tram_stop_mapper.exceptions import TramStopMappingBuildError
+from src.model import CityConfiguration
+from src.tram_stop_mapper import (
+    GTFSPackage,
+    TramStopMapper,
+    TramStopMappingBuildError,
+)
 
 
 class TestTramStopMapper:

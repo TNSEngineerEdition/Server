@@ -5,8 +5,9 @@ from collections import defaultdict
 from functools import cached_property
 
 import overpy
-from src.model import CityConfiguration, GTFSPackage
+from src.model import CityConfiguration
 from src.tram_stop_mapper.exceptions import TramStopMappingBuildError
+from src.tram_stop_mapper.gtfs_package import GTFSPackage
 from src.tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
 
 

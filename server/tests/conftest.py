@@ -5,8 +5,8 @@ import zipfile
 import networkx as nx
 import overpy
 import pytest
-from src.model.city_configuration import CityConfiguration
-from src.model.gtfs_package import GTFSPackage
+from src.model import CityConfiguration
+from src.tram_stop_mapper import GTFSPackage
 
 
 @pytest.fixture
