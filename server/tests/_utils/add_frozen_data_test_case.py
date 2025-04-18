@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from src.model import CityConfiguration
+from src.city_data_builder import CityConfiguration
 from src.overpass_client import OverpassClient
 from src.tram_stop_mapper import GTFSPackage
 from tests.constants import FROZEN_DATA_DIRECTORY

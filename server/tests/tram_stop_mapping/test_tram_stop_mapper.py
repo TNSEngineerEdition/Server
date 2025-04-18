@@ -4,7 +4,7 @@ from zipfile import ZipFile
 
 import overpy
 import pytest
-from src.model import CityConfiguration
+from src.city_data_builder import CityConfiguration
 from src.tram_stop_mapper import (
     GTFSPackage,
     TramStopMapper,

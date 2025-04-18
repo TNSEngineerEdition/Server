@@ -5,7 +5,7 @@ from pathlib import Path
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import ValidationError
-from src.model import CityConfiguration
+from src.city_data_builder import CityConfiguration
 
 CONFIG_DIRECTORY_PATH = Path(__file__).parents[1] / "config" / "cities"
 

@@ -4,7 +4,7 @@ import networkx as nx
 import overpy
 from pyproj import Geod, Transformer
 from shapely.geometry import LineString
-from src.model import CityConfiguration
+from src.city_data_builder import CityConfiguration
 from src.tram_track_graph_transformer.exceptions import (
     TrackDirectionChangeError,
 )
