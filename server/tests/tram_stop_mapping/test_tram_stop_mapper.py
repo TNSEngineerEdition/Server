@@ -271,7 +271,7 @@ class TestTramStopMapper:
     def _get_unique_trips_from_stop_nodes(stop_nodes: list[list[Hashable]]):
         return set(map(tuple, stop_nodes))
 
-    def test_get_stop_nodes_by_gtfs_trip_id(
+    def test_stop_nodes_by_gtfs_trip_id(
         self,
         krakow_city_configuration: CityConfiguration,
         gtfs_package: GTFSPackage,
@@ -291,7 +291,7 @@ class TestTramStopMapper:
         )
 
         # Act
-        stop_nodes_by_gtfs_trip_id = tram_stop_mapper.get_stop_nodes_by_gtfs_trip_id()
+        stop_nodes_by_gtfs_trip_id = tram_stop_mapper.stop_nodes_by_gtfs_trip_id
         unique_trips = self._get_unique_trips_from_stop_nodes(
             stop_nodes_by_gtfs_trip_id.values()
         )
@@ -305,3 +305,46 @@ class TestTramStopMapper:
 
         for gtfs_trip_id, expected_stop_count in expected_trip_stop_count.items():
             assert len(stop_nodes_by_gtfs_trip_id[gtfs_trip_id]) == expected_stop_count
+
+    def test_stop_ids_by_node_id(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        gtfs_package: GTFSPackage,
+        relations_and_stops_overpass_query_result: overpy.Result,
+    ):
+        # Arrange
+        tram_stop_mapper = TramStopMapper(
+            krakow_city_configuration,
+            gtfs_package,
+            relations_and_stops_overpass_query_result,
+        )
+
+        # Act
+        gtfs_stop_ids_by_node_id = tram_stop_mapper.gtfs_stop_ids_by_node_id
+
+        # Assert
+        assert all(
+            gtfs_stop_id in gtfs_stop_ids_by_node_id[node_id]
+            for (
+                gtfs_stop_id,
+                node_id,
+            ) in tram_stop_mapper.gtfs_stop_id_to_osm_node_id_mapping.items()
+        )
+
+        assert all(
+            gtfs_stop_id in gtfs_stop_ids_by_node_id[node_id]
+            for (
+                gtfs_stop_id,
+                node_ids,
+            ) in tram_stop_mapper.first_gtfs_stop_id_to_osm_node_ids.items()
+            for node_id in node_ids
+        )
+
+        assert all(
+            gtfs_stop_id in gtfs_stop_ids_by_node_id[node_id]
+            for (
+                gtfs_stop_id,
+                node_ids,
+            ) in tram_stop_mapper.last_gtfs_stop_id_to_osm_node_ids.items()
+            for node_id in node_ids
+        )
