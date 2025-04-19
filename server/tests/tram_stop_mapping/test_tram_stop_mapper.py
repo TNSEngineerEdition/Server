@@ -348,3 +348,37 @@ class TestTramStopMapper:
             ) in tram_stop_mapper.last_gtfs_stop_id_to_osm_node_ids.items()
             for node_id in node_ids
         )
+
+    def test_trip_data_and_stops_by_trip_id(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        gtfs_package: GTFSPackage,
+        relations_and_stops_overpass_query_result: overpy.Result,
+    ):
+        # Arrange
+        expected_trip_stop_count = gtfs_package.stop_times.value_counts("trip_id")
+
+        tram_stop_mapper = TramStopMapper(
+            krakow_city_configuration,
+            gtfs_package,
+            relations_and_stops_overpass_query_result,
+        )
+
+        # Act
+        trip_data_by_trip_id, trip_stops_data = (
+            tram_stop_mapper.trip_data_and_stops_by_trip_id
+        )
+
+        # Assert
+        assert set(trip_data_by_trip_id.keys()) == set(trip_stops_data.keys())
+        assert all(
+            trip_data.get("route_long_name")
+            for trip_data in trip_data_by_trip_id.values()
+        )
+        assert all(
+            trip_data.get("trip_headsign")
+            for trip_data in trip_data_by_trip_id.values()
+        )
+
+        for trip_id, expected_stop_count in expected_trip_stop_count.items():
+            assert len(trip_stops_data[trip_id]) == expected_stop_count
