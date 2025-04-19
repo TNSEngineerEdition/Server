@@ -1,6 +1,7 @@
 from collections import defaultdict
 from functools import cached_property
 from io import BytesIO
+from typing import Any
 from zipfile import ZipFile
 
 import pandas as pd
@@ -44,19 +45,48 @@ class GTFSPackage(BaseModel):
         return cls._from_zip_file(zip_file)
 
     @cached_property
+    def _stop_times_as_dict(self) -> dict[str, dict[tuple[str, int], Any]]:
+        return self.stop_times.set_index(["trip_id", "stop_sequence"]).to_dict()
+
+    @cached_property
     def stop_id_sequence_by_trip_id(self):
-        stop_times_dict = self.stop_times.set_index(
-            ["trip_id", "stop_sequence"]
-        ).to_dict()
+        stop_ids = self._stop_times_as_dict["stop_id"]
 
-        stop_times_dict_for_stop_ids: dict[tuple[str, int], str] = stop_times_dict[
-            "stop_id"
-        ]
-        stop_ids_by_trip_id: defaultdict[str, list[str]] = defaultdict(list)
+        result: defaultdict[str, list[str]] = defaultdict(list)
+        for trip_id, stop_sequence in sorted(stop_ids.keys()):
+            result[trip_id].append(stop_ids[trip_id, stop_sequence])
 
-        for trip_id, stop_sequence in sorted(stop_times_dict_for_stop_ids.keys()):
-            stop_ids_by_trip_id[trip_id].append(
-                stop_times_dict_for_stop_ids[trip_id, stop_sequence]
+        return dict(result)
+
+    @staticmethod
+    def _time_string_to_seconds(time_str: str) -> int:
+        hour, minute, second = map(int, time_str.split(":"))
+        return (hour * 60 + minute) * 60 + second
+
+    @cached_property
+    def trip_data_and_stops_by_trip_id(self):
+        stop_ids = self._stop_times_as_dict["stop_id"]
+        departure_times = self._stop_times_as_dict["departure_time"]
+
+        trip_stops_by_trip_id: defaultdict[str, list[tuple[str, int]]] = defaultdict(
+            list
+        )
+        for trip_id, stop_sequence in sorted(stop_ids.keys()):
+            trip_stops_by_trip_id[trip_id].append(
+                (
+                    stop_ids[trip_id, stop_sequence],
+                    self._time_string_to_seconds(
+                        departure_times[trip_id, stop_sequence]
+                    ),
+                )
             )
 
-        return dict(stop_ids_by_trip_id)
+        trip_data_by_trip_id: defaultdict[str, dict[str, Any]] = defaultdict(dict)
+        for trip_id, trip_row in self.trips.iterrows():
+            for name, value in trip_row.items():
+                trip_data_by_trip_id[trip_id][name] = value
+
+            for name, value in self.routes.loc[trip_row["route_id"]].items():
+                trip_data_by_trip_id[trip_id][name] = value
+
+        return dict(trip_data_by_trip_id), dict(trip_stops_by_trip_id)
