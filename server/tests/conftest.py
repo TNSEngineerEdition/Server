@@ -25,6 +25,17 @@ def relations_and_stops_overpass_query_result() -> overpy.Result:
 
 
 @pytest.fixture
+def tram_stops_and_tracks_overpass_query_result() -> overpy.Result:
+    with zipfile.ZipFile(
+        "tests/assets/tram_stops_and_tracks_overpass_query_result.zip"
+    ) as zip_file:
+        with zip_file.open(
+            "tram_stops_and_tracks_overpass_query_result.pickle"
+        ) as file:
+            return pickle.load(file)
+
+
+@pytest.fixture
 def krakow_tram_network_graph() -> nx.DiGraph:
     with zipfile.ZipFile("tests/assets/krakow_tram_network_graph.zip") as zip_file:
         with zip_file.open("krakow_tram_network_graph.pickle") as file:
