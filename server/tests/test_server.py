@@ -2,18 +2,22 @@ import logging
 import urllib.parse
 from unittest.mock import MagicMock, patch
 
+import overpy
 import pytest
 from fastapi.testclient import TestClient
 from src.server import app
+from src.tram_stop_mapper import GTFSPackage
 
 
 class TestServer:
     client = TestClient(app)
 
     def test_cities(self):
+        # Act
         response = self.client.get("/cities")
         cities = response.json()
 
+        # Assert
         assert response.status_code == 200
         assert isinstance(cities, dict)
 
@@ -57,11 +61,112 @@ class TestServer:
     def test_cities_validation_error(
         self, read_text_mock: MagicMock, caplog: pytest.LogCaptureFixture
     ):
+        # Act
         with caplog.at_level(logging.ERROR, logger="src.server"):
             response = self.client.get("/cities")
 
+        # Assert
         assert response.status_code == 500
         assert response.json()["detail"] == "Invalid configuration files"
 
         assert "Invalid configuration file: " in caplog.text
         assert "ValidationError" in caplog.text
+
+    @patch("src.tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("src.overpass_client.OverpassClient.get_tram_stops_and_tracks")
+    @patch("src.overpass_client.OverpassClient.get_relations_and_stops")
+    def test_get_city_data(
+        self,
+        get_relations_and_stops_mock: MagicMock,
+        get_tram_stops_and_tracks_mock: MagicMock,
+        gtfs_package_from_url_mock: MagicMock,
+        relations_and_stops_overpass_query_result: overpy.Result,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
+        gtfs_package: GTFSPackage,
+    ):
+        # Arrange
+        get_relations_and_stops_mock.return_value = (
+            relations_and_stops_overpass_query_result
+        )
+        get_tram_stops_and_tracks_mock.return_value = (
+            tram_stops_and_tracks_overpass_query_result
+        )
+        gtfs_package_from_url_mock.return_value = gtfs_package
+
+        # Act
+        response = self.client.get("/cities/krakow")
+        city_data = response.json()
+
+        # Assert
+        assert response.status_code == 200
+        assert isinstance(city_data, dict)
+
+        tram_track_graph = city_data["tram_track_graph"]
+        assert tram_track_graph
+        assert isinstance(tram_track_graph, list)
+
+        for tram_track_node in tram_track_graph:
+            node_id = tram_track_node["id"]
+            assert node_id
+            assert isinstance(node_id, int)
+
+            assert isinstance(tram_track_node["lat"], float)
+            assert isinstance(tram_track_node["lon"], float)
+
+            neighbors = tram_track_node["neighbors"]
+            assert isinstance(neighbors, list)
+            for neighbor in neighbors:
+                assert isinstance(neighbor, dict)
+
+                neighbor_id = neighbor["id"]
+                assert neighbor_id
+                assert isinstance(neighbor_id, int)
+
+                neighbor_length = neighbor["length"]
+                assert neighbor_length
+                assert isinstance(neighbor_length, float)
+
+                neighbor_azimuth = neighbor["azimuth"]
+                assert isinstance(neighbor_azimuth, float)
+                assert -180 <= neighbor_azimuth <= 180
+
+            if "name" in tram_track_node or "gtfs_stop_ids" in tram_track_node:
+                assert isinstance(tram_track_node["name"], str)
+
+                gtfs_stop_ids = tram_track_node["gtfs_stop_ids"]
+                assert isinstance(gtfs_stop_ids, list)
+                assert all(isinstance(item, str) for item in gtfs_stop_ids)
+
+        tram_trips = city_data["tram_trips"]
+        assert tram_trips
+        assert isinstance(tram_trips, list)
+
+        for tram_trip in tram_trips:
+            route = tram_trip["route"]
+            assert route
+            assert isinstance(route, str)
+
+            trip_head_sign = tram_trip["trip_head_sign"]
+            assert trip_head_sign
+            assert isinstance(trip_head_sign, str)
+
+            stops = tram_trip["stops"]
+            assert stops
+            assert isinstance(stops, list)
+
+            for stop in stops:
+                stop_node_id = stop["id"]
+                assert stop_node_id
+                assert isinstance(stop_node_id, int)
+
+                stop_time = stop["time"]
+                assert stop_time >= 0
+                assert isinstance(stop_time, int)
+
+    def test_get_city_data_unknown_city_id(self):
+        # Act
+        response = self.client.get("/cities/1234567890")
+
+        # Assert
+        assert response.status_code == 404
+        assert response.json()["detail"] == "City not found"
