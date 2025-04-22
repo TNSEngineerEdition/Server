@@ -11,6 +11,8 @@ class CityConfiguration(BaseModel):
     osm_area_name: str
     gtfs_url: str
     ignored_gtfs_lines: list[str]
+    ignored_crossings_ids: list[int]
+    ignored_tram_stops_ids: list[int]
     custom_stop_mapping: dict[str, int]
     max_distance_ratio: float
     custom_tram_stop_pair_max_distance_checks: list[TramStopPairCheck]
