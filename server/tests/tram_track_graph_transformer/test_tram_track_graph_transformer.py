@@ -1,138 +1,216 @@
-import json
 import pickle
-from math import ceil
-from pathlib import Path
+from collections import deque
+from math import sqrt
+from zipfile import ZipFile
 
+import overpy
 import pytest
-from src.overpass_client import OverpassClient
+from geopy.distance import geodesic
+from networkx import DiGraph
+from src.model import CityConfiguration
 from src.tram_track_graph_transformer import TramTrackGraphTransformer
 from src.tram_track_graph_transformer.node import Node
+from tests.constants import FROZEN_DATA_DIRECTORY
 
-TRAM_TRACK_GRAPH_TRANSFORMER_DIRECTORY = (
-    Path(__file__).parents[1] / "assets" / "tram_track_graph_transformer"
-)
+FILES_WITH_DATA = ["2025-04-22T03-35-34.zip"]
 
 
-@pytest.fixture(scope="module")
-def graph_25():
-    tram_stops_and_tracks = OverpassClient.get_tram_stops_and_tracks("Kraków")
-    transformer = TramTrackGraphTransformer(tram_stops_and_tracks)
-    return transformer.densify_graph_by_max_distance(25.0)
+@pytest.fixture(scope="module", params=FILES_WITH_DATA)
+def graph_25(request):
+    file_path = request.param
+
+    with ZipFile(FROZEN_DATA_DIRECTORY / file_path) as zip_file:
+        with zip_file.open("osm_tram_stops_and_tracks.pickle") as file:
+            osm_tram_stops_and_tracks: overpy.Result = pickle.load(file)
+
+    transformer = TramTrackGraphTransformer(osm_tram_stops_and_tracks)
+    return (transformer, transformer.densify_graph_by_max_distance(25.0), file_path)
 
 
 class TestTramTrackGraphTransformer:
-    CORRECT_MAX_INTERPOLATION_DISTANCES = [10.0, 25.0]
-    INCORRECT_MAX_INTERPOLATION_DISTANCES = [-5.0, 0.0]
+    CORRECT_MAX_DENSIFICATION_DISTANCES = [10.0, 25.0]
+    INCORRECT_MAX_DENSIFICATION_DISTANCES = [-5.0, 0.0]
 
-    def _get_tram_tracks_crossings_data(self) -> dict[str, Node]:
-        with open(
-            TRAM_TRACK_GRAPH_TRANSFORMER_DIRECTORY
-            / "tram_track_crossings_query_results.pickle",
-            "rb",
-        ) as pickle_file:
-            tram_track_crossings_nodes: dict[str, Node] = pickle.load(pickle_file)
-        return tram_track_crossings_nodes
+    def _get_city_configuration(self, zip_file: ZipFile) -> CityConfiguration:
+        with zip_file.open("city_configuration.pickle") as file:
+            city_configuration: CityConfiguration = pickle.load(file)
+        return city_configuration
 
-    def _get_correct_tram_track_interpolation(self) -> dict:
-        with open(
-            TRAM_TRACK_GRAPH_TRANSFORMER_DIRECTORY
-            / "correct_tram_track_interpolation.json",
-            "r",
-        ) as json_file:
-            correct_tram_track_interpolation: dict = json.load(json_file)
-        return correct_tram_track_interpolation
+    def _get_tram_track_crossings_data(self, zip_file: ZipFile) -> overpy.Result:
+        with zip_file.open("osm_tram_track_crossings.pickle") as file:
+            osm_tram_track_crossings: overpy.Result = pickle.load(file)
+        return osm_tram_track_crossings
 
-    def _is_reachable_within_depth(
-        self, graph, current: Node, goal: Node, step: int, max_steps: int, forward=True
+    def _get_tram_stops_and_tracks_data(self, zip_file: ZipFile) -> overpy.Result:
+        with zip_file.open("osm_tram_stops_and_tracks.pickle") as file:
+            osm_tram_stops_and_tracks: overpy.Result = pickle.load(file)
+        return osm_tram_stops_and_tracks
+
+    def _get_tram_stops_data(self, zip_file: ZipFile) -> overpy.Result:
+        with zip_file.open("osm_tram_stops.pickle") as file:
+            osm_tram_stops: overpy.Result = pickle.load(file)
+        return osm_tram_stops
+
+    def test_if_tram_track_crossings_in_graph(
+        self, graph_25: tuple[TramTrackGraphTransformer, DiGraph, str]
     ):
-        if goal == current:
-            return {"is_reachable": True, "steps": step}
-        if step == max_steps:
-            return {"is_reachable": False, "steps": step, "last_node": current}
-        if forward:
-            successors = list(graph.successors(current))
-            for succ in successors:
-                result = self._is_reachable_within_depth(
-                    graph, current=succ, goal=goal, step=step + 1, max_steps=max_steps
-                )
-                if result["is_reachable"]:
-                    return result
-            return result
-        predecessors = list(graph.predecessors(current))
-        for pred in predecessors:
-            result = self._is_reachable_within_depth(
-                graph,
-                current=pred,
-                goal=goal,
-                step=step + 1,
-                max_steps=max_steps,
-                forward=False,
-            )
-            if result["is_reachable"]:
-                return result
-        return result
+        # arrange
+        transformer, graph, file_name = graph_25
 
-    def test_tram_track_crossings_neighbors_amount(self, graph_25):
-        # prepare data
-        tram_track_crossings_nodes = self._get_tram_tracks_crossings_data()
+        with ZipFile(FROZEN_DATA_DIRECTORY / file_name) as zip_file:
+            city_configuration = self._get_city_configuration(zip_file)
+            osm_tram_track_crossings = self._get_tram_track_crossings_data(zip_file)
 
-        # assert
-        for crossing_node in tram_track_crossings_nodes.values():
-            if graph_25.has_node(crossing_node):
-                assert len(list(graph_25.predecessors(crossing_node))) == len(
-                    list(graph_25.successors(crossing_node))
+        for node_id in osm_tram_track_crossings.get_node_ids():
+            if node_id not in city_configuration.ignored_crossings_ids:
+
+                # assert
+                assert graph.has_node(transformer.get_node_by_id(node_id)) is True
+
+    def test_tram_track_crossings_neighbors_amount(
+        self, graph_25: tuple[TramTrackGraphTransformer, DiGraph, str]
+    ):
+        # arrange
+        transformer, graph, file_name = graph_25
+
+        with ZipFile(FROZEN_DATA_DIRECTORY / file_name) as zip_file:
+            city_configuration = self._get_city_configuration(zip_file)
+            osm_tram_track_crossings = self._get_tram_track_crossings_data(zip_file)
+
+        for node_id in osm_tram_track_crossings.get_node_ids():
+            if node_id not in city_configuration.ignored_crossings_ids:
+                node = transformer.get_node_by_id(node_id)
+
+                # assert
+                assert len(list(graph.predecessors(node))) == len(
+                    list(graph.successors(node))
                 )
+
+    def test_if_tram_stops_in_graph(
+        self, graph_25: tuple[TramTrackGraphTransformer, DiGraph, str]
+    ):
+        # arrange
+        transformer, graph, file_name = graph_25
+
+        with ZipFile(FROZEN_DATA_DIRECTORY / file_name) as zip_file:
+            city_configuration = self._get_city_configuration(zip_file)
+            osm_tram_stops = self._get_tram_stops_data(zip_file)
+
+        for node_id in osm_tram_stops.get_node_ids():
+            if node_id not in city_configuration.ignored_tram_stops_ids:
+
+                # assert
+                assert graph.has_node(transformer.get_node_by_id(node_id)) is True
 
     @pytest.mark.parametrize(
-        "max_interpolation_distance", CORRECT_MAX_INTERPOLATION_DISTANCES
+        "max_densification_distance", CORRECT_MAX_DENSIFICATION_DISTANCES
     )
-    def test_interpolation(self, max_interpolation_distance: int):
-        # make graph
-        tram_stops_and_tracks = OverpassClient.get_tram_stops_and_tracks("Kraków")
-        transformer = TramTrackGraphTransformer(tram_stops_and_tracks)
-        graph = transformer.densify_graph_by_max_distance(max_interpolation_distance)
+    def test_densification_max_distance(
+        self,
+        max_densification_distance: int,
+        graph_25: tuple[TramTrackGraphTransformer, DiGraph, str],
+    ):
+        # arrange
+        transformer, _, _ = graph_25
+        perm_nodes = transformer.get_permament_nodes()
+        tolerance = max_densification_distance * 0.001
 
-        # prepare data
-        correct_tram_track_interpolation: dict = (
-            self._get_correct_tram_track_interpolation()
+        # act
+        densified_graph = transformer.densify_graph_by_max_distance(
+            max_densification_distance
         )
 
-        for test_name, test_data in correct_tram_track_interpolation.items():
-            expected_steps = test_data["distance"] // max_interpolation_distance + 1
-            tolerance = ceil(expected_steps * 0.03)
+        for perm_node in perm_nodes:
+            prev_nodes: deque[Node] = deque()
+            prev_nodes.append(perm_node)
+            visited = set()
 
-            result = self._is_reachable_within_depth(
-                graph=graph,
-                current=transformer._nodes_by_id[test_data["start_node_id"]],
-                goal=transformer._nodes_by_id[test_data["goal_node_id"]],
-                step=0,
-                max_steps=expected_steps + tolerance,
-            )
+            while prev_nodes:
+                prev_node = prev_nodes.popleft()
+                visited.add(prev_node)
 
-            assert_msg = (
-                f"Test case '{test_name}' failed: "
-                f"start={test_data["start_node_id"]}, goal={test_data["goal_node_id"]}, "
-                f"expected_steps={expected_steps} +/- {tolerance}, actual_steps={result["steps"]}"
-            )
+                for next_node in densified_graph.successors(prev_node):
+                    if next_node not in perm_nodes and next_node not in visited:
+                        prev_nodes.append(next_node)
 
-            # assert
-            assert result["is_reachable"] is True, assert_msg
-            assert (
-                result["steps"] >= expected_steps - tolerance
-                and result["steps"] <= expected_steps + tolerance
-            ), assert_msg
+                    distance = geodesic(
+                        (prev_node.lat, prev_node.lon), (next_node.lat, next_node.lon)
+                    ).meters
+
+                    # assert
+                    assert distance <= (max_densification_distance + tolerance)
 
     @pytest.mark.parametrize(
-        "max_interpolation_distance", INCORRECT_MAX_INTERPOLATION_DISTANCES
+        "max_densification_distance", CORRECT_MAX_DENSIFICATION_DISTANCES
     )
-    def test_interpolation_distance_exception(self, max_interpolation_distance: int):
-        # make graph
-        tram_stops_and_tracks = OverpassClient.get_tram_stops_and_tracks("Kraków")
+    def test_densification_even_spacing(
+        self,
+        max_densification_distance: int,
+        graph_25: tuple[TramTrackGraphTransformer, DiGraph, str],
+    ):
+        # arrange
+        transformer, _, _ = graph_25
+        perm_nodes = transformer.get_permament_nodes()
+        m = 0.05
+
+        # act
+        densified_graph = transformer.densify_graph_by_max_distance(
+            max_densification_distance
+        )
+
+        for perm_node in perm_nodes:
+            succ_nodes = densified_graph.successors(perm_node)
+
+            for succ_node in succ_nodes:
+                if succ_node in perm_nodes:
+                    continue
+                distances = []
+                prev_node = perm_node
+                next_node = succ_node
+                visited = set()
+                visited.add(prev_node)
+
+                while next_node not in perm_nodes and next_node not in visited:
+                    distances.append(
+                        geodesic(
+                            (prev_node.lat, prev_node.lon),
+                            (next_node.lat, next_node.lon),
+                        ).meters
+                    )
+                    visited.add(prev_node)
+                    prev_node = next_node
+                    next_node = list(densified_graph.successors(prev_node))[0]
+
+                n = len(distances)
+                if not n:
+                    continue
+
+                mean = sum(distances) / n
+                squares_sum = sum(map(lambda x: (x - mean) ** 2, distances))
+                sigma = sqrt(squares_sum / n)
+
+                # assert
+                assert sigma < mean * m
+
+    @pytest.mark.parametrize(
+        "max_densification_distance", INCORRECT_MAX_DENSIFICATION_DISTANCES
+    )
+    def test_densification_distance_exception(
+        self,
+        graph_25: tuple[TramTrackGraphTransformer, DiGraph, str],
+        max_densification_distance: int,
+    ):
+        # arrange
+        _, _, file_name = graph_25
+
+        with ZipFile(FROZEN_DATA_DIRECTORY / file_name) as zip_file:
+            tram_stops_and_tracks = self._get_tram_stops_and_tracks_data(zip_file)
+
         transformer = TramTrackGraphTransformer(tram_stops_and_tracks)
 
-        # prepare error
+        # act
         with pytest.raises(ValueError) as actual_error:
-            transformer.densify_graph_by_max_distance(max_interpolation_distance)
+            transformer.densify_graph_by_max_distance(max_densification_distance)
 
         # assert
         assert (

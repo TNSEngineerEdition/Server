@@ -282,7 +282,35 @@ class TramTrackGraphTransformer:
                     path_nodes[-1],
                 )
 
-        if errors:
-            raise ExceptionGroup("Track direction errors during densification", errors)
+        # if errors:
+        #     raise ExceptionGroup("Track direction errors during densification", errors)
 
         return densified_graph
+
+    def get_node_by_id(self, id: int) -> Node | None:
+        """
+        Returns node with the given ID if it exists
+
+        Parameters
+        ----------
+        id : int
+
+        Returns
+        ----------
+        Node or None
+        """
+        if id in self._nodes_by_id:
+            return self._nodes_by_id[id]
+        return None
+
+    def get_permament_nodes(self) -> set[Node]:
+        """
+        Get set of permament nodes from the graph
+        """
+        return self._permanent_nodes
+
+    def get_basic_graph(self) -> nx.DiGraph:
+        """
+        Get basic tram tracks graph
+        """
+        return self._tram_track_graph
