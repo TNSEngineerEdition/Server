@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import BaseModel
 
 
@@ -21,3 +23,7 @@ class CityConfiguration(BaseModel):
             (item.source, item.destination): item.ratio
             for item in self.custom_tram_stop_pair_max_distance_checks
         }
+
+    @classmethod
+    def from_path(cls, path: Path):
+        return cls.model_validate_json(path.read_text())

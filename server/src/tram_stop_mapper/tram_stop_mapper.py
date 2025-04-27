@@ -5,8 +5,9 @@ from collections import defaultdict
 from functools import cached_property
 
 import overpy
-from src.model import CityConfiguration, GTFSPackage
+from src.city_data_builder import CityConfiguration
 from src.tram_stop_mapper.exceptions import TramStopMappingBuildError
+from src.tram_stop_mapper.gtfs_package import GTFSPackage
 from src.tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
 
 
@@ -35,11 +36,11 @@ class TramStopMapper:
         self,
         city_configuration: CityConfiguration,
         gtfs_package: GTFSPackage,
-        osm_relations_and_stops: overpy.Result,
+        relations_and_stops: overpy.Result,
     ):
         self._city_configuration = city_configuration
         self._gtfs_package = gtfs_package
-        self._osm_relations_and_stops = osm_relations_and_stops
+        self._relations_and_stops = relations_and_stops
 
         self._stop_mapping: dict[str, set[int]] = {
             str(stop_id): set() for stop_id in self._gtfs_package.stops.index
@@ -60,7 +61,7 @@ class TramStopMapper:
 
     @cached_property
     def _osm_node_by_id(self):
-        return {item.id: item for item in self._osm_relations_and_stops.get_nodes()}
+        return {item.id: item for item in self._relations_and_stops.get_nodes()}
 
     @cached_property
     def _stops_by_osm_relation(self):
@@ -71,7 +72,7 @@ class TramStopMapper:
                 if isinstance(member, overpy.RelationNode)
                 and member.ref in self._osm_node_by_id
             ]
-            for relation in self._osm_relations_and_stops.get_relations()
+            for relation in self._relations_and_stops.get_relations()
         }
 
     @staticmethod
@@ -335,9 +336,9 @@ class TramStopMapper:
             "TramStopMappingBuildError should have been raised but wasn't."
         )
 
-    def get_stop_nodes_by_gtfs_trip_id(self):
-        stop_nodes_by_gtfs_trip_id: dict[str, list[int]] = {}
-
+    @cached_property
+    def stop_nodes_by_gtfs_trip_id(self):
+        result: dict[str, list[int]] = {}
         for (
             gtfs_trip_id,
             longest_relation,
@@ -357,9 +358,7 @@ class TramStopMapper:
             ]
 
             if gtfs_trip_stop_names[1:-1] == relation_stop_names[1:-1]:
-                stop_nodes_by_gtfs_trip_id[gtfs_trip_id] = [
-                    item.id for item in relation_stop_nodes
-                ]
+                result[gtfs_trip_id] = [item.id for item in relation_stop_nodes]
                 continue
 
             stop_nodes_from_mapping = [
@@ -367,6 +366,40 @@ class TramStopMapper:
                 for i, stop in enumerate(gtfs_trip_stops)
             ]
 
-            stop_nodes_by_gtfs_trip_id[gtfs_trip_id] = stop_nodes_from_mapping
+            result[gtfs_trip_id] = stop_nodes_from_mapping
 
-        return stop_nodes_by_gtfs_trip_id
+        return result
+
+    @cached_property
+    def gtfs_stop_ids_by_node_id(self):
+        result: dict[int, set[str]] = defaultdict(set)
+
+        for gtfs_stop_id, node_id in self.gtfs_stop_id_to_osm_node_id_mapping.items():
+            result[node_id].add(gtfs_stop_id)
+
+        for gtfs_stop_id, node_ids in self.first_gtfs_stop_id_to_osm_node_ids.items():
+            for node_id in node_ids:
+                result[node_id].add(gtfs_stop_id)
+
+        for gtfs_stop_id, node_ids in self.last_gtfs_stop_id_to_osm_node_ids.items():
+            for node_id in node_ids:
+                result[node_id].add(gtfs_stop_id)
+
+        return result
+
+    @cached_property
+    def trip_data_and_stops_by_trip_id(self):
+        trip_data_by_trip_id, trip_stops_by_trip_id = (
+            self._gtfs_package.trip_data_and_stops_by_trip_id
+        )
+
+        trip_stops_data: dict[str, list[tuple[int, int]]] = {}
+        for trip_id, trip_stops in trip_stops_by_trip_id.items():
+            trip_stops_data[trip_id] = []
+
+            for node_id, trip_stop in zip(
+                self.stop_nodes_by_gtfs_trip_id[trip_id], trip_stops
+            ):
+                trip_stops_data[trip_id].append((node_id, trip_stop[1]))
+
+        return trip_data_by_trip_id, trip_stops_data
