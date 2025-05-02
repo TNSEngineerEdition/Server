@@ -47,6 +47,8 @@ class TestCityDataBuilder:
             == expected_stop_count
         )
 
+        assert all(trip.stops for trip in city_data_builder.tram_trips_data)
+
         get_relations_and_stops_mock.assert_called_once_with(
             krakow_city_configuration.osm_area_name,
             list(krakow_city_configuration.custom_stop_mapping.values()),

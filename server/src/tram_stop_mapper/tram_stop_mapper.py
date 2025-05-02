@@ -395,11 +395,14 @@ class TramStopMapper:
 
         trip_stops_data: dict[str, list[tuple[int, int]]] = {}
         for trip_id, trip_stops in trip_stops_by_trip_id.items():
-            trip_stops_data[trip_id] = []
+            if trip_id not in self.stop_nodes_by_gtfs_trip_id:
+                continue
 
-            for node_id, trip_stop in zip(
-                self.stop_nodes_by_gtfs_trip_id[trip_id], trip_stops
-            ):
-                trip_stops_data[trip_id].append((node_id, trip_stop[1]))
+            trip_stops_data[trip_id] = [
+                (node_id, trip_stop[1])
+                for node_id, trip_stop in zip(
+                    self.stop_nodes_by_gtfs_trip_id[trip_id], trip_stops
+                )
+            ]
 
         return trip_data_by_trip_id, trip_stops_data
