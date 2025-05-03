@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import overpy
+
 from src.city_data_builder import CityConfiguration, CityDataBuilder
 from src.tram_stop_mapper.gtfs_package import GTFSPackage
 

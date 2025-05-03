@@ -6,6 +6,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import ValidationError
+
 from src.city_data_builder import CityConfiguration, CityDataBuilder
 
 CONFIG_DIRECTORY_PATH = Path(__file__).parents[1] / "config" / "cities"
