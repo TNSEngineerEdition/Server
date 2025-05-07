@@ -123,4 +123,5 @@ class CityDataBuilder:
                 ],
             )
             for trip_id, trip_data in trip_data_by_trip_id.items()
+            if trip_id in trip_stops_data
         ]

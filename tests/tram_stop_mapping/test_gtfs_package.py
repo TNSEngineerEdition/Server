@@ -4,6 +4,7 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
+
 from src.tram_stop_mapper import GTFSPackage
 
 

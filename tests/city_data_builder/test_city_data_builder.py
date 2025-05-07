@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import overpy
+
 from src.city_data_builder import CityConfiguration, CityDataBuilder
 from src.tram_stop_mapper.gtfs_package import GTFSPackage
 
@@ -46,6 +47,8 @@ class TestCityDataBuilder:
             sum(len(trip.stops) for trip in city_data_builder.tram_trips_data)
             == expected_stop_count
         )
+
+        assert all(trip.stops for trip in city_data_builder.tram_trips_data)
 
         get_relations_and_stops_mock.assert_called_once_with(
             krakow_city_configuration.osm_area_name,
