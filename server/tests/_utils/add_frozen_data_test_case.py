@@ -4,13 +4,11 @@ from datetime import datetime
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from src.model import CityConfiguration, GTFSPackage
-from src.overpass_client import OverpassClient
+from tests._utils.overpass_test_client import OverpassTestClient
 from tests.constants import FROZEN_DATA_DIRECTORY
-from util_overpass_client import UtilOverpassClient
 
 
 def main(city_configuration_path: str):
-    util_overpass_client = UtilOverpassClient()
 
     with open(city_configuration_path) as file:
         city_configuration = CityConfiguration.model_validate_json(file.read())
@@ -19,20 +17,12 @@ def main(city_configuration_path: str):
 
     gtfs_package = GTFSPackage.from_url(city_configuration.gtfs_url)
 
-    relations_and_stops_query_result = OverpassClient.get_relations_and_stops(
+    relations_and_stops_query_result = OverpassTestClient.get_relations_and_stops(
         city_configuration.osm_area_name,
         city_configuration.custom_stop_mapping.values(),
     )
 
-    tram_stops_and_tracks_query_result = OverpassClient.get_tram_stops_and_tracks(
-        city_configuration.osm_area_name
-    )
-
-    osm_tram_stops = util_overpass_client.get_tram_stops(
-        city_configuration.osm_area_name
-    )
-
-    osm_tram_track_crossings = util_overpass_client.get_tram_track_crossings(
+    tram_stops_and_tracks_query_result = OverpassTestClient.get_tram_stops_and_tracks(
         city_configuration.osm_area_name
     )
 
@@ -50,12 +40,6 @@ def main(city_configuration_path: str):
 
         with zip_file.open("tram_stops_and_tracks_query_result.pickle", "w") as file:
             pickle.dump(tram_stops_and_tracks_query_result, file)
-
-        with zip_file.open("osm_tram_stops.pickle", "w") as file:
-            pickle.dump(osm_tram_stops, file)
-
-        with zip_file.open("osm_tram_track_crossings.pickle", "w") as file:
-            pickle.dump(osm_tram_track_crossings, file)
 
 
 if __name__ == "__main__":

@@ -1,10 +1,8 @@
 import overpy
+from src.overpass_client import OverpassClient
 
 
-class UtilOverpassClient:
-    def __init__(self):
-        self.overpass = overpy.Overpass()
-
+class OverpassTestClient(OverpassClient):
     _TRAM_TRACK_CROSSINGS_QUERY_TEMPLATE = """
     [out:json];
     area["name"="{area_name}"]->.search_area;
@@ -34,14 +32,17 @@ class UtilOverpassClient:
     out geom;
     """
 
-    def get_tram_track_crossings(self, area_name: str) -> overpy.Result:
-        query = self._TRAM_TRACK_CROSSINGS_QUERY_TEMPLATE.format(area_name=area_name)
-        return self.overpass.query(query)
+    @classmethod
+    def get_tram_track_crossings(cls, area_name: str) -> overpy.Result:
+        query = cls._TRAM_TRACK_CROSSINGS_QUERY_TEMPLATE.format(area_name=area_name)
+        return cls._OVERPASS.query(query)
 
-    def get_tram_track_switches(self, area_name: str) -> overpy.Result:
-        query = self._TRAM_TRACK_SWITCHES_QUERY_TEMPLATE.format(area_name=area_name)
-        return self.overpass.query(query)
+    @classmethod
+    def get_tram_track_switches(cls, area_name: str) -> overpy.Result:
+        query = cls._TRAM_TRACK_SWITCHES_QUERY_TEMPLATE.format(area_name=area_name)
+        return cls._OVERPASS.query(query)
 
-    def get_tram_stops(self, area_name: str) -> overpy.Result:
-        query = self._TRAM_STOPS_QUERY_TEMPLATE.format(area_name=area_name)
-        return self.overpass.query(query)
+    @classmethod
+    def get_tram_stops(cls, area_name: str) -> overpy.Result:
+        query = cls._TRAM_STOPS_QUERY_TEMPLATE.format(area_name=area_name)
+        return cls._OVERPASS.query(query)
