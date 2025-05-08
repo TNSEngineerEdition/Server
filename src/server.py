@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 from pathlib import Path
 
 import uvicorn
@@ -8,6 +9,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import ValidationError
 
 from src.city_data_builder import CityConfiguration, CityDataBuilder
+from src.city_data_cache import CityDataCache
 
 CONFIG_DIRECTORY_PATH = Path(__file__).parents[1] / "config" / "cities"
 
@@ -16,6 +18,7 @@ app = FastAPI()
 app.add_middleware(GZipMiddleware)
 
 logger = logging.getLogger(__name__)
+cache = CityDataCache()
 
 
 @app.get("/cities")
@@ -39,13 +42,35 @@ def get_city_data(city_id: str):
     if not (file_path := CONFIG_DIRECTORY_PATH / f"{city_id}.json").is_file():
         raise HTTPException(404, "City not found")
 
-    city_configuration = CityConfiguration.from_path(file_path)
-    city_data_builder = CityDataBuilder(city_configuration)
+    if cache.is_valid(city_id):
+        logger.info(f"Loading data from cache for {city_id}")
+        city_data = cache.load(city_id)
+        city_data["last_updated"] = cache.last_updated(city_id)
+        return city_data
 
-    return {
-        "tram_track_graph": city_data_builder.tram_track_graph_data,
-        "tram_trips": city_data_builder.tram_trips_data,
-    }
+    try:
+        city_configuration = CityConfiguration.from_path(file_path)
+        city_data_builder = CityDataBuilder(city_configuration)
+        response_data = {
+            "tram_track_graph": city_data_builder.tram_track_graph_data,
+            "tram_trips": city_data_builder.tram_trips_data,
+            "last_updated": datetime.now().isoformat(),
+        }
+        cache.save(city_id, response_data)
+        return response_data
+
+    except Exception as exc:
+        logger.exception(f"Failed to build city data for {city_id}: {exc}")
+
+        if (CONFIG_DIRECTORY_PATH / f"{city_id}.json").exists():
+            try:
+                cached_data = cache.load(city_id)
+                cached_data["last_updated"] = cache.last_updated(city_id)
+                return cached_data
+            except Exception as inner:
+                logger.exception(f"Cache loading failed for {city_id}: {inner}")
+
+        raise HTTPException(500, "Data unavailable for {city_id}")
 
 
 if __name__ == "__main__":
