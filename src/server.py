@@ -42,11 +42,9 @@ def get_city_data(city_id: str):
     if not (file_path := CONFIG_DIRECTORY_PATH / f"{city_id}.json").is_file():
         raise HTTPException(404, "City not found")
 
-    if cache.is_valid(city_id):
+    if cache.is_cache_fresh(city_id):
         logger.info(f"Loading data from cache for {city_id}")
-        city_data = cache.load(city_id)
-        city_data["last_updated"] = cache.last_updated(city_id)
-        return city_data
+        return cache.load_cached_data(city_id)
 
     try:
         city_configuration = CityConfiguration.from_path(file_path)
@@ -56,21 +54,18 @@ def get_city_data(city_id: str):
             "tram_trips": city_data_builder.tram_trips_data,
             "last_updated": datetime.now().isoformat(),
         }
-        cache.save(city_id, response_data)
+        cache.save_to_cache(city_id, response_data)
         return response_data
 
     except Exception as exc:
-        logger.exception(f"Failed to build city data for {city_id}: {exc}")
+        logger.exception(f"Failed to build city data for {city_id}", exc_info=exc)
 
-        if (CONFIG_DIRECTORY_PATH / f"{city_id}.json").exists():
-            try:
-                cached_data = cache.load(city_id)
-                cached_data["last_updated"] = cache.last_updated(city_id)
-                return cached_data
-            except Exception as inner:
-                logger.exception(f"Cache loading failed for {city_id}: {inner}")
+        try:
+            return cache.load_cached_data(city_id)
+        except Exception as inner:
+            logger.exception(f"Cache loading failed for {city_id}", exc_info=inner)
 
-        raise HTTPException(500, "Data unavailable for {city_id}")
+        raise HTTPException(422, "Data processing for {city_id} failed.")
 
 
 if __name__ == "__main__":
