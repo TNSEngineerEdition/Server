@@ -21,7 +21,7 @@ cache = CityDataCache()
 
 
 @app.get("/cities")
-def cities():
+def cities() -> dict[str, CityConfiguration]:
     city_configuration_by_id: dict[str, CityConfiguration] = {}
 
     for file in filter(lambda x: x.is_file(), CONFIG_DIRECTORY_PATH.iterdir()):
@@ -36,7 +36,7 @@ def cities():
     return city_configuration_by_id
 
 
-@app.get("/cities/{city_id}", response_model=ResponseCityData)
+@app.get("/cities/{city_id}")
 def get_city_data(city_id: str) -> ResponseCityData:
     if not (file_path := CONFIG_DIRECTORY_PATH / f"{city_id}.json").is_file():
         raise HTTPException(404, "City not found")
@@ -62,7 +62,7 @@ def get_city_data(city_id: str) -> ResponseCityData:
         except Exception as inner:
             logger.exception(f"Cache loading failed for {city_id}", exc_info=inner)
 
-        raise HTTPException(422, "Data processing for {city_id} failed.")
+        raise HTTPException(422, f"Data processing for {city_id} failed.")
 
 
 if __name__ == "__main__":
