@@ -1,6 +1,5 @@
 import logging
 import os
-from datetime import datetime
 from pathlib import Path
 
 import uvicorn
@@ -9,7 +8,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import ValidationError
 
 from src.city_data_builder import CityConfiguration, CityDataBuilder
-from src.city_data_cache import CityDataCache
+from src.city_data_cache import CityDataCache, ResponseCityData
 
 CONFIG_DIRECTORY_PATH = Path(__file__).parents[1] / "config" / "cities"
 
@@ -37,8 +36,8 @@ def cities():
     return city_configuration_by_id
 
 
-@app.get("/cities/{city_id}")
-def get_city_data(city_id: str):
+@app.get("/cities/{city_id}", response_model=ResponseCityData)
+def get_city_data(city_id: str) -> ResponseCityData:
     if not (file_path := CONFIG_DIRECTORY_PATH / f"{city_id}.json").is_file():
         raise HTTPException(404, "City not found")
 
@@ -49,13 +48,11 @@ def get_city_data(city_id: str):
     try:
         city_configuration = CityConfiguration.from_path(file_path)
         city_data_builder = CityDataBuilder(city_configuration)
-        response_data = {
-            "tram_track_graph": city_data_builder.tram_track_graph_data,
-            "tram_trips": city_data_builder.tram_trips_data,
-            "last_updated": datetime.now().isoformat(),
-        }
-        cache.save_to_cache(city_id, response_data)
-        return response_data
+        return cache.store_and_return(
+            city_id,
+            tram_track_graph=city_data_builder.tram_track_graph_data,
+            tram_trips=city_data_builder.tram_trips_data,
+        )
 
     except Exception as exc:
         logger.exception(f"Failed to build city data for {city_id}", exc_info=exc)
