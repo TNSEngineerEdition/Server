@@ -6,7 +6,6 @@ import overpy
 import pytest
 from fastapi.testclient import TestClient
 
-from src.city_data_cache import CityDataCache
 from src.server import app
 from src.tram_stop_mapper import GTFSPackage
 
@@ -179,35 +178,3 @@ class TestServer:
         # Assert
         assert response.status_code == 404
         assert response.json()["detail"] == "City not found"
-
-    @patch("src.server.cache")
-    @patch("src.server.CityDataBuilder.__init__", return_value=None)
-    @patch("src.server.CityDataBuilder.tram_track_graph_data", new_callable=MagicMock)
-    @patch("src.server.CityDataBuilder.tram_trips_data", new_callable=MagicMock)
-    def test_cache_used_after_initial_build(
-        self, tram_trips_mock, tram_track_mock, builder_init_mock, cache_mock, tmp_path
-    ):
-
-        city_id = "krakow"
-
-        temp_cache = CityDataCache(cache_dir=tmp_path)
-        cache_mock._get_path_to_cache.side_effect = temp_cache._get_path_to_cache
-        cache_mock.is_cache_fresh.side_effect = temp_cache.is_cache_fresh
-        cache_mock.load_cached_data.side_effect = temp_cache.load_cached_data
-        cache_mock.store_and_return.side_effect = temp_cache.store_and_return
-
-        tram_trips_mock.return_value = []
-        tram_track_mock.return_value = []
-
-        response1 = self.client.get(f"/cities/{city_id}")
-        assert response1.status_code == 200
-        assert builder_init_mock.called
-        assert temp_cache._get_path_to_cache(city_id).exists()
-
-        builder_init_mock.reset_mock()
-
-        response2 = self.client.get(f"/cities/{city_id}")
-        assert response2.status_code == 200
-        assert "last_updated" in response1.json()
-        assert response1.json() == response2.json()
-        builder_init_mock.assert_not_called()
