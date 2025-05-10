@@ -77,8 +77,10 @@ class TestServer:
     @patch("src.tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
     @patch("src.overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("src.overpass_client.OverpassClient.get_relations_and_stops")
+    @patch("src.city_data_cache.CityDataCache.is_cache_fresh", return_value=False)
     def test_get_city_data(
         self,
+        is_cache_fresh_mock: MagicMock,
         get_relations_and_stops_mock: MagicMock,
         get_tram_stops_and_tracks_mock: MagicMock,
         gtfs_package_from_url_mock: MagicMock,
@@ -138,6 +140,11 @@ class TestServer:
                 gtfs_stop_ids = tram_track_node["gtfs_stop_ids"]
                 assert isinstance(gtfs_stop_ids, list)
                 assert all(isinstance(item, str) for item in gtfs_stop_ids)
+
+        assert any(
+            ("name" in tram_track_node or "gtfs_stop_ids" in tram_track_node)
+            for tram_track_node in tram_track_graph
+        )
 
         tram_trips = city_data["tram_trips"]
         assert tram_trips

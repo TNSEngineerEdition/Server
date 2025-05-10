@@ -3,11 +3,15 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from src.city_data_builder.model import ResponseGraphNode, ResponseTramTrip
+from src.city_data_builder.model import (
+    ResponseGraphNode,
+    ResponseGraphTramStop,
+    ResponseTramTrip,
+)
 
 
 class ResponseCityData(BaseModel):
-    tram_track_graph: list[ResponseGraphNode]
+    tram_track_graph: list[ResponseGraphNode | ResponseGraphTramStop]
     tram_trips: list[ResponseTramTrip]
     last_updated: datetime = Field(default_factory=lambda: datetime.now())
 
