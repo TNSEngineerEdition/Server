@@ -1,6 +1,5 @@
-import os
 import tempfile
-from datetime import datetime, timedelta
+import time
 from pathlib import Path
 
 import pytest
@@ -38,7 +37,9 @@ class TestCityDataCache:
         # Assert
         assert not is_fresh
 
-    def test_store_and_load_data(self, sample_data):
+    def test_store_and_load_data(
+        self, sample_data: tuple[list[ResponseGraphNode], list[ResponseTramTrip]]
+    ):
         # Arrange
         cache_dir = Path(tempfile.mkdtemp())
         cache = CityDataCache(cache_dir=cache_dir, ttl_hours=1)
@@ -54,7 +55,9 @@ class TestCityDataCache:
         assert stored_data == loaded_data
         assert cache.is_cache_fresh(city_id)
 
-    def test_is_cache_fresh_expired(self, sample_data):
+    def test_is_cache_fresh_expired(
+        self, sample_data: tuple[list[ResponseGraphNode], list[ResponseTramTrip]]
+    ):
         # Arrange
         cache_dir = Path(tempfile.mkdtemp())
         cache = CityDataCache(cache_dir=cache_dir, ttl_hours=0)
@@ -62,9 +65,8 @@ class TestCityDataCache:
         tram_track_graph, tram_trips = sample_data
         cache.store_and_return(city_id, tram_track_graph, tram_trips)
 
-        old_time = datetime.now() - timedelta(hours=1)
-        path = cache._get_path_to_cache(city_id)
-        os.utime(path, (old_time.timestamp(), old_time.timestamp()))
+        # Sleeping so we're sure the cache expires
+        time.sleep(1)
 
         # Act
         is_fresh = cache.is_cache_fresh(city_id)
