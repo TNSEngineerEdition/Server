@@ -1,7 +1,8 @@
 import networkx as nx
 import pytest
 from pyproj import Geod
-from src.model import CityConfiguration
+
+from src.city_data_builder import CityConfiguration
 from src.tram_track_graph_transformer import (
     Node,
     NodeNotFoundError,
@@ -11,16 +12,12 @@ from src.tram_track_graph_transformer import (
 )
 
 
-class TestTramStopGraphReachability:
+class TestTramTrackGraphInspector:
     geod = Geod(ellps="WGS84")
 
     @pytest.fixture
-    def tram_stop_pairs(self, tram_trips_by_id: dict[str, list[int]]):
-        return {
-            (stop_ids[i], stop_ids[i + 1])
-            for stop_ids in tram_trips_by_id.values()
-            for i in range(len(stop_ids) - 1)
-        }
+    def unique_tram_stop_pairs(self, tram_trips_by_id: dict[str, list[int]]):
+        return TramTrackGraphInspector.get_unique_tram_stop_pairs(tram_trips_by_id)
 
     def _get_dijkstra_path(self, graph: nx.DiGraph, start_node: Node, end_node: Node):
         return nx.dijkstra_path(
@@ -30,17 +27,30 @@ class TestTramStopGraphReachability:
             weight=lambda u, v, _: self.geod.inv(u.lon, u.lat, v.lon, v.lat)[2],
         )
 
+    def test_get_unique_tram_stop_pairs(self, tram_trips_by_id: dict[str, list[int]]):
+        # Act
+        unique_tram_stop_pairs = TramTrackGraphInspector.get_unique_tram_stop_pairs(
+            tram_trips_by_id
+        )
+
+        # Assert
+        assert len(unique_tram_stop_pairs) == 442
+        assert all(
+            (dest, source) not in unique_tram_stop_pairs
+            for source, dest in unique_tram_stop_pairs
+        )
+
     def test_check_path_viability(
         self,
         krakow_city_configuration: CityConfiguration,
         krakow_tram_network_graph: nx.DiGraph,
-        tram_stop_pairs: set[tuple[int, int]],
+        unique_tram_stop_pairs: set[tuple[int, int]],
     ):
         # Arrange
         tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
 
         # Act
-        for start_id, end_id in tram_stop_pairs:
+        for start_id, end_id in unique_tram_stop_pairs:
             tram_graph_inspector.check_path_viability(
                 start_id,
                 end_id,
@@ -62,7 +72,7 @@ class TestTramStopGraphReachability:
         node_id,
         krakow_city_configuration: CityConfiguration,
         krakow_tram_network_graph: nx.DiGraph,
-        tram_stop_pairs: set[tuple[int, int]],
+        unique_tram_stop_pairs: set[tuple[int, int]],
     ):
         # Arrange
         krakow_tram_network_graph.remove_node(node_id)
@@ -70,7 +80,7 @@ class TestTramStopGraphReachability:
 
         # Act
         with pytest.raises(NodeNotFoundError) as exc_info:
-            for start_id, end_id in tram_stop_pairs:
+            for start_id, end_id in unique_tram_stop_pairs:
                 tram_graph_inspector.check_path_viability(
                     start_id,
                     end_id,
@@ -115,7 +125,7 @@ class TestTramStopGraphReachability:
         end_stop,
         krakow_city_configuration: CityConfiguration,
         krakow_tram_network_graph: nx.DiGraph,
-        tram_stop_pairs: set[tuple[int, int]],
+        unique_tram_stop_pairs: set[tuple[int, int]],
     ):
         # Arrange
         krakow_tram_network_graph.remove_edge(*edge)
@@ -123,7 +133,7 @@ class TestTramStopGraphReachability:
 
         # Act
         with pytest.raises(PathTooLongError) as exc_info:
-            for start_id, end_id in tram_stop_pairs:
+            for start_id, end_id in unique_tram_stop_pairs:
                 tram_graph_inspector.check_path_viability(
                     start_id,
                     end_id,
@@ -169,7 +179,7 @@ class TestTramStopGraphReachability:
         end_stop,
         krakow_city_configuration: CityConfiguration,
         krakow_tram_network_graph: nx.DiGraph,
-        tram_stop_pairs: set[tuple[int, int]],
+        unique_tram_stop_pairs: set[tuple[int, int]],
     ):
         # Arrange
         krakow_tram_network_graph.remove_edge(*edge)
@@ -177,7 +187,7 @@ class TestTramStopGraphReachability:
 
         # Act
         with pytest.raises(NoPathFoundError) as exc_info:
-            for start_id, end_id in tram_stop_pairs:
+            for start_id, end_id in unique_tram_stop_pairs:
                 tram_graph_inspector.check_path_viability(
                     start_id,
                     end_id,
@@ -195,12 +205,12 @@ class TestTramStopGraphReachability:
     def test_shortest_path_between_nodes(
         self,
         krakow_tram_network_graph: nx.DiGraph,
-        tram_stop_pairs: set[tuple[int, int]],
+        unique_tram_stop_pairs: set[tuple[int, int]],
     ):
         # Arrange
         tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
         nodes_by_id = {node.id: node for node in krakow_tram_network_graph.nodes}
-        for start_id, end_id in tram_stop_pairs:
+        for start_id, end_id in unique_tram_stop_pairs:
             dijkstra_path = self._get_dijkstra_path(
                 krakow_tram_network_graph, nodes_by_id[start_id], nodes_by_id[end_id]
             )
