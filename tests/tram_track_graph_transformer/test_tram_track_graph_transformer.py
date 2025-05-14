@@ -4,7 +4,8 @@ from math import sqrt
 import overpy
 import pytest
 from pyproj import Geod
-from src.tram_track_graph_transformer import TramTrackGraphTransformer, Node
+
+from src.tram_track_graph_transformer import Node, TramTrackGraphTransformer
 
 
 class TestTramTrackGraphTransformer:
