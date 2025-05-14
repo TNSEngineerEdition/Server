@@ -3,18 +3,8 @@ from math import sqrt
 
 import overpy
 import pytest
-from networkx import DiGraph
 from pyproj import Geod
-from src.tram_track_graph_transformer import TramTrackGraphTransformer
-from src.tram_track_graph_transformer.node import Node
-
-
-@pytest.fixture()
-def graph_25(osm_tram_stops_and_tracks, krakow_city_configuration):
-    transformer = TramTrackGraphTransformer(
-        osm_tram_stops_and_tracks, krakow_city_configuration
-    )
-    return (transformer, transformer.densify_graph_by_max_distance(25.0))
+from src.tram_track_graph_transformer import TramTrackGraphTransformer, Node
 
 
 class TestTramTrackGraphTransformer:
@@ -24,59 +14,56 @@ class TestTramTrackGraphTransformer:
 
     def test_tram_track_transformer_crossings_in_graph(
         self,
-        krakow_ignored_crossings_and_stops,
         osm_tram_track_crossings: overpy.Result,
-        graph_25: tuple[TramTrackGraphTransformer, DiGraph],
+        tram_stops_and_tracks_overpass_query_result,
+        krakow_city_configuration,
     ):
-        # arrange
-        _, graph = graph_25
+        # Arrange
+        transformer = TramTrackGraphTransformer(
+            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+        )
+        graph = transformer.densify_graph_by_max_distance(25.0)
 
         for node_id in osm_tram_track_crossings.get_node_ids():
-            if (
-                node_id
-                not in krakow_ignored_crossings_and_stops["ignored_crossings_ids"]
-            ):
 
-                # assert
-                assert graph.has_node(node_id) is True
+            # Assert
+            assert graph.has_node(node_id)
 
     def test_tram_track_transformer_crossings_neighbors_amount(
         self,
-        krakow_ignored_crossings_and_stops,
         osm_tram_track_crossings: overpy.Result,
-        graph_25: tuple[TramTrackGraphTransformer, DiGraph],
+        tram_stops_and_tracks_overpass_query_result,
+        krakow_city_configuration,
     ):
-        # arrange
-        _, graph = graph_25
+        # Arrange
+        transformer = TramTrackGraphTransformer(
+            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+        )
+        graph = transformer.densify_graph_by_max_distance(25.0)
 
         for node_id in osm_tram_track_crossings.get_node_ids():
-            if (
-                node_id
-                not in krakow_ignored_crossings_and_stops["ignored_crossings_ids"]
-            ):
 
-                # assert
-                assert len(list(graph.predecessors(node_id))) == len(
-                    list(graph.successors(node_id))
-                )
+            # Assert
+            assert len(list(graph.predecessors(node_id))) == len(
+                list(graph.successors(node_id))
+            )
 
     def test_tram_track_transformer_tram_stops_in_graph(
         self,
-        krakow_ignored_crossings_and_stops,
         osm_tram_stops: overpy.Result,
-        graph_25: tuple[TramTrackGraphTransformer, DiGraph],
+        tram_stops_and_tracks_overpass_query_result,
+        krakow_city_configuration,
     ):
-        # arrange
-        _, graph = graph_25
+        # Arrange
+        transformer = TramTrackGraphTransformer(
+            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+        )
+        graph = transformer.densify_graph_by_max_distance(25.0)
 
         for node_id in osm_tram_stops.get_node_ids():
-            if (
-                node_id
-                not in krakow_ignored_crossings_and_stops["ignored_tram_stops_ids"]
-            ):
 
-                # assert
-                assert graph.has_node(node_id) is True
+            # Assert
+            assert graph.has_node(node_id)
 
     @pytest.mark.parametrize(
         "max_densification_distance", CORRECT_MAX_DENSIFICATION_DISTANCES
@@ -84,14 +71,17 @@ class TestTramTrackGraphTransformer:
     def test_tram_track_transformer_densify_max_distance(
         self,
         max_densification_distance: float,
-        graph_25: tuple[TramTrackGraphTransformer, DiGraph],
+        tram_stops_and_tracks_overpass_query_result,
+        krakow_city_configuration,
     ):
-        # arrange
-        transformer, _ = graph_25
+        # Arrange
+        transformer = TramTrackGraphTransformer(
+            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+        )
         perm_nodes = transformer.permament_nodes
         tolerance = max_densification_distance * 0.001
 
-        # act
+        # Act
         densified_graph = transformer.densify_graph_by_max_distance(
             max_densification_distance
         )
@@ -113,7 +103,7 @@ class TestTramTrackGraphTransformer:
                         prev_node.lon, prev_node.lat, next_node.lon, next_node.lat
                     )
 
-                    # assert
+                    # Assert
                     assert distance <= (max_densification_distance + tolerance)
 
     @pytest.mark.parametrize(
@@ -122,14 +112,17 @@ class TestTramTrackGraphTransformer:
     def test_tram_track_transformer_densify_even_spacing(
         self,
         max_densification_distance: float,
-        graph_25: tuple[TramTrackGraphTransformer, DiGraph],
+        tram_stops_and_tracks_overpass_query_result,
+        krakow_city_configuration,
     ):
-        # arrange
-        transformer, _ = graph_25
+        # Arrange
+        transformer = TramTrackGraphTransformer(
+            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+        )
         perm_nodes = transformer.permament_nodes
         m = 0.05
 
-        # act
+        # Act
         densified_graph = transformer.densify_graph_by_max_distance(
             max_densification_distance
         )
@@ -163,7 +156,7 @@ class TestTramTrackGraphTransformer:
                 squares_sum = sum(map(lambda x: (x - mean) ** 2, distances))
                 sigma = sqrt(squares_sum / n)
 
-                # assert
+                # Assert
                 assert sigma < mean * m
 
     @pytest.mark.parametrize(
@@ -173,18 +166,18 @@ class TestTramTrackGraphTransformer:
         self,
         max_densification_distance: float,
         krakow_city_configuration,
-        osm_tram_stops_and_tracks: overpy.Result,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
     ):
-        # arrange
+        # Arrange
         transformer = TramTrackGraphTransformer(
-            osm_tram_stops_and_tracks, krakow_city_configuration
+            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
         )
 
-        # act
-        with pytest.raises(ValueError) as actual_error:
+        # Act
+        with pytest.raises(ValueError) as Actual_error:
             transformer.densify_graph_by_max_distance(max_densification_distance)
 
-        # assert
+        # Assert
         assert (
-            str(actual_error.value) == "max_distance_in_meters must be greater than 0."
+            str(Actual_error.value) == "max_distance_in_meters must be greater than 0."
         )
