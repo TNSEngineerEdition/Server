@@ -1,4 +1,5 @@
 import overpy
+
 from src.overpass_client import OverpassClient
 
 
@@ -55,7 +56,7 @@ class OverpassTestClient(OverpassClient):
     def get_tram_track_crossings(cls, area_name: str) -> overpy.Result:
         query = cls._TRAM_TRACK_CROSSINGS_QUERY_TEMPLATE.format(area_name=area_name)
         return cls._OVERPASS.query(query)
-    
+
     @classmethod
     def get_tram_track_crossings_excluding(
         cls,
@@ -64,10 +65,9 @@ class OverpassTestClient(OverpassClient):
     ) -> overpy.Result:
         query = cls._TRAM_TRACK_CROSSINGS_EXCLUDING_QUERY_TEMPLATE.format(
             area_name=area_name,
-            excluding_ids=" && ".join([f"id() != {id}" for id in excluding_ids])
+            excluding_ids=" && ".join([f"id() != {id}" for id in excluding_ids]),
         )
         return cls._OVERPASS.query(query)
-        
 
     @classmethod
     def get_tram_track_switches(cls, area_name: str) -> overpy.Result:
@@ -78,7 +78,7 @@ class OverpassTestClient(OverpassClient):
     def get_tram_stops(cls, area_name: str) -> overpy.Result:
         query = cls._TRAM_STOPS_QUERY_TEMPLATE.format(area_name=area_name)
         return cls._OVERPASS.query(query)
-    
+
     @classmethod
     def get_tram_stops_excluding(
         cls,
@@ -87,6 +87,6 @@ class OverpassTestClient(OverpassClient):
     ):
         query = cls._TRAM_STOPS_EXCLUDING_QUERY_TEMPLATE.format(
             area_name=area_name,
-            excluding_ids=" && ".join([f"id() != {id}" for id in excluding_ids])
+            excluding_ids=" && ".join([f"id() != {id}" for id in excluding_ids]),
         )
         return cls._OVERPASS.query(query)
