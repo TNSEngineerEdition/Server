@@ -43,11 +43,9 @@ class TramStopMapper:
         self._gtfs_package = gtfs_package
         self._relations_and_stops = relations_and_stops
 
-        self._stop_mapping: dict[str, set[int]] = {
-            str(stop_id): set() for stop_id in self._gtfs_package.stops.index
-        }
-        self._first_stop_mapping: dict[str, set[int]] = defaultdict(set)
-        self._last_stop_mapping: dict[str, set[int]] = defaultdict(set)
+        self._first_stop_mapping, self._stop_mapping, self._last_stop_mapping = (
+            self._get_initial_stop_mapping()
+        )
 
         self._mapping_errors = TramStopMappingErrors()
         self._longest_osm_relation_by_trip_id: dict[str, overpy.Relation] = {}
@@ -59,6 +57,31 @@ class TramStopMapper:
 
         if self._mapping_errors:
             raise TramStopMappingBuildError(self._mapping_errors)
+
+    def _get_initial_stop_mapping(self):
+        first_stop_mapping: dict[str, set[int]] = defaultdict(set)
+        stop_mapping: dict[str, set[int]] = {
+            str(stop_id): set() for stop_id in self._gtfs_package.stops.index
+        }
+        last_stop_mapping: dict[str, set[int]] = defaultdict(set)
+
+        for (
+            gtfs_stop_id,
+            node_ids,
+        ) in self._city_configuration.custom_stop_mapping.items():
+            if isinstance(node_ids, int):
+                stop_mapping[gtfs_stop_id].add(node_ids)
+                continue
+
+            for node_id, mapping in zip(
+                node_ids, (first_stop_mapping, stop_mapping, last_stop_mapping)
+            ):
+                if node_id is None:
+                    continue
+
+                mapping[gtfs_stop_id].add(node_id)
+
+        return first_stop_mapping, stop_mapping, last_stop_mapping
 
     @cached_property
     def _osm_node_by_id(self):
@@ -250,12 +273,6 @@ class TramStopMapper:
             self._longest_osm_relation_by_trip_id[gtfs_trip_id] = longest_relation
 
     def _build_tram_stop_mapping(self):
-        for (
-            gtfs_stop_id,
-            node_id,
-        ) in self._city_configuration.custom_stop_mapping.items():
-            self._stop_mapping[gtfs_stop_id].add(node_id)
-
         for gtfs_route_id, gtfs_route_row in self._gtfs_package.routes.iterrows():
             route_number = str(gtfs_route_row["route_long_name"])
             if route_number in self._city_configuration.ignored_gtfs_lines:
@@ -337,9 +354,39 @@ class TramStopMapper:
             "TramStopMappingBuildError should have been raised but wasn't."
         )
 
+    def _get_stop_nodes_from_mapping(self, gtfs_trip_stops: list[str]):
+        custom_pair_mapping_last_used = False
+        stop_pair_by_gtfs_stop_ids = (
+            self._city_configuration.custom_stop_pair_by_gtfs_stop_ids
+        )
+
+        result: list[int] = []
+        for i, stop in enumerate(gtfs_trip_stops):
+            if custom_pair_mapping_last_used:
+                result.append(
+                    stop_pair_by_gtfs_stop_ids[gtfs_trip_stops[i - 1], stop][1]
+                )
+                custom_pair_mapping_last_used = False
+                continue
+
+            stop_pair = (
+                (stop, gtfs_trip_stops[i + 1]) if i < len(gtfs_trip_stops) - 1 else None
+            )
+
+            if stop_pair in stop_pair_by_gtfs_stop_ids:
+                custom_pair_mapping_last_used = True
+                result.append(stop_pair_by_gtfs_stop_ids[stop_pair][0])
+            else:
+                result.append(
+                    self._get_node_id_for_trip_stop(stop, i, len(gtfs_trip_stops))
+                )
+
+        return result
+
     @cached_property
     def stop_nodes_by_gtfs_trip_id(self):
         result: dict[str, list[int]] = {}
+
         for (
             gtfs_trip_id,
             longest_relation,
@@ -362,12 +409,7 @@ class TramStopMapper:
                 result[gtfs_trip_id] = [item.id for item in relation_stop_nodes]
                 continue
 
-            stop_nodes_from_mapping = [
-                self._get_node_id_for_trip_stop(stop, i, len(gtfs_trip_stops))
-                for i, stop in enumerate(gtfs_trip_stops)
-            ]
-
-            result[gtfs_trip_id] = stop_nodes_from_mapping
+            result[gtfs_trip_id] = self._get_stop_nodes_from_mapping(gtfs_trip_stops)
 
         return result
 

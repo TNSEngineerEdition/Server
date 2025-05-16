@@ -3,10 +3,28 @@
   "custom_stop_mapping": {
     "stop_272_46419": 1770194211,
     "stop_273_46529": 2163355814,
-    "stop_274_46619": 2756848361,
+    "stop_274_46619": [
+      10020926691,
+      null,
+      2163355821
+    ],
     "stop_294_61419": 2375524420,
     "stop_314_92239": 629106153
   },
+  "custom_stop_pair_mapping": [
+    {
+      "source_gtfs_stop_id": "stop_259_44929",
+      "source_osm_node_id": 2194801607,
+      "destination_gtfs_stop_id": "stop_260_45029",
+      "destination_osm_node_id": 2426893478
+    },
+    {
+      "source_gtfs_stop_id": "stop_274_46619",
+      "source_osm_node_id": 10020926691,
+      "destination_gtfs_stop_id": "stop_272_46429",
+      "destination_osm_node_id": 1369031767
+    }
+  ],
   "gtfs_url": "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip",
   "ignored_gtfs_lines": [
     "99"
@@ -67,6 +85,11 @@
       "source": 11872059166,
       "destination": 10180183264,
       "ratio": 2.1
+    },
+    {
+      "source": 2163355821,
+      "destination": 2163355813,
+      "ratio": 2.3
     }
   ]
 }
