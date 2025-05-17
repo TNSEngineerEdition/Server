@@ -58,6 +58,10 @@ class TramTrackGraphTransformer:
         self._permanent_nodes = self._find_permanent_nodes()
         self._max_node_id = max(node.id for node in self._permanent_nodes)
 
+    @property
+    def permament_nodes(self) -> set[Node]:
+        return self._permanent_nodes.copy()
+
     def _build_tram_track_graph_from_osm_ways(self):
         graph = nx.DiGraph()
 
