@@ -49,7 +49,7 @@ class TestServer:
                 isinstance(gtfs_stop_id, str) for gtfs_stop_id in custom_stop_mapping
             )
             assert all(
-                isinstance(osm_node_id, int)
+                isinstance(osm_node_id, (int, list))
                 for osm_node_id in custom_stop_mapping.values()
             )
 
