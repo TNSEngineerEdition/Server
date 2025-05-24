@@ -79,7 +79,10 @@ class CityDataBuilder:
         for source, dest, data in self._tram_track_graph.edges.data():
             response_data_edge_by_source[source].append(
                 ResponseGraphEdge(
-                    id=dest.id, length=data["length"], azimuth=data["azimuth"]
+                    id=dest.id,
+                    length=data["length"],
+                    azimuth=data["azimuth"],
+                    max_speed=data["max_speed"],
                 )
             )
 
