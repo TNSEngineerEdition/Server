@@ -16,6 +16,7 @@ class GTFSPackage(BaseModel):
     routes: pd.DataFrame
     trips: pd.DataFrame
     stop_times: pd.DataFrame
+    calendar: pd.DataFrame
 
     @classmethod
     def _from_zip_file(cls, zip_file: ZipFile):
@@ -31,7 +32,16 @@ class GTFSPackage(BaseModel):
         with zip_file.open("stop_times.txt") as file:
             stop_times = pd.read_csv(file)
 
-        return cls(stops=stops, routes=routes, trips=trips, stop_times=stop_times)
+        with zip_file.open("calendar.txt") as file:
+            calendar = pd.read_csv(file)
+
+        return cls(
+            stops=stops,
+            routes=routes,
+            trips=trips,
+            stop_times=stop_times,
+            calendar=calendar,
+        )
 
     @classmethod
     def from_file(cls, file_path: str):
@@ -47,6 +57,24 @@ class GTFSPackage(BaseModel):
     @cached_property
     def _stop_times_as_dict(self) -> dict[str, dict[tuple[str, int], Any]]:
         return self.stop_times.set_index(["trip_id", "stop_sequence"]).to_dict()
+
+    @cached_property
+    def _service_id_as_dict(self) -> dict[str, set[str]]:
+        days = [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+        ]
+        result: defaultdict[str, list[str]] = defaultdict(list)
+        for _, row in self.calendar.iterrows():
+            service_id = row["service_id"]
+            service_days = [day for day in days if row[day] == 1]
+            result[service_id] = set(service_days)
+        return dict(result)
 
     @cached_property
     def stop_id_sequence_by_trip_id(self):
@@ -67,7 +95,7 @@ class GTFSPackage(BaseModel):
     def trip_data_and_stops_by_trip_id(self):
         stop_ids = self._stop_times_as_dict["stop_id"]
         departure_times = self._stop_times_as_dict["departure_time"]
-
+        service_id_to_days = self._service_id_as_dict
         trip_stops_by_trip_id: defaultdict[str, list[tuple[str, int]]] = defaultdict(
             list
         )
@@ -83,9 +111,13 @@ class GTFSPackage(BaseModel):
 
         trip_data_by_trip_id: defaultdict[str, dict[str, Any]] = defaultdict(dict)
         for trip_id, trip_row in self.trips.iterrows():
+            service_id = trip_row["service_id"]
             for name, value in trip_row.items():
-                trip_data_by_trip_id[trip_id][name] = value
-
+                if name != "service_id":
+                    trip_data_by_trip_id[trip_id][name] = value
+            trip_data_by_trip_id[trip_id]["service_days"] = list(
+                service_id_to_days.get(service_id)
+            )
             for name, value in self.routes.loc[trip_row["route_id"]].items():
                 trip_data_by_trip_id[trip_id][name] = value
 
