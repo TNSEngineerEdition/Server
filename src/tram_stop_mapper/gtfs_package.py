@@ -113,11 +113,12 @@ class GTFSPackage(BaseModel):
         for trip_id, trip_row in self.trips.iterrows():
             service_id = trip_row["service_id"]
             for name, value in trip_row.items():
-                if name != "service_id":
+                if name == "service_id":
+                    trip_data_by_trip_id[trip_id]["service_days"] = list(
+                        service_id_to_days.get(service_id)
+                    )
+                else:
                     trip_data_by_trip_id[trip_id][name] = value
-            trip_data_by_trip_id[trip_id]["service_days"] = list(
-                service_id_to_days.get(service_id)
-            )
             for name, value in self.routes.loc[trip_row["route_id"]].items():
                 trip_data_by_trip_id[trip_id][name] = value
 
