@@ -1,12 +1,26 @@
 from unittest.mock import MagicMock, patch
 
 import overpy
+import pytest
 
 from src.city_data_builder import CityConfiguration, CityDataBuilder
 from src.tram_stop_mapper.gtfs_package import GTFSPackage
+from src.tram_stop_mapper.weekday import Weekday
 
 
 class TestCityDataBuilder:
+    @pytest.mark.parametrize(
+        ("weekday_enum", "expected_trip_count", "expected_stop_count"),
+        [
+            (Weekday.MONDAY, 4440, 115299),
+            (Weekday.TUESDAY, 4440, 115299),
+            (Weekday.WEDNESDAY, 4440, 115299),
+            (Weekday.THURSDAY, 4440, 115299),
+            (Weekday.FRIDAY, 4532, 117637),
+            (Weekday.SATURDAY, 2666, 70424),
+            (Weekday.SUNDAY, 2400, 63013),
+        ],
+    )
     @patch("src.tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
     @patch("src.overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("src.overpass_client.OverpassClient.get_relations_and_stops")
@@ -19,6 +33,9 @@ class TestCityDataBuilder:
         relations_and_stops_overpass_query_result: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
         gtfs_package: GTFSPackage,
+        weekday_enum: Weekday,
+        expected_trip_count: int,
+        expected_stop_count: int,
     ):
         # Arrange
         get_relations_and_stops_mock.return_value = (
@@ -30,10 +47,11 @@ class TestCityDataBuilder:
         gtfs_package_from_url_mock.return_value = gtfs_package
 
         expected_node_count, expected_edge_count = 43227, 45953
-        expected_trip_count, expected_stop_count = 18478, 481672
 
         # Act
-        city_data_builder = CityDataBuilder(krakow_city_configuration)
+        city_data_builder = CityDataBuilder(
+            krakow_city_configuration, weekday=weekday_enum
+        )
 
         # Assert
         assert len(city_data_builder.tram_track_graph_data) == expected_node_count
