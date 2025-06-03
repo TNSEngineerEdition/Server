@@ -3,25 +3,22 @@ from unittest.mock import MagicMock, patch
 import overpy
 import pytest
 
-from src.city_data_builder import (
-    CityConfiguration,
-    CityDataBuilder,
-    WeekdayEnum,
-)
+from src.city_data_builder import CityConfiguration, CityDataBuilder
 from src.tram_stop_mapper.gtfs_package import GTFSPackage
+from src.tram_stop_mapper.weekday import Weekday
 
 
 class TestCityDataBuilder:
     @pytest.mark.parametrize(
         ("weekday_enum", "expected_trip_count", "expected_stop_count"),
         [
-            (WeekdayEnum.MONDAY, 4440, 115299),
-            (WeekdayEnum.TUESDAY, 4440, 115299),
-            (WeekdayEnum.WEDNESDAY, 4440, 115299),
-            (WeekdayEnum.THURSDAY, 4440, 115299),
-            (WeekdayEnum.FRIDAY, 4532, 117637),
-            (WeekdayEnum.SATURDAY, 2666, 70424),
-            (WeekdayEnum.SUNDAY, 2400, 63013),
+            (Weekday.MONDAY, 4440, 115299),
+            (Weekday.TUESDAY, 4440, 115299),
+            (Weekday.WEDNESDAY, 4440, 115299),
+            (Weekday.THURSDAY, 4440, 115299),
+            (Weekday.FRIDAY, 4532, 117637),
+            (Weekday.SATURDAY, 2666, 70424),
+            (Weekday.SUNDAY, 2400, 63013),
         ],
     )
     @patch("src.tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
@@ -36,7 +33,7 @@ class TestCityDataBuilder:
         relations_and_stops_overpass_query_result: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
         gtfs_package: GTFSPackage,
-        weekday_enum: WeekdayEnum,
+        weekday_enum: Weekday,
         expected_trip_count: int,
         expected_stop_count: int,
     ):
