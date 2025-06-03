@@ -6,9 +6,8 @@ from src.city_data_builder.model import (
     ResponseTramTrip,
     ResponseTramTripStop,
 )
-from src.city_data_builder.weekday_enum import WeekdayEnum
 from src.overpass_client import OverpassClient
-from src.tram_stop_mapper import GTFSPackage, TramStopMapper
+from src.tram_stop_mapper import GTFSPackage, TramStopMapper, Weekday
 from src.tram_track_graph_transformer import (
     Node,
     NodeType,
@@ -21,7 +20,7 @@ class CityDataBuilder:
     def __init__(
         self,
         city_configuration: CityConfiguration,
-        weekday: WeekdayEnum,
+        weekday: Weekday,
         max_distance_between_nodes: float = 5,
     ):
         self._city_configuration = city_configuration

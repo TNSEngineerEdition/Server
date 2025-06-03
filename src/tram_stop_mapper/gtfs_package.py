@@ -8,6 +8,8 @@ import pandas as pd
 import requests
 from pydantic import BaseModel, ConfigDict
 
+from src.tram_stop_mapper.weekday import Weekday
+
 
 class GTFSPackage(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -60,21 +62,12 @@ class GTFSPackage(BaseModel):
 
     @cached_property
     def _service_id_as_dict(self) -> dict[str, set[str]]:
-        days = [
-            "monday",
-            "tuesday",
-            "wednesday",
-            "thursday",
-            "friday",
-            "saturday",
-            "sunday",
-        ]
-        result: defaultdict[str, list[str]] = defaultdict(list)
+        result: dict[str, set[str]] = {}
         for _, row in self.calendar.iterrows():
             service_id = row["service_id"]
-            service_days = [day for day in days if row[day] == 1]
-            result[service_id] = set(service_days)
-        return dict(result)
+            service_days = {day for day in list(Weekday) if row[day] == 1}
+            result[service_id] = service_days
+        return result
 
     @cached_property
     def stop_id_sequence_by_trip_id(self):
@@ -95,7 +88,6 @@ class GTFSPackage(BaseModel):
     def trip_data_and_stops_by_trip_id(self):
         stop_ids = self._stop_times_as_dict["stop_id"]
         departure_times = self._stop_times_as_dict["departure_time"]
-        service_id_to_days = self._service_id_as_dict
         trip_stops_by_trip_id: defaultdict[str, list[tuple[str, int]]] = defaultdict(
             list
         )
@@ -114,8 +106,8 @@ class GTFSPackage(BaseModel):
             service_id = trip_row["service_id"]
             for name, value in trip_row.items():
                 if name == "service_id":
-                    trip_data_by_trip_id[trip_id]["service_days"] = list(
-                        service_id_to_days.get(service_id)
+                    trip_data_by_trip_id[trip_id]["service_days"] = set(
+                        self._service_id_as_dict.get(service_id)
                     )
                 else:
                     trip_data_by_trip_id[trip_id][name] = value

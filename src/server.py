@@ -1,4 +1,3 @@
-import datetime
 import logging
 import os
 from pathlib import Path
@@ -8,12 +7,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import ValidationError
 
-from src.city_data_builder import (
-    CityConfiguration,
-    CityDataBuilder,
-    WeekdayEnum,
-)
+from src.city_data_builder import CityConfiguration, CityDataBuilder
 from src.city_data_cache import CityDataCache, ResponseCityData
+from src.tram_stop_mapper.weekday import Weekday
 
 CONFIG_DIRECTORY_PATH = Path(__file__).parents[1] / "config" / "cities"
 
@@ -42,23 +38,20 @@ def cities() -> dict[str, CityConfiguration]:
 
 
 @app.get("/cities/{city_id}")
-def get_city_data(
-    city_id: str, weekday: str | None = datetime.datetime.now().strftime("%A").lower()
-) -> ResponseCityData:
+def get_city_data(city_id: str, weekday: str | None = None) -> ResponseCityData:
+    day = Weekday.get_current_weekday(weekday)
+
     if not (file_path := CONFIG_DIRECTORY_PATH / f"{city_id}.json").is_file():
         raise HTTPException(404, "City not found")
-    city_daily_schedule = f"{city_id}_{weekday}"
 
-    if not (weekday_enum := WeekdayEnum(weekday)):
-        raise HTTPException(422, f"Invalid weekday: {weekday}")
-
+    city_daily_schedule = f"{city_id}_{day.value}"
     if cache.is_cache_fresh(city_daily_schedule):
         logger.info(f"Loading data from cache for {city_daily_schedule}")
         return cache.load_cached_data(city_daily_schedule)
 
     try:
         city_configuration = CityConfiguration.from_path(file_path)
-        city_data_builder = CityDataBuilder(city_configuration, weekday_enum)
+        city_data_builder = CityDataBuilder(city_configuration, day)
         return cache.store_and_return(
             city_daily_schedule,
             tram_track_graph=city_data_builder.tram_track_graph_data,

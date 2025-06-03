@@ -62,6 +62,19 @@ class TestGTFSPackage:
         "timepoint",
     ]
 
+    GTFS_CALENDAR_COLUMNS = [
+        "service_id",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+        "start_date",
+        "end_date",
+    ]
+
     GTFS_FILE_PATH = Path.cwd() / "tests" / "assets" / "gtfs_schedule.zip"
 
     @staticmethod
@@ -108,6 +121,12 @@ class TestGTFSPackage:
             row_count=481672,
         )
 
+        self._assert_data_frame_content(
+            data_frame=gtfs_package.calendar,
+            columns=self.GTFS_CALENDAR_COLUMNS,
+            row_count=5,
+        )
+
     @patch("requests.get")
     def test_from_url(self, get_mock: MagicMock):
         # Arrange
@@ -146,6 +165,12 @@ class TestGTFSPackage:
             data_frame=gtfs_package.stop_times,
             columns=self.GTFS_STOP_TIMES_COLUMNS,
             row_count=481672,
+        )
+
+        self._assert_data_frame_content(
+            data_frame=gtfs_package.calendar,
+            columns=self.GTFS_CALENDAR_COLUMNS,
+            row_count=5,
         )
 
     def test_stop_id_sequence_by_trip_id(self):
