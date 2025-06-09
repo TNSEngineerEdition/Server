@@ -27,7 +27,9 @@ class TestCityDataCache:
                 id=1,
                 lat=50.0,
                 lon=19.0,
-                neighbors=[ResponseGraphEdge(id=2, length=100.0, azimuth=90.0)],
+                neighbors=[
+                    ResponseGraphEdge(id=2, length=100.0, azimuth=90.0, max_speed=5)
+                ],
             )
         ]
 
