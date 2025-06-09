@@ -33,9 +33,11 @@ class TestTramTrackGraphTransformer:
                     )
                     assert distance <= (max_distance + tolerance)
 
-    def _assert_even_spacing_of_densified_nodes(self, graph, m: int, perm_nodes, perm_node, succ_node):
+    def _assert_even_spacing_of_densified_nodes(
+        self, graph, m: int, perm_nodes, perm_node, succ_node
+    ):
         if succ_node in perm_nodes:
-            return    
+            return
         distances = []
         prev_node = perm_node
         next_node = succ_node
@@ -168,7 +170,7 @@ class TestTramTrackGraphTransformer:
                     m=m,
                     perm_nodes=perm_nodes,
                     perm_node=perm_node,
-                    succ_node=succ_node
+                    succ_node=succ_node,
                 )
 
     @pytest.mark.parametrize(
