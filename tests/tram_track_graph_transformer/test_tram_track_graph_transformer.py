@@ -33,35 +33,29 @@ class TestTramTrackGraphTransformer:
                     )
                     assert distance <= (max_distance + tolerance)
 
-    def _assert_even_spacing_of_densified_nodes(self, graph, perm_nodes):
-        m = 0.05
-        for perm_node in perm_nodes:
-            succ_nodes = graph.successors(perm_node)
+    def _assert_even_spacing_of_densified_nodes(self, graph, m: int, perm_nodes, perm_node, succ_node):
+        if succ_node in perm_nodes:
+            return    
+        distances = []
+        prev_node = perm_node
+        next_node = succ_node
+        visited = {prev_node}
 
-            for succ_node in succ_nodes:
-                if succ_node in perm_nodes:
-                    continue
+        while next_node not in perm_nodes and next_node not in visited:
+            _, _, distance = self._geod.inv(
+                prev_node.lon, prev_node.lat, next_node.lon, next_node.lat
+            )
+            distances.append(distance)
+            visited.add(prev_node)
+            prev_node = next_node
+            next_node = list(graph.successors(prev_node))[0]
 
-                distances = []
-                prev_node = perm_node
-                next_node = succ_node
-                visited = {prev_node}
+        if not distances:
+            return
 
-                while next_node not in perm_nodes and next_node not in visited:
-                    _, _, distance = self._geod.inv(
-                        prev_node.lon, prev_node.lat, next_node.lon, next_node.lat
-                    )
-                    distances.append(distance)
-                    visited.add(prev_node)
-                    prev_node = next_node
-                    next_node = list(graph.successors(prev_node))[0]
-
-                if not distances:
-                    continue
-
-                mean = sum(distances) / len(distances)
-                sigma = sqrt(sum((x - mean) ** 2 for x in distances) / len(distances))
-                assert sigma < mean * m
+        mean = sum(distances) / len(distances)
+        sigma = sqrt(sum((x - mean) ** 2 for x in distances) / len(distances))
+        assert sigma < mean * m
 
     def test_tram_track_transformer_crossings_in_graph(
         self,
@@ -154,6 +148,7 @@ class TestTramTrackGraphTransformer:
         krakow_city_configuration,
     ):
         # Arrange
+        m = 0.05
         transformer = TramTrackGraphTransformer(
             tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
         )
@@ -165,7 +160,16 @@ class TestTramTrackGraphTransformer:
         )
 
         # Assert
-        self._assert_even_spacing_of_densified_nodes(densified_graph, perm_nodes)
+        for perm_node in perm_nodes:
+            succ_nodes = densified_graph.successors(perm_node)
+            for succ_node in succ_nodes:
+                self._assert_even_spacing_of_densified_nodes(
+                    graph=densified_graph,
+                    m=m,
+                    perm_nodes=perm_nodes,
+                    perm_node=perm_node,
+                    succ_node=succ_node
+                )
 
     @pytest.mark.parametrize(
         "max_densification_distance", INCORRECT_MAX_DENSIFICATION_DISTANCES
