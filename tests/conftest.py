@@ -31,7 +31,6 @@ def tram_stops_and_tracks_overpass_query_result() -> overpy.Result:
         "tests/assets/tram_stops_and_tracks_overpass_query_result.zip"
     ) as zip_file:
         with zip_file.open("osm_tram_stops_and_tracks.pickle") as file:
-        with zip_file.open("osm_tram_stops_and_tracks.pickle") as file:
             return pickle.load(file)
 
 

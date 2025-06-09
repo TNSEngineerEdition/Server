@@ -65,7 +65,7 @@ class OverpassTestClient(OverpassClient):
     ) -> overpy.Result:
         query = cls._TRAM_TRACK_CROSSINGS_EXCLUDING_QUERY_TEMPLATE.format(
             area_name=area_name,
-            excluding_ids=" && ".join([f"id() != {id}" for id in excluding_ids]),
+            excluding_ids=" && ".join(f"id() != {id}" for id in excluding_ids),
         )
         return cls._OVERPASS.query(query)
 
@@ -87,6 +87,6 @@ class OverpassTestClient(OverpassClient):
     ):
         query = cls._TRAM_STOPS_EXCLUDING_QUERY_TEMPLATE.format(
             area_name=area_name,
-            excluding_ids=" && ".join([f"id() != {id}" for id in excluding_ids]),
+            excluding_ids=" && ".join(f"id() != {id}" for id in excluding_ids),
         )
         return cls._OVERPASS.query(query)
