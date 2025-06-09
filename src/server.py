@@ -39,7 +39,11 @@ def cities() -> dict[str, CityConfiguration]:
 
 @app.get("/cities/{city_id}")
 def get_city_data(city_id: str, weekday: str | None = None) -> ResponseCityData:
-    day = Weekday.get_current_weekday(weekday)
+    day = (
+        Weekday.get_weekday_by_value(weekday)
+        if weekday
+        else Weekday.get_current_weekday()
+    )
 
     if not (file_path := CONFIG_DIRECTORY_PATH / f"{city_id}.json").is_file():
         raise HTTPException(404, "City not found")
