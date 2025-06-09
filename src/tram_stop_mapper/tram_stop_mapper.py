@@ -100,6 +100,7 @@ class TramStopMapper:
                 and member.ref in self._osm_node_by_id
             ]
             for relation in self._relations_and_stops.get_relations()
+            if relation.id not in self._city_configuration.ignored_osm_relations
         }
 
     @staticmethod

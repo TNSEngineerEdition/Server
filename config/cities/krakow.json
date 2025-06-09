@@ -23,11 +23,25 @@
       "source_osm_node_id": 10020926691,
       "destination_gtfs_stop_id": "stop_272_46429",
       "destination_osm_node_id": 1369031767
+    },
+    {
+      "source_gtfs_stop_id": "stop_1491_372329",
+      "source_osm_node_id": 11155961810,
+      "destination_gtfs_stop_id": "stop_1486_372419",
+      "destination_osm_node_id": 11872059166
+    },
+    {
+      "source_gtfs_stop_id": "stop_1491_372329",
+      "source_osm_node_id": 11155961810,
+      "destination_gtfs_stop_id": "stop_1486_372439",
+      "destination_osm_node_id": 11872059166
     }
   ],
   "gtfs_url": "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip",
-  "ignored_gtfs_lines": [
-    "99"
+  "ignored_gtfs_lines": [],
+  "ignored_osm_relations": [
+    19165542,
+    19165543
   ],
   "max_distance_ratio": 1.5,
   "custom_tram_stop_pair_max_distance_checks": [
