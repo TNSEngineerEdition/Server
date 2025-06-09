@@ -54,6 +54,7 @@ def krakow_city_configuration():
         Path.cwd() / "tests" / "assets" / "krakow_city_configuration.json"
     )
 
+
 @pytest.fixture
 def krakow_ignored_crossings_and_stops():
     with open("tests/assets/krakow_ignored_crossings_and_stops.json") as file:
