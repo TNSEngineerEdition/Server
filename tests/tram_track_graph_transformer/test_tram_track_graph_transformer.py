@@ -3,8 +3,10 @@ from math import sqrt
 
 import overpy
 import pytest
+from networkx import DiGraph
 from pyproj import Geod
 
+from src.city_data_builder import CityConfiguration
 from src.tram_track_graph_transformer import Node, TramTrackGraphTransformer
 
 
@@ -13,7 +15,9 @@ class TestTramTrackGraphTransformer:
     INCORRECT_MAX_DENSIFICATION_DISTANCES = [-5.0, 0.0]
     _geod = Geod(ellps="WGS84")
 
-    def _assert_densified_edges_within_distance(self, graph, perm_nodes, max_distance):
+    def _assert_densified_edges_within_distance(
+        self, graph: DiGraph, perm_nodes: list[Node], max_distance: int
+    ):
         tolerance = max_distance * 0.001
         for perm_node in perm_nodes:
             queue: deque[Node] = deque()
@@ -34,7 +38,12 @@ class TestTramTrackGraphTransformer:
                     assert distance <= (max_distance + tolerance)
 
     def _assert_even_spacing_of_densified_nodes(
-        self, graph, m: int, perm_nodes, perm_node, succ_node
+        self,
+        graph: DiGraph,
+        m: int,
+        perm_nodes: list[Node],
+        perm_node: Node,
+        succ_node: Node,
     ):
         if succ_node in perm_nodes:
             return
@@ -62,8 +71,8 @@ class TestTramTrackGraphTransformer:
     def test_tram_track_transformer_crossings_in_graph(
         self,
         osm_tram_track_crossings: overpy.Result,
-        tram_stops_and_tracks_overpass_query_result,
-        krakow_city_configuration,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
+        krakow_city_configuration: CityConfiguration,
     ):
         # Arrange
         transformer = TramTrackGraphTransformer(
@@ -80,8 +89,8 @@ class TestTramTrackGraphTransformer:
     def test_tram_track_transformer_crossings_neighbors_amount(
         self,
         osm_tram_track_crossings: overpy.Result,
-        tram_stops_and_tracks_overpass_query_result,
-        krakow_city_configuration,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
+        krakow_city_configuration: CityConfiguration,
     ):
         # Arrange
         transformer = TramTrackGraphTransformer(
@@ -100,8 +109,8 @@ class TestTramTrackGraphTransformer:
     def test_tram_track_transformer_tram_stops_in_graph(
         self,
         osm_tram_stops: overpy.Result,
-        tram_stops_and_tracks_overpass_query_result,
-        krakow_city_configuration,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
+        krakow_city_configuration: CityConfiguration,
     ):
         # Arrange
         transformer = TramTrackGraphTransformer(
@@ -121,8 +130,8 @@ class TestTramTrackGraphTransformer:
     def test_tram_track_transformer_densify_max_distance(
         self,
         max_densification_distance: float,
-        tram_stops_and_tracks_overpass_query_result,
-        krakow_city_configuration,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
+        krakow_city_configuration: CityConfiguration,
     ):
         # Arrange
         transformer = TramTrackGraphTransformer(
@@ -146,8 +155,8 @@ class TestTramTrackGraphTransformer:
     def test_tram_track_transformer_densify_even_spacing(
         self,
         max_densification_distance: float,
-        tram_stops_and_tracks_overpass_query_result,
-        krakow_city_configuration,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
+        krakow_city_configuration: CityConfiguration,
     ):
         # Arrange
         m = 0.05
@@ -179,7 +188,7 @@ class TestTramTrackGraphTransformer:
     def test_tram_track_transformer_densify_exception(
         self,
         max_densification_distance: float,
-        krakow_city_configuration,
+        krakow_city_configuration: CityConfiguration,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
     ):
         # Arrange
