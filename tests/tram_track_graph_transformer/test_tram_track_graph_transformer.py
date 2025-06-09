@@ -186,8 +186,4 @@ class TestTramTrackGraphTransformer:
             transformer.densify_graph_by_max_distance(max_densification_distance)
 
         # Assert
-        assert (
-            str(exc.value) == "max_distance_in_meters must be greater than 0."
-        )
-
-    
+        assert str(exc.value) == "max_distance_in_meters must be greater than 0."
