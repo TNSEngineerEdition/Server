@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from src.city_data_builder import CityConfiguration, CityDataBuilder
 from src.city_data_cache import CityDataCache, ResponseCityData
+from src.tram_stop_mapper.weekday import Weekday
 
 CONFIG_DIRECTORY_PATH = Path(__file__).parents[1] / "config" / "cities"
 
@@ -37,32 +38,43 @@ def cities() -> dict[str, CityConfiguration]:
 
 
 @app.get("/cities/{city_id}")
-def get_city_data(city_id: str) -> ResponseCityData:
+def get_city_data(city_id: str, weekday: str | None = None) -> ResponseCityData:
+    day = (
+        Weekday.get_weekday_by_value(weekday)
+        if weekday
+        else Weekday.get_current_weekday()
+    )
+
     if not (file_path := CONFIG_DIRECTORY_PATH / f"{city_id}.json").is_file():
         raise HTTPException(404, "City not found")
 
-    if cache.is_cache_fresh(city_id):
-        logger.info(f"Loading data from cache for {city_id}")
-        return cache.load_cached_data(city_id)
+    city_daily_schedule = f"{city_id}_{day.value}"
+    if cache.is_cache_fresh(city_daily_schedule):
+        logger.info(f"Loading data from cache for {city_daily_schedule}")
+        return cache.load_cached_data(city_daily_schedule)
 
     try:
         city_configuration = CityConfiguration.from_path(file_path)
-        city_data_builder = CityDataBuilder(city_configuration)
+        city_data_builder = CityDataBuilder(city_configuration, day)
         return cache.store_and_return(
-            city_id,
+            city_daily_schedule,
             tram_track_graph=city_data_builder.tram_track_graph_data,
             tram_trips=city_data_builder.tram_trips_data,
         )
 
     except Exception as exc:
-        logger.exception(f"Failed to build city data for {city_id}", exc_info=exc)
+        logger.exception(
+            f"Failed to build city data for {city_daily_schedule}", exc_info=exc
+        )
 
         try:
-            return cache.load_cached_data(city_id)
+            return cache.load_cached_data(city_daily_schedule)
         except Exception as inner:
-            logger.exception(f"Cache loading failed for {city_id}", exc_info=inner)
+            logger.exception(
+                f"Cache loading failed for {city_daily_schedule}", exc_info=inner
+            )
 
-        raise HTTPException(422, f"Data processing for {city_id} failed.")
+        raise HTTPException(422, f"Data processing for {city_daily_schedule} failed.")
 
 
 if __name__ == "__main__":

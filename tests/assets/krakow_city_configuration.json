@@ -26,8 +26,10 @@
     }
   ],
   "gtfs_url": "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip",
-  "ignored_gtfs_lines": [
-    "99"
+  "ignored_gtfs_lines": [],
+  "ignored_osm_relations": [
+    19165542,
+    19165543
   ],
   "max_distance_ratio": 1.5,
   "custom_tram_stop_pair_max_distance_checks": [
