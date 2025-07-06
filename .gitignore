@@ -1,5 +1,6 @@
 /prototypes/
-/cached_data/
+/cities/
+/cache/
 
 .python-version
 __pycache__
