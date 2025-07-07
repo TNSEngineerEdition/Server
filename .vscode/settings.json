@@ -3,6 +3,7 @@
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "python.testing.cwd": "${workspaceFolder}",
+    "python.envFile": "",
     "cSpell.words": [
         "compresslevel",
         "GTFS",

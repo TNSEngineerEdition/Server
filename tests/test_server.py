@@ -6,6 +6,7 @@ import overpy
 import pytest
 from fastapi.testclient import TestClient
 
+from src.city_data_builder.city_configuration import CityConfiguration
 from src.server import app
 from src.tram_stop_mapper import GTFSPackage
 
@@ -73,19 +74,22 @@ class TestServer:
         assert "Invalid configuration file: " in caplog.text
         assert "ValidationError" in caplog.text
 
+    @patch("src.city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
     @patch("src.tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
     @patch("src.overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("src.overpass_client.OverpassClient.get_relations_and_stops")
-    @patch("src.city_data_cache.CityDataCache.is_cache_fresh", return_value=False)
+    @patch("src.city_data_cache.CityDataCache.is_fresh", return_value=False)
     def test_get_city_data(
         self,
-        is_cache_fresh_mock: MagicMock,
+        cache_is_fresh_mock: MagicMock,
         get_relations_and_stops_mock: MagicMock,
         get_tram_stops_and_tracks_mock: MagicMock,
         gtfs_package_from_url_mock: MagicMock,
+        get_latest_in_directory_mock: MagicMock,
         relations_and_stops_overpass_query_result: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
         gtfs_package: GTFSPackage,
+        krakow_city_configuration: CityConfiguration,
     ):
         # Arrange
         get_relations_and_stops_mock.return_value = (
@@ -95,6 +99,7 @@ class TestServer:
             tram_stops_and_tracks_overpass_query_result
         )
         gtfs_package_from_url_mock.return_value = gtfs_package
+        get_latest_in_directory_mock.return_value = krakow_city_configuration
 
         # Act
         response = self.client.get("/cities/krakow")

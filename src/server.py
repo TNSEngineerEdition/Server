@@ -4,6 +4,7 @@ import os
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
+from pydantic import ValidationError
 
 from src.city_data_builder import CityConfiguration, CityDataBuilder
 from src.city_data_cache import CityDataCache, ResponseCityData
@@ -18,7 +19,10 @@ city_data_cache = CityDataCache()
 
 @app.get("/cities")
 def cities() -> dict[str, CityConfiguration]:
-    return CityConfiguration.get_all()
+    try:
+        return CityConfiguration.get_all()
+    except ValidationError:
+        raise HTTPException(500, "Invalid configuration files")
 
 
 @app.get("/cities/{city_id}")
