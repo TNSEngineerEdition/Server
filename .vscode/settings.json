@@ -5,6 +5,7 @@
     "python.testing.cwd": "${workspaceFolder}",
     "python.envFile": "",
     "cSpell.words": [
+        "caplog",
         "compresslevel",
         "GTFS",
         "headsign",
