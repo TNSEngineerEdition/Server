@@ -1,5 +1,6 @@
 services:
-  backend:
+  server:
+    container_name: tns-engineer-edition-server
     build: .
     ports:
       - "${SERVER_PORT}:8000"
