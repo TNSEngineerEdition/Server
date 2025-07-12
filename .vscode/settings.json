@@ -3,7 +3,9 @@
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true,
     "python.testing.cwd": "${workspaceFolder}",
+    "python.envFile": "",
     "cSpell.words": [
+        "caplog",
         "compresslevel",
         "GTFS",
         "headsign",

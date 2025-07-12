@@ -2,6 +2,25 @@
 This repository contains source code, and tests for engineering thesis:  \
 **Concurrent interactive simulator of Krakow's tram network**
 
+## Defining city configurations
+City configurations are by default defined in the `cities` directory in the root of this repository. Inside of this directory there should be multiple directories, names of which specify the city ID. Inside these directories there should be city configurations in the form of JSON files with file names in the form of ISO 8601 format, for example `2025-07-07.json`. These files should contain a valid configuration for a given day, which should contain information specified inside the `CityConfiguration` class.
+
+### Adding or updating configurations
+In case you need to update the city configuration, you should create a new file with the name of the current date. This approach helps keeping backup copies of city configurations in case they need to be brought back. The configuration chosen by the server will always be the configuration with the maximal date.
+
+### Example directory structure
+```
+cities/
+├── krakow/
+│   ├── 2025-01-18.json
+│   ├── 2025-06-13.json
+│   └── 2025-07-25.json
+└── warsaw/
+    ├── 2025-03-05.json
+    ├── 2025-05-31.json
+    └── 2025-07-01.json
+```
+
 ## Development setup and notes
 In order to efficiently and cleanly develop the application, we need to follow a few simple rules.
 

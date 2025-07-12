@@ -1,61 +1,68 @@
+import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from src.city_data_builder.model import (
+from src.city_data_builder import (
+    CityDataBuilder,
     ResponseGraphNode,
     ResponseGraphTramStop,
     ResponseTramTrip,
 )
+from src.tram_stop_mapper import Weekday
 
 
 class ResponseCityData(BaseModel):
     tram_track_graph: list[ResponseGraphNode | ResponseGraphTramStop]
     tram_trips: list[ResponseTramTrip]
-    last_updated: datetime = Field(default_factory=lambda: datetime.now())
+    last_updated: datetime = Field(default_factory=datetime.now)
 
 
 class CityDataCache:
     def __init__(
         self,
-        cache_dir: Path = Path(__file__).parents[1] / "cached_data",
-        ttl_hours: int = 24,
+        cache_directory=Path(
+            os.environ.get("CITY_DATA_CACHE_DIRECTORY", "./cache/cities")
+        ),
+        ttl_timedelta=timedelta(hours=24),
     ):
-        self.cache_dir = cache_dir
-        self.ttl = timedelta(hours=ttl_hours)
+        self.cache_directory = cache_directory
+        self.ttl_timedelta = ttl_timedelta
 
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.cache_directory.mkdir(parents=True, exist_ok=True)
 
-    def _get_path_to_cache(self, city_id: str) -> Path:
-        return self.cache_dir / f"{city_id}.json"
+    def _get_path_to_cache(self, city_id: str, weekday: Weekday) -> Path:
+        return self.cache_directory / f"{city_id}_{weekday}.json"
 
-    def is_cache_fresh(self, city_id: str) -> bool:
-        if not (path := self._get_path_to_cache(city_id)).exists():
+    def is_fresh(self, city_id: str, weekday: Weekday) -> bool:
+        cache_file_path = self._get_path_to_cache(city_id, weekday)
+        if not cache_file_path.is_file():
             return False
 
         timedelta_since_last_update = datetime.now() - datetime.fromtimestamp(
-            path.stat().st_mtime
+            cache_file_path.stat().st_mtime
         )
 
-        return timedelta_since_last_update < self.ttl
+        return timedelta_since_last_update < self.ttl_timedelta
 
-    def load_cached_data(self, city_id: str) -> ResponseCityData:
-        return ResponseCityData.model_validate_json(
-            self._get_path_to_cache(city_id).read_text()
-        )
+    def get(self, city_id: str, weekday: Weekday) -> ResponseCityData | None:
+        cache_file_path = self._get_path_to_cache(city_id, weekday)
+        if not cache_file_path.is_file():
+            return None
 
-    def store_and_return(
+        return ResponseCityData.model_validate_json(cache_file_path.read_text())
+
+    def store(
         self,
         city_id: str,
-        tram_track_graph: list[ResponseGraphNode],
-        tram_trips: list[ResponseTramTrip],
-    ) -> ResponseCityData:
+        weekday: Weekday,
+        city_data_builder: CityDataBuilder,
+    ) -> None:
         data = ResponseCityData(
-            tram_track_graph=tram_track_graph,
-            tram_trips=tram_trips,
+            tram_track_graph=city_data_builder.tram_track_graph_data,
+            tram_trips=city_data_builder.tram_trips_data,
         )
 
-        self._get_path_to_cache(city_id).write_text(data.model_dump_json())
-
-        return data
+        cache_file_path = self._get_path_to_cache(city_id, weekday)
+        cache_file_path.write_text(data.model_dump_json())
