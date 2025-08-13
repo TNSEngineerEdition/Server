@@ -3,7 +3,7 @@ import math
 import networkx as nx
 import overpy
 from pyproj import Geod, Transformer
-from shapely.geometry import LineString, Point
+from shapely.geometry import LineString
 
 from src.city_data_builder import CityConfiguration
 from src.tram_track_graph_transformer.exceptions import (
@@ -31,6 +31,7 @@ class TramTrackGraphTransformer:
     on the called method.
     """
 
+    _KPH_TO_MS = 3.6
     _geod = Geod(ellps="WGS84")
     _transformer = Transformer.from_crs("EPSG:4326", "EPSG:2180", always_xy=True)
     _inverse_transformer = Transformer.from_crs(
@@ -62,15 +63,15 @@ class TramTrackGraphTransformer:
     def permament_nodes(self) -> set[Node]:
         return self._permanent_nodes.copy()
 
-    @staticmethod
+    @classmethod
     def _get_max_speed_for_way(
-        way: overpy.Way, ratio: float = 3.6, default_speed: float = 50.0
+        cls, way: overpy.Way, default_speed_kph: float = 50.0
     ) -> float:
         try:
             max_speed = float(way.tags.get("maxspeed"))
         except (ValueError, TypeError):
-            max_speed = default_speed
-        return max_speed / ratio
+            max_speed = default_speed_kph
+        return max_speed / cls._KPH_TO_MS
 
     def _build_tram_track_graph_from_osm_ways(self):
         graph = nx.DiGraph()
@@ -136,6 +137,25 @@ class TramTrackGraphTransformer:
 
         return result
 
+    def _get_nodes_with_speed_changes(self):
+        """
+        Returns set of nodes at which the maximum allowed speed changes
+        between incident track segments. A node qualifies if among its
+        incident edges (incoming or outgoing) there are at least two distinct
+        non-null `max_speed` values.
+        """
+
+        result: set[Node] = set()
+        for node in self._tram_track_graph.nodes:
+            speeds = {
+                data.get("max_speed")
+                for _, _, data in list(self._tram_track_graph.in_edges(node, data=True))
+                + list(self._tram_track_graph.out_edges(node, data=True))
+            }
+            if len(speeds) > 1:
+                result.add(node)
+        return result
+
     def _find_permanent_nodes(self):
         """
         Permanent nodes are used in `densify_graph_by_max_distance`.
@@ -145,24 +165,24 @@ class TramTrackGraphTransformer:
 
         tram_stops = self._get_tram_stop_node_ids_in_graph()
         crossings = self._get_track_crossing_and_endpoint_node_ids()
+        speed_changes = self._get_nodes_with_speed_changes()
 
-        return tram_stops | crossings
+        return tram_stops | crossings | speed_changes
 
     def _find_path_between_permanent_nodes(
         self, permanent_node: Node, successor: Node
-    ) -> list[tuple[Node, float]]:
+    ) -> tuple[list[Node], float]:
         """
         Finds the first different permanent node reachable from provided
         `permanent_node` via provided `successor` without backtracking.
         """
 
-        path_coords_with_speed = [(permanent_node, 0.0)]
+        path_coordinates = [permanent_node]
         previous_node, current_node = permanent_node, successor
-        current_speed = self._tram_track_graph.get_edge_data(
-            previous_node, current_node
-        )["max_speed"]
+
         while current_node not in self._permanent_nodes:
-            path_coords_with_speed.append((current_node, current_speed))
+            path_coordinates.append(current_node)
+
             next_candidate = next(
                 filter(
                     lambda x: x != previous_node,
@@ -173,28 +193,28 @@ class TramTrackGraphTransformer:
 
             if next_candidate is None:
                 raise TrackDirectionChangeError(permanent_node.id, current_node.id)
-            current_speed = self._tram_track_graph.get_edge_data(
-                current_node, next_candidate
-            )["max_speed"]
+
             previous_node, current_node = current_node, next_candidate
 
-        path_coords_with_speed.append((current_node, current_speed))
-        return path_coords_with_speed
+        path_coordinates.append(current_node)
+
+        max_speed = self._tram_track_graph[permanent_node][path_coordinates[1]].get(
+            "max_speed"
+        )
+
+        return path_coordinates, max_speed
 
     @classmethod
     def _interpolate_path_nodes(
-        cls, path_nodes: list[tuple[Node, float]], max_distance_in_meters: float
-    ) -> list[tuple[tuple[float, float], float]]:
+        cls, path_nodes: list[Node], max_distance_in_meters: float
+    ) -> list[tuple[float, float]]:
         meter_coords = [
-            cls._transformer.transform(node.lon, node.lat) for node, _ in path_nodes
+            cls._transformer.transform(node.lon, node.lat) for node in path_nodes
         ]
         line = LineString(meter_coords)
 
         if line.length <= max_distance_in_meters:
-            return [
-                (path_nodes[0][0].coordinates, path_nodes[0][1]),
-                (path_nodes[-1][0].coordinates, path_nodes[-1][1]),
-            ]
+            return [path_nodes[0].coordinates, path_nodes[-1].coordinates]
 
         segment_count = math.ceil(line.length / max_distance_in_meters)
         segment_size = line.length / segment_count
@@ -203,31 +223,16 @@ class TramTrackGraphTransformer:
             line.interpolate(i * segment_size) for i in range(1, segment_count)
         ]
 
-        interpolated_path_with_speed: list[tuple[tuple[float, float], float]] = [
-            (path_nodes[0][0].coordinates, path_nodes[0][1])
+        interpolated_lat_lon = [
+            cls._inverse_transformer.transform(p.x, p.y)[::-1]
+            for p in interpolated_points
         ]
-        cumulative_distance = [0.0]
-        for i in range(1, len(meter_coords)):
-            prev = Point(meter_coords[i - 1])
-            curr = Point(meter_coords[i])
-            cumulative_distance.append(cumulative_distance[-1] + prev.distance(curr))
 
-        segment_index = 0
-        for p in interpolated_points:
-            distance_to_p = line.project(p)
-            while (
-                segment_index < len(cumulative_distance) - 2
-            ) and cumulative_distance[segment_index + 1] < distance_to_p:
-                segment_index += 1
-
-            speed = path_nodes[segment_index + 1][1]
-            lat_lon = cls._inverse_transformer.transform(p.x, p.y)[::-1]
-            interpolated_path_with_speed.append((lat_lon, speed))
-
-        interpolated_path_with_speed.append(
-            (path_nodes[-1][0].coordinates, path_nodes[-1][1])
-        )
-        return interpolated_path_with_speed
+        return [
+            path_nodes[0].coordinates,
+            *interpolated_lat_lon,
+            path_nodes[-1].coordinates,
+        ]
 
     def _get_new_node_id(self):
         self._max_node_id += 1
@@ -250,14 +255,15 @@ class TramTrackGraphTransformer:
     def _add_interpolated_nodes_path(
         self,
         densified_graph: nx.DiGraph,
-        interpolated_node_coords_with_speed: list[tuple[tuple[float, float], float]],
+        interpolated_node_coordinates: list[tuple[float, float]],
         nodes_by_coordinates: dict[tuple[float, float], Node],
         first_node: Node,
         last_node: Node,
+        max_speed: float,
     ):
         previous_graph_node = first_node
 
-        for (lat, lon), max_speed in interpolated_node_coords_with_speed[1:-1]:
+        for lat, lon in interpolated_node_coordinates[1:-1]:
             if (lat, lon) in nodes_by_coordinates:
                 new_node = nodes_by_coordinates[(lat, lon)]
             else:
@@ -274,7 +280,7 @@ class TramTrackGraphTransformer:
             )
             previous_graph_node = new_node
 
-        (lat, lon), max_speed = interpolated_node_coords_with_speed[-1]
+        lat, lon = interpolated_node_coordinates[-1]
         if (lat, lon) in nodes_by_coordinates:
             last_node = nodes_by_coordinates[(lat, lon)]
 
@@ -302,24 +308,27 @@ class TramTrackGraphTransformer:
         for permanent_node in self._permanent_nodes:
             for successor in self._tram_track_graph.successors(permanent_node):
                 try:
-                    path_nodes = self._find_path_between_permanent_nodes(
+                    path_nodes, max_speed = self._find_path_between_permanent_nodes(
                         permanent_node, successor
                     )
                 except TrackDirectionChangeError as e:
                     errors.append(e)
                     continue
 
-                interpolated_node_coords_with_speed = self._interpolate_path_nodes(
+                interpolated_node_coordinates = self._interpolate_path_nodes(
                     path_nodes, max_distance_in_meters
                 )
+
                 self._add_interpolated_nodes_path(
                     densified_graph,
-                    interpolated_node_coords_with_speed,
+                    interpolated_node_coordinates,
                     nodes_by_coordinates,
                     permanent_node,
-                    path_nodes[-1][0],
+                    path_nodes[-1],
+                    max_speed,
                 )
 
         if errors:
             raise ExceptionGroup("Track direction errors during densification", errors)
+
         return densified_graph
