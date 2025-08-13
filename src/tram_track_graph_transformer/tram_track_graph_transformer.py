@@ -58,6 +58,10 @@ class TramTrackGraphTransformer:
         self._permanent_nodes = self._find_permanent_nodes()
         self._max_node_id = max(node.id for node in self._permanent_nodes)
 
+    @property
+    def permament_nodes(self) -> set[Node]:
+        return self._permanent_nodes.copy()
+      
     @staticmethod
     def _get_max_speed_for_way(
         way: overpy.Way, ratio: float = 3.6, default_speed: float = 50.0

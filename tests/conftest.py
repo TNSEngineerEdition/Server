@@ -30,9 +30,7 @@ def tram_stops_and_tracks_overpass_query_result() -> overpy.Result:
     with zipfile.ZipFile(
         "tests/assets/tram_stops_and_tracks_overpass_query_result.zip"
     ) as zip_file:
-        with zip_file.open(
-            "tram_stops_and_tracks_overpass_query_result.pickle"
-        ) as file:
+        with zip_file.open("osm_tram_stops_and_tracks.pickle") as file:
             return pickle.load(file)
 
 
@@ -55,3 +53,27 @@ def krakow_city_configuration():
     return CityConfiguration.from_path(
         Path.cwd() / "tests" / "assets" / "krakow_city_configuration.json"
     )
+
+
+@pytest.fixture
+def krakow_ignored_crossings_and_stops():
+    with open("tests/assets/krakow_ignored_crossings_and_stops.json") as file:
+        return json.load(file)
+
+
+@pytest.fixture
+def osm_tram_track_crossings() -> overpy.Result:
+    with zipfile.ZipFile(
+        "tests/assets/tram_track_crossings_overpass_query_result.zip"
+    ) as zip_file:
+        with zip_file.open("osm_tram_track_crossings.pickle") as file:
+            return pickle.load(file)
+
+
+@pytest.fixture
+def osm_tram_stops() -> overpy.Result:
+    with zipfile.ZipFile(
+        "tests/assets/tram_stops_overpass_query_result.zip"
+    ) as zip_file:
+        with zip_file.open("osm_tram_stops.pickle") as file:
+            return pickle.load(file)

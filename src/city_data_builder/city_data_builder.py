@@ -7,7 +7,7 @@ from src.city_data_builder.model import (
     ResponseTramTripStop,
 )
 from src.overpass_client import OverpassClient
-from src.tram_stop_mapper import GTFSPackage, TramStopMapper
+from src.tram_stop_mapper import GTFSPackage, TramStopMapper, Weekday
 from src.tram_track_graph_transformer import (
     Node,
     NodeType,
@@ -20,11 +20,12 @@ class CityDataBuilder:
     def __init__(
         self,
         city_configuration: CityConfiguration,
+        weekday: Weekday,
         max_distance_between_nodes: float = 5,
     ):
         self._city_configuration = city_configuration
         self._max_distance_between_nodes = max_distance_between_nodes
-
+        self._weekday = weekday
         self._tram_stop_mapper = self._get_tram_stop_mapper()
         self._tram_track_graph = self._get_tram_track_graph()
 
@@ -126,5 +127,8 @@ class CityDataBuilder:
                 ],
             )
             for trip_id, trip_data in trip_data_by_trip_id.items()
-            if trip_id in trip_stops_data
+            if (
+                trip_id in trip_stops_data
+                and self._weekday.value in trip_data.get("service_days")
+            )
         ]

@@ -1,11 +1,11 @@
-import logging
 import urllib.parse
 from unittest.mock import MagicMock, patch
 
 import overpy
-import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
+from src.city_data_builder.city_configuration import CityConfiguration
 from src.server import app
 from src.tram_stop_mapper import GTFSPackage
 
@@ -13,7 +13,13 @@ from src.tram_stop_mapper import GTFSPackage
 class TestServer:
     client = TestClient(app)
 
-    def test_cities(self):
+    @patch("src.city_data_builder.city_configuration.CityConfiguration.get_all")
+    def test_cities(
+        self, get_all_mock: MagicMock, krakow_city_configuration: CityConfiguration
+    ):
+        # Arrange
+        get_all_mock.return_value = {"krakow": krakow_city_configuration.model_dump()}
+
         # Act
         response = self.client.get("/cities")
         cities = response.json()
@@ -21,6 +27,8 @@ class TestServer:
         # Assert
         assert response.status_code == 200
         assert isinstance(cities, dict)
+        assert len(cities) == 1
+        assert "krakow" in cities
 
         for city_id, city_configuration in cities.items():
             assert city_id
@@ -58,34 +66,34 @@ class TestServer:
             for city_configuration in cities.values()
         )
 
-    @patch("pathlib.Path.read_text", return_value="{Malformed json")
-    def test_cities_validation_error(
-        self, read_text_mock: MagicMock, caplog: pytest.LogCaptureFixture
-    ):
+    @patch("src.city_data_builder.city_configuration.CityConfiguration.get_all")
+    def test_cities_validation_error(self, get_all_mock: MagicMock):
+        # Arrange
+        get_all_mock.side_effect = ValidationError.from_exception_data("", [])
+
         # Act
-        with caplog.at_level(logging.ERROR, logger="src.server"):
-            response = self.client.get("/cities")
+        response = self.client.get("/cities")
 
         # Assert
         assert response.status_code == 500
         assert response.json()["detail"] == "Invalid configuration files"
 
-        assert "Invalid configuration file: " in caplog.text
-        assert "ValidationError" in caplog.text
-
+    @patch("src.city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
     @patch("src.tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
     @patch("src.overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("src.overpass_client.OverpassClient.get_relations_and_stops")
-    @patch("src.city_data_cache.CityDataCache.is_cache_fresh", return_value=False)
+    @patch("src.city_data_cache.CityDataCache.is_fresh", return_value=False)
     def test_get_city_data(
         self,
-        is_cache_fresh_mock: MagicMock,
+        cache_is_fresh_mock: MagicMock,
         get_relations_and_stops_mock: MagicMock,
         get_tram_stops_and_tracks_mock: MagicMock,
         gtfs_package_from_url_mock: MagicMock,
+        get_latest_in_directory_mock: MagicMock,
         relations_and_stops_overpass_query_result: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
         gtfs_package: GTFSPackage,
+        krakow_city_configuration: CityConfiguration,
     ):
         # Arrange
         get_relations_and_stops_mock.return_value = (
@@ -95,6 +103,7 @@ class TestServer:
             tram_stops_and_tracks_overpass_query_result
         )
         gtfs_package_from_url_mock.return_value = gtfs_package
+        get_latest_in_directory_mock.return_value = krakow_city_configuration
 
         # Act
         response = self.client.get("/cities/krakow")
