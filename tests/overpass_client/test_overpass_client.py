@@ -11,7 +11,7 @@ class TestOverpassClient:
     CUSTOM_NODE_IDS = [1, 2, 3, 4]
 
     EXPECTED_RELATIONS_AND_STOPS_QUERY = """
-    [out:json];
+    [out:json][timeout:600];
     area["name"="Some area"]->.search_area;
     (
         relation["route"="tram"](area.search_area);
@@ -28,7 +28,7 @@ class TestOverpassClient:
                 "Some area",
                 [1, 2, 3, 4],
                 """
-                [out:json];
+                [out:json][timeout:600];
                 area["name"="Some area"]->.search_area;
                 (
                     relation["route"="tram"](area.search_area);
@@ -43,7 +43,7 @@ class TestOverpassClient:
                 "Some area",
                 [],
                 """
-                [out:json];
+                [out:json][timeout:600];
                 area["name"="Some area"]->.search_area;
                 (
                     relation["route"="tram"](area.search_area);
