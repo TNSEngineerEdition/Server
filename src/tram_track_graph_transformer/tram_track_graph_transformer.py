@@ -1,4 +1,5 @@
 import math
+from itertools import chain
 
 import networkx as nx
 import overpy
@@ -69,7 +70,7 @@ class TramTrackGraphTransformer:
     ) -> float:
         try:
             max_speed = float(way.tags.get("maxspeed"))
-        except (ValueError, TypeError):
+        except TypeError:
             max_speed = default_speed_kph
         return max_speed / cls._KPH_TO_MS
 
@@ -149,8 +150,10 @@ class TramTrackGraphTransformer:
         for node in self._tram_track_graph.nodes:
             speeds = {
                 data.get("max_speed")
-                for _, _, data in list(self._tram_track_graph.in_edges(node, data=True))
-                + list(self._tram_track_graph.out_edges(node, data=True))
+                for _, _, data in chain(
+                    self._tram_track_graph.in_edges(node, data=True),
+                    self._tram_track_graph.out_edges(node, data=True),
+                )
             }
             if len(speeds) > 1:
                 result.add(node)
