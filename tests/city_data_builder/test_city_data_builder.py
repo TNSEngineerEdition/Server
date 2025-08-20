@@ -46,7 +46,7 @@ class TestCityDataBuilder:
         )
         gtfs_package_from_url_mock.return_value = gtfs_package
 
-        expected_node_count, expected_edge_count = 43227, 45953
+        expected_node_count, expected_edge_count = 43321, 46047
 
         # Act
         city_data_builder = CityDataBuilder(

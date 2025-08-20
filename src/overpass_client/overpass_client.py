@@ -5,7 +5,7 @@ class OverpassClient:
     _OVERPASS = overpy.Overpass()
 
     _RELATIONS_STOPS_QUERY_TEMPLATE = """
-    [out:json];
+    [out:json][timeout:600];
     area["name"="{area_name}"]->.search_area;
     (
         relation["route"="tram"](area.search_area);
@@ -15,7 +15,7 @@ class OverpassClient:
     """
 
     _RELATIONS_STOPS_NODES_QUERY_TEMPLATE = """
-    [out:json];
+    [out:json][timeout:600];
     area["name"="{area_name}"]->.search_area;
     (
         relation["route"="tram"](area.search_area);
@@ -26,7 +26,7 @@ class OverpassClient:
     """
 
     _TRAM_STOPS_AND_TRACKS_TEMPLATE = """
-    [out:json];
+    [out:json][timeout:600];
     area["name"="{area_name}"]->.search_area;
     (
         way["railway"="tram"](area.search_area);

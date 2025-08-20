@@ -1,4 +1,5 @@
 import math
+from itertools import chain
 
 import networkx as nx
 import overpy
@@ -31,6 +32,7 @@ class TramTrackGraphTransformer:
     on the called method.
     """
 
+    _KPH_TO_MS = 3.6
     _geod = Geod(ellps="WGS84")
     _transformer = Transformer.from_crs("EPSG:4326", "EPSG:2180", always_xy=True)
     _inverse_transformer = Transformer.from_crs(
@@ -62,20 +64,31 @@ class TramTrackGraphTransformer:
     def permament_nodes(self) -> set[Node]:
         return self._permanent_nodes.copy()
 
+    @classmethod
+    def _get_max_speed_for_way(
+        cls, way: overpy.Way, default_speed_kph: float = 50.0
+    ) -> float:
+        try:
+            max_speed = float(way.tags.get("maxspeed"))
+        except TypeError:
+            max_speed = default_speed_kph
+        return max_speed / cls._KPH_TO_MS
+
     def _build_tram_track_graph_from_osm_ways(self):
         graph = nx.DiGraph()
 
         for way in self._ways:
             node_ids = [self._nodes_by_id[node.id] for node in way.get_nodes()]
             is_oneway = way.tags.get("oneway") == "yes"
+            max_speed = self._get_max_speed_for_way(way)
 
             for i in range(len(node_ids) - 1):
                 source_node = node_ids[i]
                 destination_node = node_ids[i + 1]
 
-                graph.add_edge(source_node, destination_node)
+                graph.add_edge(source_node, destination_node, max_speed=max_speed)
                 if not is_oneway:
-                    graph.add_edge(destination_node, source_node)
+                    graph.add_edge(destination_node, source_node, max_speed=max_speed)
 
         return graph
 
@@ -125,6 +138,27 @@ class TramTrackGraphTransformer:
 
         return result
 
+    def _get_nodes_with_speed_changes(self):
+        """
+        Returns set of nodes at which the maximum allowed speed changes
+        between incident track segments. A node qualifies if among its
+        incident edges (incoming or outgoing) there are at least two distinct
+        non-null `max_speed` values.
+        """
+
+        result: set[Node] = set()
+        for node in self._tram_track_graph.nodes:
+            speeds = {
+                data.get("max_speed")
+                for _, _, data in chain(
+                    self._tram_track_graph.in_edges(node, data=True),
+                    self._tram_track_graph.out_edges(node, data=True),
+                )
+            }
+            if len(speeds) > 1:
+                result.add(node)
+        return result
+
     def _find_permanent_nodes(self):
         """
         Permanent nodes are used in `densify_graph_by_max_distance`.
@@ -134,12 +168,13 @@ class TramTrackGraphTransformer:
 
         tram_stops = self._get_tram_stop_node_ids_in_graph()
         crossings = self._get_track_crossing_and_endpoint_node_ids()
+        speed_changes = self._get_nodes_with_speed_changes()
 
-        return tram_stops | crossings
+        return tram_stops | crossings | speed_changes
 
     def _find_path_between_permanent_nodes(
         self, permanent_node: Node, successor: Node
-    ) -> list[Node]:
+    ) -> tuple[list[Node], float]:
         """
         Finds the first different permanent node reachable from provided
         `permanent_node` via provided `successor` without backtracking.
@@ -166,7 +201,11 @@ class TramTrackGraphTransformer:
 
         path_coordinates.append(current_node)
 
-        return path_coordinates
+        max_speed = self._tram_track_graph[permanent_node][path_coordinates[1]].get(
+            "max_speed"
+        )
+
+        return path_coordinates, max_speed
 
     @classmethod
     def _interpolate_path_nodes(
@@ -203,14 +242,18 @@ class TramTrackGraphTransformer:
         return self._max_node_id
 
     @classmethod
-    def _add_geodetic_edge(cls, graph: nx.DiGraph, source_node: Node, dest_node: Node):
+    def _add_geodetic_edge(
+        cls, graph: nx.DiGraph, source_node: Node, dest_node: Node, max_speed: float
+    ):
         azimuth, _, length = cls._geod.inv(
             source_node.lon,
             source_node.lat,
             dest_node.lon,
             dest_node.lat,
         )
-        graph.add_edge(source_node, dest_node, azimuth=azimuth, length=length)
+        graph.add_edge(
+            source_node, dest_node, azimuth=azimuth, length=length, max_speed=max_speed
+        )
 
     def _add_interpolated_nodes_path(
         self,
@@ -219,6 +262,7 @@ class TramTrackGraphTransformer:
         nodes_by_coordinates: dict[tuple[float, float], Node],
         first_node: Node,
         last_node: Node,
+        max_speed: float,
     ):
         previous_graph_node = first_node
 
@@ -234,14 +278,18 @@ class TramTrackGraphTransformer:
                 )
                 nodes_by_coordinates[(lat, lon)] = new_node
 
-            self._add_geodetic_edge(densified_graph, previous_graph_node, new_node)
+            self._add_geodetic_edge(
+                densified_graph, previous_graph_node, new_node, max_speed
+            )
             previous_graph_node = new_node
 
         lat, lon = interpolated_node_coordinates[-1]
         if (lat, lon) in nodes_by_coordinates:
             last_node = nodes_by_coordinates[(lat, lon)]
 
-        self._add_geodetic_edge(densified_graph, previous_graph_node, last_node)
+        self._add_geodetic_edge(
+            densified_graph, previous_graph_node, last_node, max_speed
+        )
 
     def densify_graph_by_max_distance(
         self, max_distance_in_meters: float
@@ -263,7 +311,7 @@ class TramTrackGraphTransformer:
         for permanent_node in self._permanent_nodes:
             for successor in self._tram_track_graph.successors(permanent_node):
                 try:
-                    path_nodes = self._find_path_between_permanent_nodes(
+                    path_nodes, max_speed = self._find_path_between_permanent_nodes(
                         permanent_node, successor
                     )
                 except TrackDirectionChangeError as e:
@@ -280,6 +328,7 @@ class TramTrackGraphTransformer:
                     nodes_by_coordinates,
                     permanent_node,
                     path_nodes[-1],
+                    max_speed,
                 )
 
         if errors:

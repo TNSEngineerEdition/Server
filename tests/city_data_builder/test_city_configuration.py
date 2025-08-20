@@ -65,10 +65,14 @@ class TestCityConfiguration:
 
     def test_from_path_invalid_json(self, caplog: LogCaptureFixture):
         # Arrange
-        with tempfile.NamedTemporaryFile() as temp_file:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            delete=False,
+            dir=Path.cwd(),
+        ) as temp_file:
             temp_file.write(b"{Malformed json")
-            path = Path.cwd() / temp_file.name
-
+            path = Path(temp_file.name)
+        try:
             # Act
             with pytest.raises(ValidationError) as exc_info, caplog.at_level(
                 logging.ERROR, "src.city_data_builder.city_configuration"
@@ -78,6 +82,8 @@ class TestCityConfiguration:
             # Assert
             assert "Invalid JSON" in str(exc_info.value)
             assert f"Invalid configuration file: {path}" in caplog.text
+        finally:
+            path.unlink(missing_ok=True)
 
     @patch.object(CityConfiguration, "CITIES_DIRECTORY_PATH", new_callable=PropertyMock)
     def test_get_all(

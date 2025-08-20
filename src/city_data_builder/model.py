@@ -7,6 +7,7 @@ class ResponseGraphEdge(BaseModel):
     id: int
     length: float
     azimuth: float
+    max_speed: float
 
 
 class ResponseGraphNode(BaseModel):
