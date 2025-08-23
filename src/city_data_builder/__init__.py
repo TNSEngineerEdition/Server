@@ -1,6 +1,11 @@
 from .city_configuration import CityConfiguration
 from .city_data_builder import CityDataBuilder
-from .model import ResponseGraphNode, ResponseGraphTramStop, ResponseTramTrip
+from .model import (
+    ResponseGraphNode,
+    ResponseGraphTramStop,
+    ResponseTramRoute,
+    ResponseTramTrip,
+)
 
 __all__ = [
     "CityConfiguration",
@@ -8,4 +13,5 @@ __all__ = [
     "ResponseGraphNode",
     "ResponseGraphTramStop",
     "ResponseTramTrip",
+    "ResponseTramRoute",
 ]

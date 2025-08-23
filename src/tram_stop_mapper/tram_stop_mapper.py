@@ -6,6 +6,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING
 
 import overpy
+from pydantic import BaseModel
 
 from src.tram_stop_mapper.exceptions import TramStopMappingBuildError
 from src.tram_stop_mapper.gtfs_package import GTFSPackage
@@ -13,6 +14,11 @@ from src.tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
 
 if TYPE_CHECKING:
     from src.city_data_builder import CityConfiguration
+
+
+class StopIDAndTime(BaseModel):
+    stop_id: int
+    time: int
 
 
 class TramStopMapper:
@@ -73,7 +79,7 @@ class TramStopMapper:
             node_ids,
         ) in self._city_configuration.custom_stop_mapping.items():
             if isinstance(node_ids, int):
-                stop_mapping[gtfs_stop_id].add(node_ids)
+                stop_mapping[gtfs_stop_id] = {node_ids}
                 continue
 
             for node_id, mapping in zip(
@@ -82,9 +88,13 @@ class TramStopMapper:
                 if node_id is None:
                     continue
 
-                mapping[gtfs_stop_id].add(node_id)
+                mapping[gtfs_stop_id] = {node_id}
 
         return first_stop_mapping, stop_mapping, last_stop_mapping
+
+    @property
+    def gtfs_package(self):
+        return self._gtfs_package
 
     @cached_property
     def _osm_node_by_id(self):
@@ -435,21 +445,14 @@ class TramStopMapper:
         return result
 
     @cached_property
-    def trip_data_and_stops_by_trip_id(self):
-        trip_data_by_trip_id, trip_stops_by_trip_id = (
-            self._gtfs_package.trip_data_and_stops_by_trip_id
-        )
-
-        trip_stops_data: dict[str, list[tuple[int, int]]] = {}
-        for trip_id, trip_stops in trip_stops_by_trip_id.items():
-            if trip_id not in self.stop_nodes_by_gtfs_trip_id:
-                continue
-
-            trip_stops_data[trip_id] = [
-                (node_id, trip_stop[1])
-                for node_id, trip_stop in zip(
-                    self.stop_nodes_by_gtfs_trip_id[trip_id], trip_stops
+    def trip_stops_by_trip_id(self):
+        return {
+            trip_id: [
+                StopIDAndTime(stop_id=node_id, time=stop_time)
+                for node_id, stop_time in zip(
+                    self.stop_nodes_by_gtfs_trip_id[trip_id], stop_times
                 )
             ]
-
-        return trip_data_by_trip_id, trip_stops_data
+            for trip_id, stop_times, in self._gtfs_package.trip_stop_times_by_trip_id.items()
+            if trip_id in self.stop_nodes_by_gtfs_trip_id
+        }

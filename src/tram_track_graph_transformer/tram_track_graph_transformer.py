@@ -245,14 +245,18 @@ class TramTrackGraphTransformer:
     def _add_geodetic_edge(
         cls, graph: nx.DiGraph, source_node: Node, dest_node: Node, max_speed: float
     ):
-        azimuth, _, length = cls._geod.inv(
+        azimuth, _, distance = cls._geod.inv(
             source_node.lon,
             source_node.lat,
             dest_node.lon,
             dest_node.lat,
         )
         graph.add_edge(
-            source_node, dest_node, azimuth=azimuth, length=length, max_speed=max_speed
+            source_node,
+            dest_node,
+            azimuth=azimuth,
+            distance=distance,
+            max_speed=max_speed,
         )
 
     def _add_interpolated_nodes_path(

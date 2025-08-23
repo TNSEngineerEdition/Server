@@ -1,11 +1,14 @@
-from pydantic import BaseModel, ConfigDict
+import re
+from typing import Any, ClassVar
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ResponseGraphEdge(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     id: int
-    length: float
+    distance: float
     azimuth: float
     max_speed: float
 
@@ -16,7 +19,7 @@ class ResponseGraphNode(BaseModel):
     id: int
     lat: float
     lon: float
-    neighbors: list[ResponseGraphEdge]
+    neighbors: dict[int, ResponseGraphEdge]
 
 
 class ResponseGraphTramStop(ResponseGraphNode):
@@ -34,6 +37,39 @@ class ResponseTramTripStop(BaseModel):
 class ResponseTramTrip(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    route: str
     trip_head_sign: str
     stops: list[ResponseTramTripStop]
+
+
+class ResponseTramRoute(BaseModel):
+    _HEX_COLOR_REGEX: ClassVar[re.Pattern] = re.compile(r"^[0-9a-fA-F]{6}$")
+    _DEFAULT_BACKGROUND_COLOR: ClassVar[str] = "0063AF"
+    _DEFAULT_TEXT_COLOR: ClassVar[str] = "1D1D1B"
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    background_color: str
+    text_color: str
+    trips: list[ResponseTramTrip] = Field(default_factory=list)
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def validate_name(cls, value: Any) -> str:
+        return str(value)
+
+    @field_validator("background_color", mode="before")
+    @classmethod
+    def validate_background_color(cls, value: Any) -> str:
+        if isinstance(value, str) and cls._HEX_COLOR_REGEX.match(value):
+            return value.upper()
+
+        return cls._DEFAULT_BACKGROUND_COLOR
+
+    @field_validator("text_color", mode="before")
+    @classmethod
+    def validate_text_color(cls, value: Any) -> str:
+        if isinstance(value, str) and cls._HEX_COLOR_REGEX.match(value):
+            return value.upper()
+
+        return cls._DEFAULT_TEXT_COLOR

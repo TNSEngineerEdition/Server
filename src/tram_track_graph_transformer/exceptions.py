@@ -20,11 +20,11 @@ class NoPathFoundError(Exception):
 
 class PathTooLongError(Exception):
     def __init__(
-        self, start: int, end: int, actual_length: float, allowed_length: float
+        self, start: int, end: int, actual_distance: float, allowed_distance: float
     ):
         super().__init__(
             f"Path too long: {start} -> {end} "
-            f"length: {actual_length:.1f} > allowed: {allowed_length:.1f}"
+            f"distance: {actual_distance:.1f} > allowed: {allowed_distance:.1f}"
         )
 
 

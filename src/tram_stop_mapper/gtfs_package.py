@@ -1,7 +1,7 @@
 from collections import defaultdict
 from functools import cached_property
 from io import BytesIO
-from typing import Any
+from typing import Any, Generator
 from zipfile import ZipFile
 
 import pandas as pd
@@ -61,13 +61,11 @@ class GTFSPackage(BaseModel):
         return self.stop_times.set_index(["trip_id", "stop_sequence"]).to_dict()
 
     @cached_property
-    def _service_id_as_dict(self) -> dict[str, set[str]]:
-        result: dict[str, set[str]] = {}
-        for _, row in self.calendar.iterrows():
-            service_id = row["service_id"]
-            service_days = {day for day in list(Weekday) if row[day] == 1}
-            result[service_id] = service_days
-        return result
+    def weekdays_by_service_id(self):
+        return {
+            str(row["service_id"]): {day for day in list(Weekday) if row[day] == 1}
+            for _, row in self.calendar.iterrows()
+        }
 
     @cached_property
     def stop_id_sequence_by_trip_id(self):
@@ -85,33 +83,23 @@ class GTFSPackage(BaseModel):
         return (hour * 60 + minute) * 60 + second
 
     @cached_property
-    def trip_data_and_stops_by_trip_id(self):
+    def trip_stop_times_by_trip_id(self):
         stop_ids = self._stop_times_as_dict["stop_id"]
         departure_times = self._stop_times_as_dict["departure_time"]
-        trip_stops_by_trip_id: defaultdict[str, list[tuple[str, int]]] = defaultdict(
-            list
-        )
+
+        result: defaultdict[str, list[int]] = defaultdict(list)
         for trip_id, stop_sequence in sorted(stop_ids.keys()):
-            trip_stops_by_trip_id[trip_id].append(
-                (
-                    stop_ids[trip_id, stop_sequence],
-                    self._time_string_to_seconds(
-                        departure_times[trip_id, stop_sequence]
-                    ),
-                )
+            result[trip_id].append(
+                self._time_string_to_seconds(departure_times[trip_id, stop_sequence])
             )
 
-        trip_data_by_trip_id: defaultdict[str, dict[str, Any]] = defaultdict(dict)
-        for trip_id, trip_row in self.trips.iterrows():
-            service_id = trip_row["service_id"]
-            for name, value in trip_row.items():
-                if name == "service_id":
-                    trip_data_by_trip_id[trip_id]["service_days"] = set(
-                        self._service_id_as_dict.get(service_id)
-                    )
-                else:
-                    trip_data_by_trip_id[trip_id][name] = value
-            for name, value in self.routes.loc[trip_row["route_id"]].items():
-                trip_data_by_trip_id[trip_id][name] = value
+        return dict(result)
 
-        return dict(trip_data_by_trip_id), dict(trip_stops_by_trip_id)
+    def get_trips_for_weekday(
+        self, weekday: Weekday
+    ) -> Generator[tuple[str, pd.Series], None, None]:
+        return (
+            (str(trip_id), trip_data)
+            for trip_id, trip_data in self.trips.iterrows()
+            if weekday in self.weekdays_by_service_id[trip_data["service_id"]]
+        )

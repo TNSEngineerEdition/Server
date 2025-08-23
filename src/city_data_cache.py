@@ -8,14 +8,14 @@ from src.city_data_builder import (
     CityDataBuilder,
     ResponseGraphNode,
     ResponseGraphTramStop,
-    ResponseTramTrip,
+    ResponseTramRoute,
 )
 from src.tram_stop_mapper import Weekday
 
 
 class ResponseCityData(BaseModel):
     tram_track_graph: list[ResponseGraphNode | ResponseGraphTramStop]
-    tram_trips: list[ResponseTramTrip]
+    tram_routes: list[ResponseTramRoute]
     last_updated: datetime = Field(default_factory=datetime.now)
 
 
@@ -61,7 +61,7 @@ class CityDataCache:
     ) -> None:
         data = ResponseCityData(
             tram_track_graph=city_data_builder.tram_track_graph_data,
-            tram_trips=city_data_builder.tram_trips_data,
+            tram_routes=city_data_builder.tram_routes_data,
         )
 
         cache_file_path = self._get_path_to_cache(city_id, weekday)
