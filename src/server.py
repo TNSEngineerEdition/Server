@@ -45,9 +45,11 @@ def get_city_data(city_id: str, weekday: str | None = None) -> ResponseCityData:
                 f"Failed to build city data for city {city_id} and weekday {weekday}",
                 exc_info=exc,
             )
-            raise HTTPException(500, f"Data processing for {city_id} failed")
 
-    return city_data_cache.get(city_id, weekday)
+    if city_data := city_data_cache.get(city_id, weekday):
+        return city_data
+
+    raise HTTPException(500, f"Data processing for {city_id} failed")
 
 
 if __name__ == "__main__":
