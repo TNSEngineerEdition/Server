@@ -126,17 +126,19 @@ class TestServer:
             assert isinstance(tram_track_node["lon"], float)
 
             neighbors = tram_track_node["neighbors"]
-            assert isinstance(neighbors, list)
-            for neighbor in neighbors:
+            assert isinstance(neighbors, dict)
+            for key, neighbor in neighbors.items():
+                assert isinstance(key, str)
                 assert isinstance(neighbor, dict)
 
                 neighbor_id = neighbor["id"]
                 assert neighbor_id
                 assert isinstance(neighbor_id, int)
+                assert int(key) == neighbor_id
 
-                neighbor_length = neighbor["length"]
-                assert neighbor_length
-                assert isinstance(neighbor_length, float)
+                neighbor_distance = neighbor["distance"]
+                assert neighbor_distance
+                assert isinstance(neighbor_distance, float)
 
                 neighbor_azimuth = neighbor["azimuth"]
                 assert isinstance(neighbor_azimuth, float)
@@ -154,31 +156,44 @@ class TestServer:
             for tram_track_node in tram_track_graph
         )
 
-        tram_trips = city_data["tram_trips"]
-        assert tram_trips
-        assert isinstance(tram_trips, list)
+        tram_routes = city_data["tram_routes"]
+        assert tram_routes
+        assert isinstance(tram_routes, list)
 
-        for tram_trip in tram_trips:
-            route = tram_trip["route"]
+        for tram_route in tram_routes:
+            route = tram_route["name"]
             assert route
             assert isinstance(route, str)
 
-            trip_head_sign = tram_trip["trip_head_sign"]
-            assert trip_head_sign
-            assert isinstance(trip_head_sign, str)
+            background_color = tram_route["background_color"]
+            assert background_color
+            assert isinstance(background_color, str)
+            assert len(background_color) == 6
 
-            stops = tram_trip["stops"]
-            assert stops
-            assert isinstance(stops, list)
+            text_color = tram_route["text_color"]
+            assert text_color
+            assert isinstance(text_color, str)
+            assert len(text_color) == 6
 
-            for stop in stops:
-                stop_node_id = stop["id"]
-                assert stop_node_id
-                assert isinstance(stop_node_id, int)
+            trips = tram_route["trips"]
+            assert isinstance(trips, list)
+            for trip in trips:
+                trip_head_sign = trip["trip_head_sign"]
+                assert trip_head_sign
+                assert isinstance(trip_head_sign, str)
 
-                stop_time = stop["time"]
-                assert stop_time >= 0
-                assert isinstance(stop_time, int)
+                stops = trip["stops"]
+                assert stops
+                assert isinstance(stops, list)
+
+                for stop in stops:
+                    stop_node_id = stop["id"]
+                    assert stop_node_id
+                    assert isinstance(stop_node_id, int)
+
+                    stop_time = stop["time"]
+                    assert stop_time >= 0
+                    assert isinstance(stop_time, int)
 
     def test_get_city_data_unknown_city_id(self):
         # Act

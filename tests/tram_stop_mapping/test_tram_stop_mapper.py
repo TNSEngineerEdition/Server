@@ -350,7 +350,7 @@ class TestTramStopMapper:
             for node_id in node_ids
         )
 
-    def test_trip_data_and_stops_by_trip_id(
+    def test_trip_stops_by_trip_id(
         self,
         krakow_city_configuration: CityConfiguration,
         gtfs_package: GTFSPackage,
@@ -366,20 +366,10 @@ class TestTramStopMapper:
         )
 
         # Act
-        trip_data_by_trip_id, trip_stops_data = (
-            tram_stop_mapper.trip_data_and_stops_by_trip_id
-        )
+        trip_stops_data = tram_stop_mapper.trip_stops_by_trip_id
 
         # Assert
-        assert set(trip_data_by_trip_id.keys()) == set(trip_stops_data.keys())
         assert all(
-            trip_data.get("route_long_name")
-            for trip_data in trip_data_by_trip_id.values()
+            len(trip_stops_data[trip_id]) == expected_stop_count
+            for trip_id, expected_stop_count in expected_trip_stop_count.items()
         )
-        assert all(
-            trip_data.get("trip_headsign")
-            for trip_data in trip_data_by_trip_id.values()
-        )
-
-        for trip_id, expected_stop_count in expected_trip_stop_count.items():
-            assert len(trip_stops_data[trip_id]) == expected_stop_count

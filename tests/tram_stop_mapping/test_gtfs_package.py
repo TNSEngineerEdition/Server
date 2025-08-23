@@ -201,21 +201,18 @@ class TestGTFSPackage:
         # Make sure the property isn't re-calculated every time for better performance
         assert stop_id_sequence_by_trip_id is gtfs_package.stop_id_sequence_by_trip_id
 
-    def test_trip_data_and_stops_by_trip_id(self):
+    def test_trip_stop_times_by_trip_id(self):
         # Arrange
         gtfs_package = GTFSPackage.from_file(self.GTFS_FILE_PATH)
 
         # Act
-        trip_data_by_trip_id, trip_stops_by_trip_id = (
-            gtfs_package.trip_data_and_stops_by_trip_id
-        )
+        trip_stop_times_by_trip_id = gtfs_package.trip_stop_times_by_trip_id
 
         # Assert
-        assert set(trip_data_by_trip_id.keys()) == set(gtfs_package.trips.index)
-        assert set(trip_stops_by_trip_id.keys()) == set(gtfs_package.trips.index)
+        assert set(trip_stop_times_by_trip_id.keys()) == set(gtfs_package.trips.index)
 
         assert all(
-            trip_stops[i][1] <= trip_stops[i + 1][1]
-            for trip_stops in trip_stops_by_trip_id.values()
+            trip_stops[i] <= trip_stops[i + 1]
+            for trip_stops in trip_stop_times_by_trip_id.values()
             for i in range(len(trip_stops) - 1)
         )

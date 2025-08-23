@@ -11,6 +11,7 @@ from src.city_data_builder.city_data_builder import CityDataBuilder
 from src.city_data_builder.model import (
     ResponseGraphEdge,
     ResponseGraphNode,
+    ResponseTramRoute,
     ResponseTramTrip,
 )
 from src.city_data_cache import CityDataCache, ResponseCityData
@@ -27,14 +28,21 @@ class TestCityDataCache:
                 id=1,
                 lat=50.0,
                 lon=19.0,
-                neighbors=[
-                    ResponseGraphEdge(id=2, length=100.0, azimuth=90.0, max_speed=5)
-                ],
+                neighbors={
+                    2: ResponseGraphEdge(
+                        id=2, distance=100.0, azimuth=90.0, max_speed=5
+                    )
+                },
             )
         ]
 
-        result.tram_trips_data = [
-            ResponseTramTrip(route="1", trip_head_sign="Centrum", stops=[])
+        result.tram_routes_data = [
+            ResponseTramRoute(
+                name="1",
+                background_color="",
+                text_color="",
+                trips=[ResponseTramTrip(trip_head_sign="Centrum", stops=[])],
+            ),
         ]
 
         return result
@@ -74,7 +82,7 @@ class TestCityDataCache:
         assert (
             loaded_data.tram_track_graph == city_data_builder_mock.tram_track_graph_data
         )
-        assert loaded_data.tram_trips == city_data_builder_mock.tram_trips_data
+        assert loaded_data.tram_routes == city_data_builder_mock.tram_routes_data
         assert cache.is_fresh(city_id, weekday)
 
     def test_is_cache_fresh_expired(
@@ -86,7 +94,7 @@ class TestCityDataCache:
 
         cache.store(city_id, weekday, city_data_builder_mock)
 
-        # Sleeping so we're sure the cache expires
+        # Sleeping to make sure the cache expires
         time.sleep(1)
 
         # Act
