@@ -88,7 +88,7 @@ class TestCityDataBuilder:
 
         get_relations_and_stops_mock.assert_called_once_with(
             krakow_city_configuration.osm_area_name,
-            list(krakow_city_configuration.custom_stop_mapping.values()),
+            [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
         )
         get_tram_stops_and_tracks_mock.assert_called_once_with(
             krakow_city_configuration.osm_area_name

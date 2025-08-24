@@ -27,11 +27,10 @@ def cities() -> dict[str, CityConfiguration]:
 
 @app.get("/cities/{city_id}")
 def get_city_data(city_id: str, weekday: str | None = None) -> ResponseCityData:
-    weekday = (
-        Weekday.get_weekday_by_value(weekday)
-        if weekday
-        else Weekday.get_current_weekday()
-    )
+    try:
+        weekday = Weekday.get_by_value_with_default(weekday)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
 
     if (city_configuration := CityConfiguration.get_by_city_id(city_id)) is None:
         raise HTTPException(404, "City not found")

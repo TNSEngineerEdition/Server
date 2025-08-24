@@ -8,6 +8,9 @@ from pyproj import Geod
 
 from src.city_data_builder import CityConfiguration
 from src.tram_track_graph_transformer import Node, TramTrackGraphTransformer
+from src.tram_track_graph_transformer.exceptions import (
+    TrackDirectionChangeError,
+)
 
 
 class TestTramTrackGraphTransformer:
@@ -68,7 +71,7 @@ class TestTramTrackGraphTransformer:
         sigma = sqrt(sum((x - mean) ** 2 for x in distances) / len(distances))
         assert sigma < mean * m
 
-    def test_tram_track_transformer_crossings_in_graph(
+    def test_densify_graph_by_max_distance_crossings_in_graph(
         self,
         osm_tram_track_crossings: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
@@ -86,7 +89,7 @@ class TestTramTrackGraphTransformer:
         for node_id in osm_tram_track_crossings.get_node_ids():
             assert graph.has_node(node_id)
 
-    def test_tram_track_transformer_crossings_neighbors_amount(
+    def test_densify_graph_by_max_distance_crossings_neighbors_amount(
         self,
         osm_tram_track_crossings: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
@@ -106,7 +109,7 @@ class TestTramTrackGraphTransformer:
                 list(graph.successors(node_id))
             )
 
-    def test_tram_track_transformer_tram_stops_in_graph(
+    def test_densify_graph_by_max_distance_tram_stops_in_graph(
         self,
         osm_tram_stops: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
@@ -127,7 +130,7 @@ class TestTramTrackGraphTransformer:
     @pytest.mark.parametrize(
         "max_densification_distance", CORRECT_MAX_DENSIFICATION_DISTANCES
     )
-    def test_tram_track_transformer_densify_max_distance(
+    def test_densify_graph_by_max_distance_max_distance(
         self,
         max_densification_distance: float,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
@@ -152,7 +155,7 @@ class TestTramTrackGraphTransformer:
     @pytest.mark.parametrize(
         "max_densification_distance", CORRECT_MAX_DENSIFICATION_DISTANCES
     )
-    def test_tram_track_transformer_densify_even_spacing(
+    def test_densify_graph_by_max_distance_even_spacing(
         self,
         max_densification_distance: float,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
@@ -185,7 +188,7 @@ class TestTramTrackGraphTransformer:
     @pytest.mark.parametrize(
         "max_densification_distance", INCORRECT_MAX_DENSIFICATION_DISTANCES
     )
-    def test_tram_track_transformer_densify_exception(
+    def test_densify_graph_by_max_distance_invalid_max_distance_in_meters(
         self,
         max_densification_distance: float,
         krakow_city_configuration: CityConfiguration,
@@ -197,8 +200,43 @@ class TestTramTrackGraphTransformer:
         )
 
         # Act
-        with pytest.raises(ValueError) as exc:
+        with pytest.raises(
+            ValueError, match="max_distance_in_meters must be greater than 0."
+        ):
             transformer.densify_graph_by_max_distance(max_densification_distance)
 
+    def test_densify_graph_by_max_distance_track_direction_change(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
+    ):
+        # Arrange
+        del tram_stops_and_tracks_overpass_query_result.get_way(310663772).tags[
+            "oneway"
+        ]
+        del tram_stops_and_tracks_overpass_query_result.get_way(310661792).tags[
+            "oneway"
+        ]
+
+        expected_exception_message = (
+            "Track from permanent node 3161207817 changes direction "
+            "at non-permanent node 3161187695."
+        )
+
+        transformer = TramTrackGraphTransformer(
+            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+        )
+
+        # Act
+        with pytest.raises(
+            ExceptionGroup,
+            match="Track direction errors during densification",
+        ) as exc_info:
+            transformer.densify_graph_by_max_distance(25)
+
         # Assert
-        assert str(exc.value) == "max_distance_in_meters must be greater than 0."
+        assert len(exc_info.value.exceptions) == 1
+
+        exception = exc_info.value.exceptions[0]
+        assert isinstance(exception, TrackDirectionChangeError)
+        assert str(exception) == expected_exception_message

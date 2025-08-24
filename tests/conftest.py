@@ -8,6 +8,7 @@ import overpy
 import pytest
 
 from src.city_data_builder import CityConfiguration
+from src.city_data_cache import ResponseCityData
 from src.tram_stop_mapper import GTFSPackage
 
 
@@ -56,12 +57,6 @@ def krakow_city_configuration():
 
 
 @pytest.fixture
-def krakow_ignored_crossings_and_stops():
-    with open("tests/assets/krakow_ignored_crossings_and_stops.json") as file:
-        return json.load(file)
-
-
-@pytest.fixture
 def osm_tram_track_crossings() -> overpy.Result:
     with zipfile.ZipFile(
         "tests/assets/tram_track_crossings_overpass_query_result.zip"
@@ -77,3 +72,10 @@ def osm_tram_stops() -> overpy.Result:
     ) as zip_file:
         with zip_file.open("osm_tram_stops.pickle") as file:
             return pickle.load(file)
+
+
+@pytest.fixture
+def krakow_response_city_data() -> ResponseCityData:
+    with zipfile.ZipFile("tests/assets/krakow_response_city_data.zip") as zip_file:
+        with zip_file.open("krakow_response_city_data.json") as file:
+            return ResponseCityData.model_validate_json(file.read())

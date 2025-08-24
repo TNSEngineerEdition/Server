@@ -31,9 +31,16 @@ class CityDataBuilder:
         self._tram_track_graph = self._get_tram_track_graph()
 
     def _get_tram_stop_mapper(self):
+        custom_node_ids: list[int] = []
+        for item in self._city_configuration.custom_stop_mapping.values():
+            if isinstance(item, int):
+                custom_node_ids.append(item)
+            else:
+                custom_node_ids.extend(filter(lambda x: x is not None, item))
+
         relations_and_stops = OverpassClient.get_relations_and_stops(
             self._city_configuration.osm_area_name,
-            list(self._city_configuration.custom_stop_mapping.values()),
+            custom_node_ids,
         )
 
         gtfs_package = GTFSPackage.from_url(self._city_configuration.gtfs_url)
