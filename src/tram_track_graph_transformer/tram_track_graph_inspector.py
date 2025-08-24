@@ -4,12 +4,12 @@ import networkx as nx
 from networkx.exception import NetworkXNoPath
 from pyproj import Geod
 
-from src.tram_track_graph_transformer.exceptions import (
+from tram_track_graph_transformer.exceptions import (
     NodeNotFoundError,
     NoPathFoundError,
     PathTooLongError,
 )
-from src.tram_track_graph_transformer.node import Node
+from tram_track_graph_transformer.node import Node
 
 
 class TramTrackGraphInspector:

@@ -1,5 +1,5 @@
-from src.city_data_builder.city_configuration import CityConfiguration
-from src.city_data_builder.model import (
+from city_data_builder.city_configuration import CityConfiguration
+from city_data_builder.model import (
     ResponseGraphEdge,
     ResponseGraphNode,
     ResponseGraphTramStop,
@@ -7,9 +7,9 @@ from src.city_data_builder.model import (
     ResponseTramTrip,
     ResponseTramTripStop,
 )
-from src.overpass_client import OverpassClient
-from src.tram_stop_mapper import GTFSPackage, TramStopMapper, Weekday
-from src.tram_track_graph_transformer import (
+from overpass_client import OverpassClient
+from tram_stop_mapper import GTFSPackage, TramStopMapper, Weekday
+from tram_track_graph_transformer import (
     Node,
     NodeType,
     TramTrackGraphInspector,

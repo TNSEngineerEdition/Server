@@ -7,9 +7,9 @@ import networkx as nx
 import overpy
 import pytest
 
-from src.city_data_builder import CityConfiguration
-from src.city_data_cache import ResponseCityData
-from src.tram_stop_mapper import GTFSPackage
+from city_data_builder import CityConfiguration
+from city_data_cache import ResponseCityData
+from tram_stop_mapper import GTFSPackage
 
 
 @pytest.fixture

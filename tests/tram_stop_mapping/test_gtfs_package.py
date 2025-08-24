@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
-from src.tram_stop_mapper import GTFSPackage
+from tram_stop_mapper import GTFSPackage
 
 
 class TestGTFSPackage:

@@ -7,15 +7,15 @@ from unittest.mock import Mock
 
 import pytest
 
-from src.city_data_builder.city_data_builder import CityDataBuilder
-from src.city_data_builder.model import (
+from city_data_builder import (
+    CityDataBuilder,
     ResponseGraphEdge,
     ResponseGraphNode,
     ResponseTramRoute,
     ResponseTramTrip,
 )
-from src.city_data_cache import CityDataCache, ResponseCityData
-from src.tram_stop_mapper import Weekday
+from city_data_cache import CityDataCache, ResponseCityData
+from tram_stop_mapper import Weekday
 
 
 class TestCityDataCache:

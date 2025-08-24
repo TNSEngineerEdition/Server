@@ -3,9 +3,9 @@ from unittest.mock import MagicMock, patch
 import overpy
 import pytest
 
-from src.city_data_builder import CityConfiguration, CityDataBuilder
-from src.tram_stop_mapper.gtfs_package import GTFSPackage
-from src.tram_stop_mapper.weekday import Weekday
+from city_data_builder import CityConfiguration, CityDataBuilder
+from tram_stop_mapper.gtfs_package import GTFSPackage
+from tram_stop_mapper.weekday import Weekday
 
 
 class TestCityDataBuilder:
@@ -26,9 +26,9 @@ class TestCityDataBuilder:
             pytest.param(Weekday.SUNDAY, 23, 2400, 63013, id=Weekday.SUNDAY),
         ],
     )
-    @patch("src.tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
-    @patch("src.overpass_client.OverpassClient.get_tram_stops_and_tracks")
-    @patch("src.overpass_client.OverpassClient.get_relations_and_stops")
+    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
+    @patch("overpass_client.OverpassClient.get_relations_and_stops")
     def test_city_data_builder(
         self,
         get_relations_and_stops_mock: MagicMock,

@@ -1,5 +1,5 @@
 # TNSEngineerEdition - Server
-This repository contains source code, and tests for engineering thesis:  \
+This repository contains source code, and tests for server component of engineering thesis:  \
 **Concurrent interactive simulator of Krakow's tram network**
 
 ## Defining city configurations

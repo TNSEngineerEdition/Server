@@ -8,12 +8,12 @@ from typing import TYPE_CHECKING
 import overpy
 from pydantic import BaseModel
 
-from src.tram_stop_mapper.exceptions import TramStopMappingBuildError
-from src.tram_stop_mapper.gtfs_package import GTFSPackage
-from src.tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
+from tram_stop_mapper.exceptions import TramStopMappingBuildError
+from tram_stop_mapper.gtfs_package import GTFSPackage
+from tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
 
 if TYPE_CHECKING:
-    from src.city_data_builder import CityConfiguration
+    from city_data_builder import CityConfiguration
 
 
 class StopIDAndTime(BaseModel):

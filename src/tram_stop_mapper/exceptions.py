@@ -1,4 +1,4 @@
-from src.tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
+from tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
 
 
 class TramStopMappingBuildError(ValueError):

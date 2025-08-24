@@ -6,9 +6,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import ValidationError
 
-from src.city_data_builder import CityConfiguration, CityDataBuilder
-from src.city_data_cache import CityDataCache, ResponseCityData
-from src.tram_stop_mapper import Weekday
+from city_data_builder import CityConfiguration, CityDataBuilder
+from city_data_cache import CityDataCache, ResponseCityData
+from tram_stop_mapper import Weekday
 
 app = FastAPI()
 app.add_middleware(GZipMiddleware)

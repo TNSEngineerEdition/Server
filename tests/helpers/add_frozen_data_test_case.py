@@ -4,10 +4,11 @@ from datetime import datetime
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from src.city_data_builder import CityConfiguration
-from src.overpass_client import OverpassClient
-from src.tram_stop_mapper import GTFSPackage
-from tests.constants import FROZEN_DATA_DIRECTORY
+from constants import FROZEN_DATA_DIRECTORY
+
+from city_data_builder import CityConfiguration
+from overpass_client import OverpassClient
+from tram_stop_mapper import GTFSPackage
 
 
 def main(city_configuration_path: Path):

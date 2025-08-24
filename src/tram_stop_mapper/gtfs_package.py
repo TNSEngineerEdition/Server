@@ -8,7 +8,7 @@ import pandas as pd
 import requests
 from pydantic import BaseModel, ConfigDict
 
-from src.tram_stop_mapper.weekday import Weekday
+from tram_stop_mapper.weekday import Weekday
 
 
 class GTFSPackage(BaseModel):

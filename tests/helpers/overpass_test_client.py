@@ -1,6 +1,6 @@
 import overpy
 
-from src.overpass_client import OverpassClient
+from overpass_client import OverpassClient
 
 
 class OverpassTestClient(OverpassClient):

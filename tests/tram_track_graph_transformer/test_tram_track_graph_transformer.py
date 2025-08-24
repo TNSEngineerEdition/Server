@@ -6,9 +6,9 @@ import pytest
 from networkx import DiGraph
 from pyproj import Geod
 
-from src.city_data_builder import CityConfiguration
-from src.tram_track_graph_transformer import Node, TramTrackGraphTransformer
-from src.tram_track_graph_transformer.exceptions import (
+from city_data_builder import CityConfiguration
+from tram_track_graph_transformer import Node, TramTrackGraphTransformer
+from tram_track_graph_transformer.exceptions import (
     TrackDirectionChangeError,
 )
 

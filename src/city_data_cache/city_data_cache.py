@@ -2,21 +2,9 @@ import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from pydantic import BaseModel, Field
-
-from src.city_data_builder import (
-    CityDataBuilder,
-    ResponseGraphNode,
-    ResponseGraphTramStop,
-    ResponseTramRoute,
-)
-from src.tram_stop_mapper import Weekday
-
-
-class ResponseCityData(BaseModel):
-    tram_track_graph: list[ResponseGraphNode | ResponseGraphTramStop]
-    tram_routes: list[ResponseTramRoute]
-    last_updated: datetime = Field(default_factory=datetime.now)
+from city_data_builder import CityDataBuilder
+from city_data_cache.model import ResponseCityData
+from tram_stop_mapper import Weekday
 
 
 class CityDataCache:

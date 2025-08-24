@@ -6,12 +6,12 @@ import overpy
 from pyproj import Geod, Transformer
 from shapely.geometry import LineString
 
-from src.city_data_builder import CityConfiguration
-from src.tram_track_graph_transformer.exceptions import (
+from city_data_builder import CityConfiguration
+from tram_track_graph_transformer.exceptions import (
     TrackDirectionChangeError,
 )
-from src.tram_track_graph_transformer.node import Node
-from src.tram_track_graph_transformer.node_type import NodeType
+from tram_track_graph_transformer.node import Node
+from tram_track_graph_transformer.node_type import NodeType
 
 
 class TramTrackGraphTransformer:

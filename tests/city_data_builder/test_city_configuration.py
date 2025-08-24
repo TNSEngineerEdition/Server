@@ -7,7 +7,7 @@ import pytest
 from pydantic import ValidationError
 from pytest import LogCaptureFixture
 
-from src.city_data_builder import CityConfiguration
+from city_data_builder import CityConfiguration
 
 
 class TestCityConfiguration:
@@ -74,8 +74,9 @@ class TestCityConfiguration:
             path = Path(temp_file.name)
         try:
             # Act
-            with pytest.raises(ValidationError) as exc_info, caplog.at_level(
-                logging.ERROR, "src.city_data_builder.city_configuration"
+            with (
+                pytest.raises(ValidationError) as exc_info,
+                caplog.at_level(logging.ERROR, "city_data_builder.city_configuration"),
             ):
                 CityConfiguration.from_path(path)
 

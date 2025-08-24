@@ -9,16 +9,16 @@ from fastapi.testclient import TestClient
 from freezegun import freeze_time
 from pydantic import ValidationError
 
-from src.city_data_builder import CityConfiguration
-from src.city_data_cache import ResponseCityData
-from src.server import app
-from src.tram_stop_mapper import GTFSPackage, Weekday
+from city_data_builder import CityConfiguration
+from city_data_cache import ResponseCityData
+from server import app
+from tram_stop_mapper import GTFSPackage, Weekday
 
 
 class TestServer:
     client = TestClient(app)
 
-    @patch("src.city_data_builder.city_configuration.CityConfiguration.get_all")
+    @patch("city_data_builder.city_configuration.CityConfiguration.get_all")
     def test_cities(
         self, get_all_mock: MagicMock, krakow_city_configuration: CityConfiguration
     ):
@@ -71,7 +71,7 @@ class TestServer:
             for city_configuration in cities.values()
         )
 
-    @patch("src.city_data_builder.city_configuration.CityConfiguration.get_all")
+    @patch("city_data_builder.city_configuration.CityConfiguration.get_all")
     def test_cities_validation_error(self, get_all_mock: MagicMock):
         # Arrange
         get_all_mock.side_effect = ValidationError.from_exception_data("", [])
@@ -116,6 +116,10 @@ class TestServer:
                 neighbor_azimuth = neighbor["azimuth"]
                 assert isinstance(neighbor_azimuth, float)
                 assert -180 <= neighbor_azimuth <= 180
+
+                neighbor_max_speed = neighbor["max_speed"]
+                assert isinstance(neighbor_max_speed, float)
+                assert neighbor_max_speed > 0
 
             if "name" in tram_track_node or "gtfs_stop_ids" in tram_track_node:
                 assert isinstance(tram_track_node["name"], str)
@@ -169,11 +173,11 @@ class TestServer:
                     assert isinstance(stop_time, int)
 
     @freeze_time("2025-01-01")
-    @patch("src.city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
-    @patch("src.tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
-    @patch("src.overpass_client.OverpassClient.get_tram_stops_and_tracks")
-    @patch("src.overpass_client.OverpassClient.get_relations_and_stops")
-    @patch("src.city_data_cache.CityDataCache.is_fresh", return_value=False)
+    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
+    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
+    @patch("overpass_client.OverpassClient.get_relations_and_stops")
+    @patch("city_data_cache.CityDataCache.is_fresh", return_value=False)
     def test_get_city_data(
         self,
         cache_is_fresh_mock: MagicMock,
@@ -214,11 +218,11 @@ class TestServer:
         )
         get_by_city_id_mock.assert_called_once_with("krakow")
 
-    @patch("src.city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
-    @patch("src.tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
-    @patch("src.overpass_client.OverpassClient.get_tram_stops_and_tracks")
-    @patch("src.overpass_client.OverpassClient.get_relations_and_stops")
-    @patch("src.city_data_cache.CityDataCache.is_fresh", return_value=False)
+    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
+    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
+    @patch("overpass_client.OverpassClient.get_relations_and_stops")
+    @patch("city_data_cache.CityDataCache.is_fresh", return_value=False)
     def test_get_city_data_with_weekday(
         self,
         cache_is_fresh_mock: MagicMock,
@@ -282,10 +286,10 @@ class TestServer:
         assert response.json()["detail"] == expected_response_detail
 
     @freeze_time("2025-01-01")
-    @patch("src.city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
-    @patch("src.overpass_client.OverpassClient.get_relations_and_stops")
-    @patch("src.city_data_cache.CityDataCache.is_fresh", return_value=False)
-    @patch("src.city_data_cache.CityDataCache.get")
+    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
+    @patch("overpass_client.OverpassClient.get_relations_and_stops")
+    @patch("city_data_cache.CityDataCache.is_fresh", return_value=False)
+    @patch("city_data_cache.CityDataCache.get")
     def test_get_city_data_exception_during_data_build(
         self,
         cache_get_mock: MagicMock,
@@ -324,10 +328,10 @@ class TestServer:
         get_by_city_id_mock.assert_called_once_with("krakow")
 
     @freeze_time("2025-01-01")
-    @patch("src.city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
-    @patch("src.overpass_client.OverpassClient.get_relations_and_stops")
-    @patch("src.city_data_cache.CityDataCache.is_fresh", return_value=False)
-    @patch("src.city_data_cache.CityDataCache.get")
+    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
+    @patch("overpass_client.OverpassClient.get_relations_and_stops")
+    @patch("city_data_cache.CityDataCache.is_fresh", return_value=False)
+    @patch("city_data_cache.CityDataCache.get")
     def test_get_city_data_exception_during_data_build_empty_cache(
         self,
         cache_get_mock: MagicMock,
