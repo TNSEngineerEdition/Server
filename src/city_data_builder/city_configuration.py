@@ -37,7 +37,7 @@ class CityConfiguration(BaseModel):
     custom_tram_stop_pair_max_distance_checks: list[TramStopPairCheck]
 
     @classmethod
-    def from_path(cls, path: Path):
+    def from_path(cls, path: Path) -> Self:
         try:
             return cls.model_validate_json(path.read_text())
         except ValidationError as exc:
@@ -45,7 +45,7 @@ class CityConfiguration(BaseModel):
             raise
 
     @classmethod
-    def _get_latest_in_directory(cls, city_directory: Path):
+    def _get_latest_in_directory(cls, city_directory: Path) -> Self:
         latest_configuration_path = max(
             config_file
             for config_file in city_directory.iterdir()
@@ -55,7 +55,7 @@ class CityConfiguration(BaseModel):
         return cls.from_path(latest_configuration_path)
 
     @classmethod
-    def get_all(cls):
+    def get_all(cls) -> dict[str, Self]:
         return {
             city_directory.name: cls._get_latest_in_directory(city_directory)
             for city_directory in cls.CITIES_DIRECTORY_PATH.iterdir()
@@ -78,7 +78,9 @@ class CityConfiguration(BaseModel):
         }
 
     @cached_property
-    def custom_stop_pair_by_gtfs_stop_ids(self):
+    def custom_stop_pair_by_gtfs_stop_ids(
+        self,
+    ) -> dict[tuple[str, str], tuple[int, int]]:
         return {
             (item.source_gtfs_stop_id, item.destination_gtfs_stop_id): (
                 item.source_osm_node_id,

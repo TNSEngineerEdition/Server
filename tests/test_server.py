@@ -21,7 +21,7 @@ class TestServer:
     @patch("city_data_builder.city_configuration.CityConfiguration.get_all")
     def test_cities(
         self, get_all_mock: MagicMock, krakow_city_configuration: CityConfiguration
-    ):
+    ) -> None:
         # Arrange
         get_all_mock.return_value = {"krakow": krakow_city_configuration.model_dump()}
 
@@ -72,7 +72,7 @@ class TestServer:
         )
 
     @patch("city_data_builder.city_configuration.CityConfiguration.get_all")
-    def test_cities_validation_error(self, get_all_mock: MagicMock):
+    def test_cities_validation_error(self, get_all_mock: MagicMock) -> None:
         # Arrange
         get_all_mock.side_effect = ValidationError.from_exception_data("", [])
 
@@ -83,7 +83,7 @@ class TestServer:
         assert response.status_code == 500
         assert response.json()["detail"] == "Invalid configuration files"
 
-    def _assert_city_data_content(self, city_data: Any):
+    def _assert_city_data_content(self, city_data: Any) -> None:
         assert isinstance(city_data, dict)
 
         tram_track_graph = city_data["tram_track_graph"]
@@ -189,7 +189,7 @@ class TestServer:
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
         gtfs_package: GTFSPackage,
         krakow_city_configuration: CityConfiguration,
-    ):
+    ) -> None:
         # Arrange
         get_relations_and_stops_mock.return_value = (
             relations_and_stops_overpass_query_result
@@ -234,7 +234,7 @@ class TestServer:
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
         gtfs_package: GTFSPackage,
         krakow_city_configuration: CityConfiguration,
-    ):
+    ) -> None:
         # Arrange
         get_relations_and_stops_mock.return_value = (
             relations_and_stops_overpass_query_result
@@ -263,7 +263,7 @@ class TestServer:
         )
         get_by_city_id_mock.assert_called_once_with("krakow")
 
-    def test_get_city_data_unknown_city_id(self):
+    def test_get_city_data_unknown_city_id(self) -> None:
         # Act
         response = self.client.get("/cities/1234567890")
 
@@ -271,7 +271,7 @@ class TestServer:
         assert response.status_code == 404
         assert response.json()["detail"] == "City not found"
 
-    def test_get_city_data_invalid_weekday(self):
+    def test_get_city_data_invalid_weekday(self) -> None:
         # Arrange
         expected_response_detail = (
             "Invalid weekday: 1234567890. Must be one of: "
@@ -299,7 +299,7 @@ class TestServer:
         krakow_response_city_data: ResponseCityData,
         krakow_city_configuration: CityConfiguration,
         caplog: pytest.LogCaptureFixture,
-    ):
+    ) -> None:
         # Arrange
         expected_log_message = (
             "Failed to build city data for city krakow and weekday wednesday"
@@ -340,7 +340,7 @@ class TestServer:
         get_by_city_id_mock: MagicMock,
         krakow_city_configuration: CityConfiguration,
         caplog: pytest.LogCaptureFixture,
-    ):
+    ) -> None:
         # Arrange
         expected_log_message = (
             "Failed to build city data for city krakow and weekday wednesday"

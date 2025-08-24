@@ -1,5 +1,6 @@
 import math
 from itertools import chain
+from typing import Any
 
 import networkx as nx
 import overpy
@@ -7,9 +8,7 @@ from pyproj import Geod, Transformer
 from shapely.geometry import LineString
 
 from city_data_builder import CityConfiguration
-from tram_track_graph_transformer.exceptions import (
-    TrackDirectionChangeError,
-)
+from tram_track_graph_transformer.exceptions import TrackDirectionChangeError
 from tram_track_graph_transformer.node import Node
 from tram_track_graph_transformer.node_type import NodeType
 
@@ -74,8 +73,8 @@ class TramTrackGraphTransformer:
             max_speed = default_speed_kph
         return max_speed / cls._KPH_TO_MS
 
-    def _build_tram_track_graph_from_osm_ways(self):
-        graph = nx.DiGraph()
+    def _build_tram_track_graph_from_osm_ways(self) -> "nx.DiGraph[Node]":
+        graph: "nx.DiGraph[Node]" = nx.DiGraph()
 
         for way in self._ways:
             node_ids = [self._nodes_by_id[node.id] for node in way.get_nodes()]
@@ -92,7 +91,7 @@ class TramTrackGraphTransformer:
 
         return graph
 
-    def _get_node_type(self, node: Node):
+    def _get_node_type(self, node: overpy.Node) -> NodeType:
         """
         OSM node IDs mentioned in `custom_stop_mapping` field of `CityConfiguration`
         should always have a type of `NodeType.TRAM_STOP`. This is due to these nodes
@@ -106,7 +105,7 @@ class TramTrackGraphTransformer:
             else NodeType.get_by_value_safe(node.tags.get("railway"))
         )
 
-    def _get_tram_stop_node_ids_in_graph(self):
+    def _get_tram_stop_node_ids_in_graph(self) -> set[Node]:
         """
         Returns set of tram stop nodes which are on the tram tracks provided by OSM.
         In case a track is out of service, the tram stops won't be used but
@@ -119,7 +118,7 @@ class TramTrackGraphTransformer:
             if node.type == NodeType.TRAM_STOP and node in self._tram_track_graph.nodes
         }
 
-    def _get_track_crossing_and_endpoint_node_ids(self):
+    def _get_track_crossing_and_endpoint_node_ids(self) -> set[Node]:
         """
         Returns set of nodes which serving the function of track crossings or endpoints.
         A node is a crossing if it has more than 2 distinct neighbors.
@@ -138,7 +137,7 @@ class TramTrackGraphTransformer:
 
         return result
 
-    def _get_nodes_with_speed_changes(self):
+    def _get_nodes_with_speed_changes(self) -> set[Node]:
         """
         Returns set of nodes at which the maximum allowed speed changes
         between incident track segments. A node qualifies if among its
@@ -159,7 +158,7 @@ class TramTrackGraphTransformer:
                 result.add(node)
         return result
 
-    def _find_permanent_nodes(self):
+    def _find_permanent_nodes(self) -> set[Node]:
         """
         Permanent nodes are used in `densify_graph_by_max_distance`.
         These nodes cannot be removed during the graph transformation process.
@@ -174,7 +173,7 @@ class TramTrackGraphTransformer:
 
     def _find_path_between_permanent_nodes(
         self, permanent_node: Node, successor: Node
-    ) -> tuple[list[Node], float]:
+    ) -> tuple[list[Node], Any]:
         """
         Finds the first different permanent node reachable from provided
         `permanent_node` via provided `successor` without backtracking.
@@ -201,9 +200,8 @@ class TramTrackGraphTransformer:
 
         path_coordinates.append(current_node)
 
-        max_speed = self._tram_track_graph[permanent_node][path_coordinates[1]].get(
-            "max_speed"
-        )
+        edge_attributes = self._tram_track_graph[permanent_node][path_coordinates[1]]
+        max_speed: float | None = edge_attributes.get("max_speed")
 
         return path_coordinates, max_speed
 
@@ -237,14 +235,18 @@ class TramTrackGraphTransformer:
             path_nodes[-1].coordinates,
         ]
 
-    def _get_new_node_id(self):
+    def _get_new_node_id(self) -> int:
         self._max_node_id += 1
         return self._max_node_id
 
     @classmethod
     def _add_geodetic_edge(
-        cls, graph: nx.DiGraph, source_node: Node, dest_node: Node, max_speed: float
-    ):
+        cls,
+        graph: "nx.DiGraph[Node]",
+        source_node: Node,
+        dest_node: Node,
+        max_speed: Any,
+    ) -> None:
         azimuth, _, distance = cls._geod.inv(
             source_node.lon,
             source_node.lat,
@@ -261,13 +263,13 @@ class TramTrackGraphTransformer:
 
     def _add_interpolated_nodes_path(
         self,
-        densified_graph: nx.DiGraph,
+        densified_graph: "nx.DiGraph[Node]",
         interpolated_node_coordinates: list[tuple[float, float]],
         nodes_by_coordinates: dict[tuple[float, float], Node],
         first_node: Node,
         last_node: Node,
         max_speed: float,
-    ):
+    ) -> None:
         previous_graph_node = first_node
 
         for lat, lon in interpolated_node_coordinates[1:-1]:
@@ -297,7 +299,7 @@ class TramTrackGraphTransformer:
 
     def densify_graph_by_max_distance(
         self, max_distance_in_meters: float
-    ) -> nx.DiGraph:
+    ) -> "nx.DiGraph[Node]":
         """
         Builds a directed graph by splitting edges between permanent nodes
         into smaller segments based on `max_distance_in_meters`.
@@ -308,7 +310,7 @@ class TramTrackGraphTransformer:
         if max_distance_in_meters <= 0:
             raise ValueError("max_distance_in_meters must be greater than 0.")
 
-        densified_graph = nx.DiGraph()
+        densified_graph: "nx.DiGraph[Node]" = nx.DiGraph()
         nodes_by_coordinates: dict[tuple[float, float], Node] = {}
         errors: list[TrackDirectionChangeError] = []
 

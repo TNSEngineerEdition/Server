@@ -12,11 +12,11 @@ class Weekday(StrEnum):
     SUNDAY = "sunday"
 
     @classmethod
-    def get_current(cls):
+    def get_current(cls) -> "Weekday":
         return list(cls)[date.today().weekday()]
 
     @classmethod
-    def get_by_value_with_default(cls, weekday: str | None):
+    def get_by_value_with_default(cls, weekday: str | None) -> "Weekday":
         if weekday is None:
             return cls.get_current()
 

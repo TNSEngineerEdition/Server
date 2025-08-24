@@ -3,6 +3,7 @@ import tempfile
 import time
 from datetime import timedelta
 from pathlib import Path
+from typing import Any, Generator
 from unittest.mock import Mock
 
 import pytest
@@ -48,12 +49,12 @@ class TestCityDataCache:
         return result
 
     @pytest.fixture(scope="class")
-    def cache_directory(self):
+    def cache_directory(self) -> Generator[Path, Any, None]:
         directory_path = Path(tempfile.mkdtemp())
         yield directory_path
         shutil.rmtree(directory_path)
 
-    def test_is_cache_fresh_no_file(self, cache_directory: Path):
+    def test_is_cache_fresh_no_file(self, cache_directory: Path) -> None:
         # Arrange
         cache = CityDataCache(cache_directory, timedelta(hours=1))
         city_id, weekday = "sample_city", Weekday.MONDAY
@@ -68,7 +69,7 @@ class TestCityDataCache:
         self,
         cache_directory: Path,
         city_data_builder_mock: CityDataBuilder,
-    ):
+    ) -> None:
         # Arrange
         cache = CityDataCache(cache_directory, timedelta(hours=1))
         city_id, weekday = "sample_city", Weekday.MONDAY
@@ -87,7 +88,7 @@ class TestCityDataCache:
 
     def test_is_cache_fresh_expired(
         self, cache_directory: Path, city_data_builder_mock: CityDataBuilder
-    ):
+    ) -> None:
         # Arrange
         cache = CityDataCache(cache_directory, timedelta())
         city_id, weekday = "sample_city", Weekday.MONDAY

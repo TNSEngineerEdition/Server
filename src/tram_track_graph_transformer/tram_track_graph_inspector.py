@@ -13,7 +13,7 @@ from tram_track_graph_transformer.node import Node
 
 
 class TramTrackGraphInspector:
-    def __init__(self, graph: nx.DiGraph):
+    def __init__(self, graph: "nx.DiGraph[Node]"):
         self._graph = graph
         self._geod = Geod(ellps="WGS84")
 
@@ -22,7 +22,9 @@ class TramTrackGraphInspector:
         return {node.id: node for node in self._graph.nodes}
 
     @staticmethod
-    def get_unique_tram_stop_pairs(stop_nodes_by_gtfs_trip_id: dict[str, list[int]]):
+    def get_unique_tram_stop_pairs(
+        stop_nodes_by_gtfs_trip_id: dict[str, list[int]],
+    ) -> set[tuple[int, int]]:
         return {
             (stop_ids[i], stop_ids[i + 1])
             for stop_ids in stop_nodes_by_gtfs_trip_id.values()
@@ -42,7 +44,7 @@ class TramTrackGraphInspector:
 
     def check_path_viability(
         self, start_stop_id: int, end_stop_id: int, max_distance_ratio: float
-    ):
+    ) -> None:
         if (start_node := self._nodes_by_id.get(start_stop_id)) is None:
             raise NodeNotFoundError(start_stop_id)
         if (end_node := self._nodes_by_id.get(end_stop_id)) is None:

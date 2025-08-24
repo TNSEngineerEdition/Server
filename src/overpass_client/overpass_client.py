@@ -37,7 +37,9 @@ class OverpassClient:
     """
 
     @classmethod
-    def get_relations_and_stops(cls, area_name: str, custom_node_ids: list[int]):
+    def get_relations_and_stops(
+        cls, area_name: str, custom_node_ids: list[int]
+    ) -> overpy.Result:
         if custom_node_ids:
             query = cls._RELATIONS_STOPS_NODES_QUERY_TEMPLATE.format(
                 area_name=area_name,
@@ -49,6 +51,6 @@ class OverpassClient:
         return cls._OVERPASS.query(query)
 
     @classmethod
-    def get_tram_stops_and_tracks(cls, area_name: str):
+    def get_tram_stops_and_tracks(cls, area_name: str) -> overpy.Result:
         query = cls._TRAM_STOPS_AND_TRACKS_TEMPLATE.format(area_name=area_name)
         return cls._OVERPASS.query(query)

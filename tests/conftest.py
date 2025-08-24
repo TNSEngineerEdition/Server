@@ -2,6 +2,7 @@ import json
 import pickle
 import zipfile
 from pathlib import Path
+from typing import cast
 
 import networkx as nx
 import overpy
@@ -10,10 +11,11 @@ import pytest
 from city_data_builder import CityConfiguration
 from city_data_cache import ResponseCityData
 from tram_stop_mapper import GTFSPackage
+from tram_track_graph_transformer import Node
 
 
 @pytest.fixture
-def gtfs_package():
+def gtfs_package() -> GTFSPackage:
     return GTFSPackage.from_file("tests/assets/gtfs_schedule.zip")
 
 
@@ -36,21 +38,21 @@ def tram_stops_and_tracks_overpass_query_result() -> overpy.Result:
 
 
 @pytest.fixture
-def krakow_tram_network_graph() -> nx.DiGraph:
+def krakow_tram_network_graph() -> "nx.DiGraph[Node]":
     with zipfile.ZipFile("tests/assets/krakow_tram_network_graph.zip") as zip_file:
         with zip_file.open("krakow_tram_network_graph.pickle") as file:
-            return pickle.load(file)
+            return cast("nx.DiGraph[Node]", pickle.load(file))
 
 
 @pytest.fixture
 def tram_trips_by_id() -> dict[str, list[int]]:
     with zipfile.ZipFile("tests/assets/tram_trips_by_id.zip") as zip_file:
         with zip_file.open("tram_trips_by_id.json") as file:
-            return json.load(file)
+            return cast(dict[str, list[int]], json.load(file))
 
 
 @pytest.fixture
-def krakow_city_configuration():
+def krakow_city_configuration() -> CityConfiguration:
     return CityConfiguration.from_path(
         Path.cwd() / "tests" / "assets" / "krakow_city_configuration.json"
     )

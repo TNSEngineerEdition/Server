@@ -1,21 +1,19 @@
 import json
-from collections.abc import Hashable
+from typing import ValuesView
 from zipfile import ZipFile
 
 import overpy
 import pytest
 
 from city_data_builder import CityConfiguration
-from tram_stop_mapper import (
-    GTFSPackage,
-    TramStopMapper,
-    TramStopMappingBuildError,
-)
+from tram_stop_mapper import GTFSPackage, TramStopMapper, TramStopMappingBuildError
 
 
 class TestTramStopMapper:
     @pytest.fixture
-    def tram_stop_mapping(self):
+    def tram_stop_mapping(
+        self,
+    ) -> tuple[dict[str, int], dict[str, list[int]], dict[str, list[int]]]:
         with ZipFile("tests/assets/tram_stop_mapping.zip") as zip_file:
             with zip_file.open(
                 "expected_gtfs_stop_id_to_osm_node_id_mapping.json"
@@ -42,7 +40,7 @@ class TestTramStopMapper:
         tram_stop_mapping: tuple[
             dict[str, int], dict[str, list[int]], dict[str, list[int]]
         ],
-    ):
+    ) -> None:
         # Act
         tram_stop_mapper = TramStopMapper(
             krakow_city_configuration,
@@ -68,7 +66,7 @@ class TestTramStopMapper:
         krakow_city_configuration: CityConfiguration,
         gtfs_package: GTFSPackage,
         relations_and_stops_overpass_query_result: overpy.Result,
-    ):
+    ) -> None:
         # Arrange
         gtfs_package.routes.loc["route_12345"] = [
             "agency_1",
@@ -112,7 +110,7 @@ class TestTramStopMapper:
         krakow_city_configuration: CityConfiguration,
         gtfs_package: GTFSPackage,
         relations_and_stops_overpass_query_result: overpy.Result,
-    ):
+    ) -> None:
         # Arrange
         krakow_city_configuration.custom_stop_mapping["stop_386_285919"] = 2419732952
 
@@ -138,7 +136,7 @@ class TestTramStopMapper:
         krakow_city_configuration: CityConfiguration,
         gtfs_package: GTFSPackage,
         relations_and_stops_overpass_query_result: overpy.Result,
-    ):
+    ) -> None:
         # Arrange
         gtfs_package.stops.loc["stop_12345_12345"] = [
             None,
@@ -176,7 +174,7 @@ class TestTramStopMapper:
         krakow_city_configuration: CityConfiguration,
         gtfs_package: GTFSPackage,
         relations_and_stops_overpass_query_result: overpy.Result,
-    ):
+    ) -> None:
         # Arrange
         gtfs_package.routes.drop("route_698", inplace=True)
 
@@ -205,7 +203,7 @@ class TestTramStopMapper:
         krakow_city_configuration: CityConfiguration,
         gtfs_package: GTFSPackage,
         relations_and_stops_overpass_query_result: overpy.Result,
-    ):
+    ) -> None:
         # Arrange
         krakow_city_configuration.custom_stop_mapping["stop_386_285919"] = 2419732952
 
@@ -269,15 +267,17 @@ class TestTramStopMapper:
         assert "Underutilized relations:\n" in exception_message
 
     @staticmethod
-    def _get_unique_trips_from_stop_nodes(stop_nodes: list[list[Hashable]]):
-        return set(map(tuple, stop_nodes))
+    def _get_unique_trips_from_stop_nodes(
+        stop_nodes: ValuesView[list[str]] | ValuesView[list[int]],
+    ) -> set[tuple[str, ...]]:
+        return set(map(tuple, stop_nodes))  # type: ignore
 
     def test_stop_nodes_by_gtfs_trip_id(
         self,
         krakow_city_configuration: CityConfiguration,
         gtfs_package: GTFSPackage,
         relations_and_stops_overpass_query_result: overpy.Result,
-    ):
+    ) -> None:
         # Arrange
         expected_trip_stop_count = gtfs_package.stop_times.value_counts("trip_id")
 
@@ -312,7 +312,7 @@ class TestTramStopMapper:
         krakow_city_configuration: CityConfiguration,
         gtfs_package: GTFSPackage,
         relations_and_stops_overpass_query_result: overpy.Result,
-    ):
+    ) -> None:
         # Arrange
         tram_stop_mapper = TramStopMapper(
             krakow_city_configuration,
@@ -355,7 +355,7 @@ class TestTramStopMapper:
         krakow_city_configuration: CityConfiguration,
         gtfs_package: GTFSPackage,
         relations_and_stops_overpass_query_result: overpy.Result,
-    ):
+    ) -> None:
         # Arrange
         expected_trip_stop_count = gtfs_package.stop_times.value_counts("trip_id")
 

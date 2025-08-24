@@ -84,7 +84,7 @@ class OverpassTestClient(OverpassClient):
         cls,
         area_name: str,
         excluding_ids: list[int],
-    ):
+    ) -> overpy.Result:
         query = cls._TRAM_STOPS_EXCLUDING_QUERY_TEMPLATE.format(
             area_name=area_name,
             excluding_ids=" && ".join(f"id() != {id}" for id in excluding_ids),

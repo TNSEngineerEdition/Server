@@ -1,3 +1,5 @@
+import networkx as nx
+
 from city_data_builder.city_configuration import CityConfiguration
 from city_data_builder.model import (
     ResponseGraphEdge,
@@ -30,13 +32,13 @@ class CityDataBuilder:
         self._tram_stop_mapper = self._get_tram_stop_mapper()
         self._tram_track_graph = self._get_tram_track_graph()
 
-    def _get_tram_stop_mapper(self):
+    def _get_tram_stop_mapper(self) -> TramStopMapper:
         custom_node_ids: list[int] = []
         for item in self._city_configuration.custom_stop_mapping.values():
             if isinstance(item, int):
                 custom_node_ids.append(item)
             else:
-                custom_node_ids.extend(filter(lambda x: x is not None, item))
+                custom_node_ids.extend(filter(lambda x: x is not None, item))  # type: ignore[arg-type]
 
         relations_and_stops = OverpassClient.get_relations_and_stops(
             self._city_configuration.osm_area_name,
@@ -51,7 +53,7 @@ class CityDataBuilder:
 
         return tram_stop_mapper
 
-    def _get_tram_track_graph(self):
+    def _get_tram_track_graph(self) -> "nx.DiGraph[Node]":
         tram_stops_and_tracks = OverpassClient.get_tram_stops_and_tracks(
             self._city_configuration.osm_area_name
         )
@@ -79,7 +81,7 @@ class CityDataBuilder:
         return tram_track_graph
 
     @property
-    def tram_track_graph_data(self):
+    def tram_track_graph_data(self) -> list[ResponseGraphNode]:
         response_data_edge_by_source: dict[Node, dict[int, ResponseGraphEdge]] = {
             node: {} for node in self._tram_track_graph.nodes
         }
@@ -92,6 +94,7 @@ class CityDataBuilder:
                 max_speed=data["max_speed"],
             )
 
+        response_node: ResponseGraphNode
         result: list[ResponseGraphNode] = []
         for node in response_data_edge_by_source:
             if node.type == NodeType.TRAM_STOP:
@@ -118,7 +121,7 @@ class CityDataBuilder:
         return result
 
     @property
-    def tram_routes_data(self):
+    def tram_routes_data(self) -> list[ResponseTramRoute]:
         trip_stops_by_trip_id = self._tram_stop_mapper.trip_stops_by_trip_id
 
         routes_by_route_id = {

@@ -42,7 +42,7 @@ class TestCityDataBuilder:
         expected_route_count: int,
         expected_trip_count: int,
         expected_stop_count: int,
-    ):
+    ) -> None:
         # Arrange
         get_relations_and_stops_mock.return_value = (
             relations_and_stops_overpass_query_result

@@ -51,7 +51,7 @@ class TestOverpassClient:
         area_name: str,
         custom_node_ids: list[int],
         expected_query: str,
-    ):
+    ) -> None:
         # Arrange
         query_mock.return_value = relations_and_stops_overpass_query_result
 
@@ -69,7 +69,7 @@ class TestOverpassClient:
         self,
         query_mock: MagicMock,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
-    ):
+    ) -> None:
         # Arrange
         expected_query = """
         [out:json][timeout:600];

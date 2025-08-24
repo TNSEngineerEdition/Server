@@ -10,11 +10,11 @@ from tram_stop_mapper import Weekday
 class CityDataCache:
     def __init__(
         self,
-        cache_directory=Path(
+        cache_directory: Path = Path(
             os.environ.get("CITY_DATA_CACHE_DIRECTORY", "./cache/cities")
         ),
-        ttl_timedelta=timedelta(hours=24),
-    ):
+        ttl_timedelta: timedelta = timedelta(hours=24),
+    ) -> None:
         self.cache_directory = cache_directory
         self.ttl_timedelta = ttl_timedelta
 

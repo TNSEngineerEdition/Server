@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Self
+from typing import Any
 
 
 class NodeType(Enum):
@@ -16,7 +16,7 @@ class NodeType(Enum):
     INTERPOLATED = "interpolated"
 
     @classmethod
-    def get_by_value_safe(cls, value: Any) -> Self:
+    def get_by_value_safe(cls, value: Any) -> "NodeType":
         try:
             return cls(value)
         except ValueError:

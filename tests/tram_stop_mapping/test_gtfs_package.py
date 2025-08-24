@@ -83,13 +83,13 @@ class TestGTFSPackage:
         columns: list[str],
         row_count: int,
         index_name: str | None = None,
-    ):
+    ) -> None:
         assert isinstance(data_frame, pd.DataFrame)
         assert data_frame.index.name == index_name
         assert list(data_frame.columns) == columns
         assert len(data_frame) == row_count
 
-    def test_from_file(self):
+    def test_from_file(self) -> None:
         # Act
         gtfs_package = GTFSPackage.from_file(self.GTFS_FILE_PATH)
 
@@ -128,7 +128,7 @@ class TestGTFSPackage:
         )
 
     @patch("requests.get")
-    def test_from_url(self, get_mock: MagicMock):
+    def test_from_url(self, get_mock: MagicMock) -> None:
         # Arrange
         url = "http://example.com/gtfs.zip"
 
@@ -173,7 +173,7 @@ class TestGTFSPackage:
             row_count=5,
         )
 
-    def test_stop_id_sequence_by_trip_id(self):
+    def test_stop_id_sequence_by_trip_id(self) -> None:
         # Arrange
         gtfs_package = GTFSPackage.from_file(self.GTFS_FILE_PATH)
 
@@ -201,7 +201,7 @@ class TestGTFSPackage:
         # Make sure the property isn't re-calculated every time for better performance
         assert stop_id_sequence_by_trip_id is gtfs_package.stop_id_sequence_by_trip_id
 
-    def test_trip_stop_times_by_trip_id(self):
+    def test_trip_stop_times_by_trip_id(self) -> None:
         # Arrange
         gtfs_package = GTFSPackage.from_file(self.GTFS_FILE_PATH)
 

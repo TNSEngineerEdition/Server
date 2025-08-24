@@ -16,10 +16,14 @@ class TestTramTrackGraphInspector:
     geod = Geod(ellps="WGS84")
 
     @pytest.fixture
-    def unique_tram_stop_pairs(self, tram_trips_by_id: dict[str, list[int]]):
+    def unique_tram_stop_pairs(
+        self, tram_trips_by_id: dict[str, list[int]]
+    ) -> set[tuple[int, int]]:
         return TramTrackGraphInspector.get_unique_tram_stop_pairs(tram_trips_by_id)
 
-    def _get_dijkstra_path(self, graph: nx.DiGraph, start_node: Node, end_node: Node):
+    def _get_dijkstra_path(
+        self, graph: "nx.DiGraph[Node]", start_node: Node, end_node: Node
+    ) -> list[Node]:
         return nx.dijkstra_path(
             graph,
             start_node,
@@ -27,7 +31,9 @@ class TestTramTrackGraphInspector:
             weight=lambda u, v, _: self.geod.inv(u.lon, u.lat, v.lon, v.lat)[2],
         )
 
-    def test_get_unique_tram_stop_pairs(self, tram_trips_by_id: dict[str, list[int]]):
+    def test_get_unique_tram_stop_pairs(
+        self, tram_trips_by_id: dict[str, list[int]]
+    ) -> None:
         # Act
         unique_tram_stop_pairs = TramTrackGraphInspector.get_unique_tram_stop_pairs(
             tram_trips_by_id
@@ -43,9 +49,9 @@ class TestTramTrackGraphInspector:
     def test_check_path_viability(
         self,
         krakow_city_configuration: CityConfiguration,
-        krakow_tram_network_graph: nx.DiGraph,
+        krakow_tram_network_graph: "nx.DiGraph[Node]",
         unique_tram_stop_pairs: set[tuple[int, int]],
-    ):
+    ) -> None:
         # Arrange
         tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
 
@@ -69,13 +75,13 @@ class TestTramTrackGraphInspector:
     )
     def test_check_path_viability_node_not_found(
         self,
-        node_id,
+        node_id: int,
         krakow_city_configuration: CityConfiguration,
-        krakow_tram_network_graph: nx.DiGraph,
+        krakow_tram_network_graph: "nx.DiGraph[Node]",
         unique_tram_stop_pairs: set[tuple[int, int]],
-    ):
+    ) -> None:
         # Arrange
-        krakow_tram_network_graph.remove_node(node_id)
+        krakow_tram_network_graph.remove_node(node_id)  # type: ignore
         tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
 
         # Act
@@ -120,15 +126,15 @@ class TestTramTrackGraphInspector:
     )
     def test_check_path_viability_path_too_long(
         self,
-        edge,
-        start_stop,
-        end_stop,
+        edge: tuple[int, int],
+        start_stop: int,
+        end_stop: int,
         krakow_city_configuration: CityConfiguration,
-        krakow_tram_network_graph: nx.DiGraph,
+        krakow_tram_network_graph: "nx.DiGraph[Node]",
         unique_tram_stop_pairs: set[tuple[int, int]],
-    ):
+    ) -> None:
         # Arrange
-        krakow_tram_network_graph.remove_edge(*edge)
+        krakow_tram_network_graph.remove_edge(*edge)  # type: ignore
         tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
 
         # Act
@@ -174,15 +180,15 @@ class TestTramTrackGraphInspector:
     )
     def test_check_path_viability_no_path_found(
         self,
-        edge,
-        start_stop,
-        end_stop,
+        edge: tuple[int, int],
+        start_stop: int,
+        end_stop: int,
         krakow_city_configuration: CityConfiguration,
-        krakow_tram_network_graph: nx.DiGraph,
+        krakow_tram_network_graph: "nx.DiGraph[Node]",
         unique_tram_stop_pairs: set[tuple[int, int]],
-    ):
+    ) -> None:
         # Arrange
-        krakow_tram_network_graph.remove_edge(*edge)
+        krakow_tram_network_graph.remove_edge(*edge)  # type: ignore
         tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
 
         # Act
@@ -204,9 +210,9 @@ class TestTramTrackGraphInspector:
 
     def test_shortest_path_between_nodes(
         self,
-        krakow_tram_network_graph: nx.DiGraph,
+        krakow_tram_network_graph: "nx.DiGraph[Node]",
         unique_tram_stop_pairs: set[tuple[int, int]],
-    ):
+    ) -> None:
         # Arrange
         tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
         nodes_by_id = {node.id: node for node in krakow_tram_network_graph.nodes}

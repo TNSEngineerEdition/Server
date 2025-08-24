@@ -1,16 +1,14 @@
 from collections import deque
 from math import sqrt
 
+import networkx as nx
 import overpy
 import pytest
-from networkx import DiGraph
 from pyproj import Geod
 
 from city_data_builder import CityConfiguration
 from tram_track_graph_transformer import Node, TramTrackGraphTransformer
-from tram_track_graph_transformer.exceptions import (
-    TrackDirectionChangeError,
-)
+from tram_track_graph_transformer.exceptions import TrackDirectionChangeError
 
 
 class TestTramTrackGraphTransformer:
@@ -19,8 +17,11 @@ class TestTramTrackGraphTransformer:
     _geod = Geod(ellps="WGS84")
 
     def _assert_densified_edges_within_distance(
-        self, graph: DiGraph, perm_nodes: list[Node], max_distance: int
-    ):
+        self,
+        graph: "nx.DiGraph[Node]",
+        perm_nodes: set[Node],
+        max_distance: int | float,
+    ) -> None:
         tolerance = max_distance * 0.001
         for perm_node in perm_nodes:
             queue: deque[Node] = deque()
@@ -42,12 +43,12 @@ class TestTramTrackGraphTransformer:
 
     def _assert_even_spacing_of_densified_nodes(
         self,
-        graph: DiGraph,
-        m: int,
-        perm_nodes: list[Node],
+        graph: "nx.DiGraph[Node]",
+        m: int | float,
+        perm_nodes: set[Node],
         perm_node: Node,
         succ_node: Node,
-    ):
+    ) -> None:
         if succ_node in perm_nodes:
             return
         distances = []
@@ -76,7 +77,7 @@ class TestTramTrackGraphTransformer:
         osm_tram_track_crossings: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
         krakow_city_configuration: CityConfiguration,
-    ):
+    ) -> None:
         # Arrange
         transformer = TramTrackGraphTransformer(
             tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
@@ -94,7 +95,7 @@ class TestTramTrackGraphTransformer:
         osm_tram_track_crossings: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
         krakow_city_configuration: CityConfiguration,
-    ):
+    ) -> None:
         # Arrange
         transformer = TramTrackGraphTransformer(
             tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
@@ -114,7 +115,7 @@ class TestTramTrackGraphTransformer:
         osm_tram_stops: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
         krakow_city_configuration: CityConfiguration,
-    ):
+    ) -> None:
         # Arrange
         transformer = TramTrackGraphTransformer(
             tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
@@ -135,7 +136,7 @@ class TestTramTrackGraphTransformer:
         max_densification_distance: float,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
         krakow_city_configuration: CityConfiguration,
-    ):
+    ) -> None:
         # Arrange
         transformer = TramTrackGraphTransformer(
             tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
@@ -160,7 +161,7 @@ class TestTramTrackGraphTransformer:
         max_densification_distance: float,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
         krakow_city_configuration: CityConfiguration,
-    ):
+    ) -> None:
         # Arrange
         m = 0.05
         transformer = TramTrackGraphTransformer(
@@ -193,7 +194,7 @@ class TestTramTrackGraphTransformer:
         max_densification_distance: float,
         krakow_city_configuration: CityConfiguration,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
-    ):
+    ) -> None:
         # Arrange
         transformer = TramTrackGraphTransformer(
             tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
@@ -209,7 +210,7 @@ class TestTramTrackGraphTransformer:
         self,
         krakow_city_configuration: CityConfiguration,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
-    ):
+    ) -> None:
         # Arrange
         del tram_stops_and_tracks_overpass_query_result.get_way(310663772).tags[
             "oneway"

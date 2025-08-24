@@ -1,7 +1,8 @@
 from collections import defaultdict
 from functools import cached_property
 from io import BytesIO
-from typing import Any, Generator
+from pathlib import Path
+from typing import Any, cast, Generator, Self
 from zipfile import ZipFile
 
 import pandas as pd
@@ -21,7 +22,7 @@ class GTFSPackage(BaseModel):
     calendar: pd.DataFrame
 
     @classmethod
-    def _from_zip_file(cls, zip_file: ZipFile):
+    def _from_zip_file(cls, zip_file: ZipFile) -> Self:
         with zip_file.open("stops.txt") as file:
             stops = pd.read_csv(file).set_index("stop_id")
 
@@ -46,29 +47,32 @@ class GTFSPackage(BaseModel):
         )
 
     @classmethod
-    def from_file(cls, file_path: str):
+    def from_file(cls, file_path: str | Path) -> Self:
         with ZipFile(file_path) as zip_file:
             return cls._from_zip_file(zip_file)
 
     @classmethod
-    def from_url(cls, url: str):
+    def from_url(cls, url: str) -> Self:
         response = requests.get(url, stream=True)
         zip_file = ZipFile(BytesIO(response.content))
         return cls._from_zip_file(zip_file)
 
     @cached_property
     def _stop_times_as_dict(self) -> dict[str, dict[tuple[str, int], Any]]:
-        return self.stop_times.set_index(["trip_id", "stop_sequence"]).to_dict()
+        return cast(
+            dict[str, dict[tuple[str, int], Any]],
+            self.stop_times.set_index(["trip_id", "stop_sequence"]).to_dict(),
+        )
 
     @cached_property
-    def weekdays_by_service_id(self):
+    def weekdays_by_service_id(self) -> dict[str, set[Weekday]]:
         return {
             str(row["service_id"]): {day for day in list(Weekday) if row[day] == 1}
             for _, row in self.calendar.iterrows()
         }
 
     @cached_property
-    def stop_id_sequence_by_trip_id(self):
+    def stop_id_sequence_by_trip_id(self) -> dict[str, list[str]]:
         stop_ids = self._stop_times_as_dict["stop_id"]
 
         result: defaultdict[str, list[str]] = defaultdict(list)
@@ -83,7 +87,7 @@ class GTFSPackage(BaseModel):
         return (hour * 60 + minute) * 60 + second
 
     @cached_property
-    def trip_stop_times_by_trip_id(self):
+    def trip_stop_times_by_trip_id(self) -> dict[str, list[int]]:
         stop_ids = self._stop_times_as_dict["stop_id"]
         departure_times = self._stop_times_as_dict["departure_time"]
 
