@@ -67,7 +67,7 @@ tns-engineer-edition
 
 If everything is working correctly, install development dependencies (such as pre-commit) by running:
 ```
-pip install -r dev-requirements.txt
+pip install -e .[dev]
 ```
 
 ### Pre-commit
