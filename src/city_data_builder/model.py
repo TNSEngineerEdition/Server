@@ -43,8 +43,8 @@ class ResponseTramTrip(BaseModel):
 
 class ResponseTramRoute(BaseModel):
     _HEX_COLOR_REGEX: ClassVar[re.Pattern[str]] = re.compile(r"^[0-9a-fA-F]{6}$")
-    _DEFAULT_BACKGROUND_COLOR: ClassVar[str] = "0063AF"
-    _DEFAULT_TEXT_COLOR: ClassVar[str] = "1D1D1B"
+    _DEFAULT_BACKGROUND_COLOR: ClassVar[str] = "366DF2"
+    _DEFAULT_TEXT_COLOR: ClassVar[str] = "FFFFFF"
 
     model_config = ConfigDict(frozen=True)
 
