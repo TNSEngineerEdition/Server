@@ -3,18 +3,20 @@ import tempfile
 import time
 from datetime import timedelta
 from pathlib import Path
+from typing import Any, Generator
 from unittest.mock import Mock
 
 import pytest
 
-from src.city_data_builder.city_data_builder import CityDataBuilder
-from src.city_data_builder.model import (
+from city_data_builder import (
+    CityDataBuilder,
     ResponseGraphEdge,
     ResponseGraphNode,
+    ResponseTramRoute,
     ResponseTramTrip,
 )
-from src.city_data_cache import CityDataCache, ResponseCityData
-from src.tram_stop_mapper import Weekday
+from city_data_cache import CityDataCache, ResponseCityData
+from tram_stop_mapper import Weekday
 
 
 class TestCityDataCache:
@@ -27,25 +29,32 @@ class TestCityDataCache:
                 id=1,
                 lat=50.0,
                 lon=19.0,
-                neighbors=[
-                    ResponseGraphEdge(id=2, length=100.0, azimuth=90.0, max_speed=5)
-                ],
+                neighbors={
+                    2: ResponseGraphEdge(
+                        id=2, distance=100.0, azimuth=90.0, max_speed=5
+                    )
+                },
             )
         ]
 
-        result.tram_trips_data = [
-            ResponseTramTrip(route="1", trip_head_sign="Centrum", stops=[])
+        result.tram_routes_data = [
+            ResponseTramRoute(
+                name="1",
+                background_color="",
+                text_color="",
+                trips=[ResponseTramTrip(trip_head_sign="Centrum", stops=[])],
+            ),
         ]
 
         return result
 
     @pytest.fixture(scope="class")
-    def cache_directory(self):
+    def cache_directory(self) -> Generator[Path, Any, None]:
         directory_path = Path(tempfile.mkdtemp())
         yield directory_path
         shutil.rmtree(directory_path)
 
-    def test_is_cache_fresh_no_file(self, cache_directory: Path):
+    def test_is_cache_fresh_no_file(self, cache_directory: Path) -> None:
         # Arrange
         cache = CityDataCache(cache_directory, timedelta(hours=1))
         city_id, weekday = "sample_city", Weekday.MONDAY
@@ -60,7 +69,7 @@ class TestCityDataCache:
         self,
         cache_directory: Path,
         city_data_builder_mock: CityDataBuilder,
-    ):
+    ) -> None:
         # Arrange
         cache = CityDataCache(cache_directory, timedelta(hours=1))
         city_id, weekday = "sample_city", Weekday.MONDAY
@@ -74,19 +83,19 @@ class TestCityDataCache:
         assert (
             loaded_data.tram_track_graph == city_data_builder_mock.tram_track_graph_data
         )
-        assert loaded_data.tram_trips == city_data_builder_mock.tram_trips_data
+        assert loaded_data.tram_routes == city_data_builder_mock.tram_routes_data
         assert cache.is_fresh(city_id, weekday)
 
     def test_is_cache_fresh_expired(
         self, cache_directory: Path, city_data_builder_mock: CityDataBuilder
-    ):
+    ) -> None:
         # Arrange
         cache = CityDataCache(cache_directory, timedelta())
         city_id, weekday = "sample_city", Weekday.MONDAY
 
         cache.store(city_id, weekday, city_data_builder_mock)
 
-        # Sleeping so we're sure the cache expires
+        # Sleeping to make sure the cache expires
         time.sleep(1)
 
         # Act

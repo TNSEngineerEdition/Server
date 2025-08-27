@@ -4,21 +4,29 @@ from datetime import datetime
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from src.city_data_builder import CityConfiguration
-from src.overpass_client import OverpassClient
-from src.tram_stop_mapper import GTFSPackage
-from tests.constants import FROZEN_DATA_DIRECTORY
+from constants import FROZEN_DATA_DIRECTORY
+
+from city_data_builder import CityConfiguration
+from overpass_client import OverpassClient
+from tram_stop_mapper import GTFSPackage
 
 
-def main(city_configuration_path: Path):
+def main(city_configuration_path: Path) -> None:
     current_date_iso = datetime.now().isoformat(timespec="seconds").replace(":", "-")
 
     city_configuration = CityConfiguration.from_path(city_configuration_path)
     gtfs_package = GTFSPackage.from_url(city_configuration.gtfs_url)
 
+    custom_node_ids: list[int] = []
+    for item in city_configuration.custom_stop_mapping.values():
+        if isinstance(item, int):
+            custom_node_ids.append(item)
+        else:
+            custom_node_ids.extend(filter(lambda x: x is not None, item))  # type: ignore[arg-type]
+
     relations_and_stops_query_result = OverpassClient.get_relations_and_stops(
         city_configuration.osm_area_name,
-        city_configuration.custom_stop_mapping.values(),
+        custom_node_ids,
     )
 
     tram_stops_and_tracks_query_result = OverpassClient.get_tram_stops_and_tracks(

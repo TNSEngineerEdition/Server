@@ -1,13 +1,14 @@
 import logging
 import tempfile
 from pathlib import Path
+from typing import Any, Generator
 from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 from pydantic import ValidationError
 from pytest import LogCaptureFixture
 
-from src.city_data_builder import CityConfiguration
+from city_data_builder import CityConfiguration
 
 
 class TestCityConfiguration:
@@ -16,7 +17,7 @@ class TestCityConfiguration:
         directory_path: Path,
         city_configuration: CityConfiguration,
         city_number: int,
-    ):
+    ) -> None:
         city_path = directory_path / f"city_{city_number}"
         city_path.mkdir()
 
@@ -39,7 +40,9 @@ class TestCityConfiguration:
         city_2025_path.write_text(city_configuration.model_dump_json())
 
     @pytest.fixture
-    def config_directory_path(self, krakow_city_configuration: CityConfiguration):
+    def config_directory_path(
+        self, krakow_city_configuration: CityConfiguration
+    ) -> Generator[Path, Any, None]:
         with tempfile.TemporaryDirectory() as temporary_directory:
             directory_path = Path(temporary_directory)
 
@@ -52,7 +55,7 @@ class TestCityConfiguration:
 
             yield directory_path
 
-    def test_from_path(self, krakow_city_configuration: CityConfiguration):
+    def test_from_path(self, krakow_city_configuration: CityConfiguration) -> None:
         # Arrange
         path = Path.cwd() / "tests" / "assets" / "krakow_city_configuration.json"
 
@@ -63,7 +66,7 @@ class TestCityConfiguration:
         assert isinstance(city_configuration, CityConfiguration)
         assert city_configuration == krakow_city_configuration
 
-    def test_from_path_invalid_json(self, caplog: LogCaptureFixture):
+    def test_from_path_invalid_json(self, caplog: LogCaptureFixture) -> None:
         # Arrange
         with tempfile.NamedTemporaryFile(
             mode="wb",
@@ -74,8 +77,9 @@ class TestCityConfiguration:
             path = Path(temp_file.name)
         try:
             # Act
-            with pytest.raises(ValidationError) as exc_info, caplog.at_level(
-                logging.ERROR, "src.city_data_builder.city_configuration"
+            with (
+                pytest.raises(ValidationError) as exc_info,
+                caplog.at_level(logging.ERROR, "city_data_builder.city_configuration"),
             ):
                 CityConfiguration.from_path(path)
 
@@ -91,7 +95,7 @@ class TestCityConfiguration:
         mock_cities_directory_path: MagicMock,
         krakow_city_configuration: CityConfiguration,
         config_directory_path: Path,
-    ):
+    ) -> None:
         # Arrange
         mock_cities_directory_path.return_value = config_directory_path
 
@@ -116,7 +120,7 @@ class TestCityConfiguration:
         mock_cities_directory_path: MagicMock,
         krakow_city_configuration: CityConfiguration,
         config_directory_path: Path,
-    ):
+    ) -> None:
         # Arrange
         mock_cities_directory_path.return_value = config_directory_path
         krakow_city_configuration.osm_area_name = "city_1_2025-02-01.json"
@@ -132,7 +136,7 @@ class TestCityConfiguration:
         self,
         mock_cities_directory_path: MagicMock,
         config_directory_path: Path,
-    ):
+    ) -> None:
         # Arrange
         mock_cities_directory_path.return_value = config_directory_path
 

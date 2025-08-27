@@ -3,16 +3,22 @@ import random
 import string
 from collections import defaultdict
 from functools import cached_property
-from typing import TYPE_CHECKING
+from typing import Hashable, TYPE_CHECKING
 
 import overpy
+from pydantic import BaseModel
 
-from src.tram_stop_mapper.exceptions import TramStopMappingBuildError
-from src.tram_stop_mapper.gtfs_package import GTFSPackage
-from src.tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
+from tram_stop_mapper.exceptions import TramStopMappingBuildError
+from tram_stop_mapper.gtfs_package import GTFSPackage
+from tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
 
 if TYPE_CHECKING:
-    from src.city_data_builder import CityConfiguration
+    from city_data_builder import CityConfiguration
+
+
+class StopIDAndTime(BaseModel):
+    stop_id: int
+    time: int
 
 
 class TramStopMapper:
@@ -61,19 +67,23 @@ class TramStopMapper:
         if self._mapping_errors:
             raise TramStopMappingBuildError(self._mapping_errors)
 
-    def _get_initial_stop_mapping(self):
-        first_stop_mapping: dict[str, set[int]] = defaultdict(set)
+    def _get_initial_stop_mapping(
+        self,
+    ) -> tuple[
+        defaultdict[str, set[int]], dict[str, set[int]], defaultdict[str, set[int]]
+    ]:
+        first_stop_mapping: defaultdict[str, set[int]] = defaultdict(set)
         stop_mapping: dict[str, set[int]] = {
             str(stop_id): set() for stop_id in self._gtfs_package.stops.index
         }
-        last_stop_mapping: dict[str, set[int]] = defaultdict(set)
+        last_stop_mapping: defaultdict[str, set[int]] = defaultdict(set)
 
         for (
             gtfs_stop_id,
             node_ids,
         ) in self._city_configuration.custom_stop_mapping.items():
             if isinstance(node_ids, int):
-                stop_mapping[gtfs_stop_id].add(node_ids)
+                stop_mapping[gtfs_stop_id] = {node_ids}
                 continue
 
             for node_id, mapping in zip(
@@ -82,16 +92,20 @@ class TramStopMapper:
                 if node_id is None:
                     continue
 
-                mapping[gtfs_stop_id].add(node_id)
+                mapping[gtfs_stop_id] = {node_id}
 
         return first_stop_mapping, stop_mapping, last_stop_mapping
 
+    @property
+    def gtfs_package(self) -> GTFSPackage:
+        return self._gtfs_package
+
     @cached_property
-    def _osm_node_by_id(self):
+    def _osm_node_by_id(self) -> dict[int, overpy.Node]:
         return {item.id: item for item in self._relations_and_stops.get_nodes()}
 
     @cached_property
-    def _stops_by_osm_relation(self):
+    def _stops_by_osm_relation(self) -> dict[overpy.Relation, list[overpy.Node]]:
         return {
             relation: [
                 self._osm_node_by_id[member.ref]
@@ -104,7 +118,7 @@ class TramStopMapper:
         }
 
     @staticmethod
-    def _to_universal_stop_name(stop_name: str):
+    def _to_universal_stop_name(stop_name: str) -> str:
         """
         Due to differences in stop names between GTFS and OSM, for example
         the 'Meksyk (nż)' stop in GTFS is equivalent to 'Meksyk 01' on OSM,
@@ -122,7 +136,7 @@ class TramStopMapper:
         )
 
     @cached_property
-    def _universal_stop_names_by_osm_relation(self):
+    def _universal_stop_names_by_osm_relation(self) -> dict[overpy.Relation, list[str]]:
         return {
             relation: [
                 self._to_universal_stop_name(item.tags.get("name")) for item in stops
@@ -136,7 +150,7 @@ class TramStopMapper:
         longest_relation: overpy.Relation,
         current_match: difflib.Match,
         current_result: overpy.Relation,
-    ):
+    ) -> bool:
         """
         Let's imagine a line which has two variants: A -> B and A -> B -> C.
         This occurs for example on line 50, which may terminate at Kurdwanów P+R (B)
@@ -172,7 +186,7 @@ class TramStopMapper:
         self,
         line_relations: list[overpy.Relation],
         gtfs_trip_stop_names: list[str],
-    ):
+    ) -> tuple[difflib.Match, overpy.Relation]:
         longest_match, longest_relation = difflib.Match(0, 0, 0), line_relations[0]
 
         for relation in line_relations:
@@ -198,7 +212,7 @@ class TramStopMapper:
 
     def _add_trip_to_mapping(
         self, gtfs_trip_id: str, line_relations: list[overpy.Relation]
-    ):
+    ) -> tuple[int, overpy.Relation]:
         gtfs_trip_stop_ids = self._gtfs_package.stop_id_sequence_by_trip_id[
             gtfs_trip_id
         ]
@@ -244,8 +258,8 @@ class TramStopMapper:
     def _update_relations_for_route(
         self,
         route_number: str,
-        gtfs_route_id: str,
-    ):
+        gtfs_route_id: Hashable,
+    ) -> None:
         gtfs_trips_for_route = self._gtfs_package.trips[
             self._gtfs_package.trips["route_id"] == gtfs_route_id
         ]
@@ -276,7 +290,7 @@ class TramStopMapper:
 
             self._longest_osm_relation_by_trip_id[gtfs_trip_id] = longest_relation
 
-    def _build_tram_stop_mapping(self):
+    def _build_tram_stop_mapping(self) -> None:
         for gtfs_route_id, gtfs_route_row in self._gtfs_package.routes.iterrows():
             route_number = str(gtfs_route_row["route_long_name"])
             if route_number in self._city_configuration.ignored_gtfs_lines:
@@ -304,14 +318,15 @@ class TramStopMapper:
 
         self._mapping_errors.underutilized_relations = {
             relation: [
-                item.tags.get("name") for item in self._stops_by_osm_relation[relation]
+                item.tags.get("name", "Unknown stop")
+                for item in self._stops_by_osm_relation[relation]
             ]
             for relation, stops in self._stops_by_osm_relation.items()
             if self._longest_match_size_by_osm_relation[relation] < len(stops)
         }
 
     @cached_property
-    def gtfs_stop_id_to_osm_node_id_mapping(self):
+    def gtfs_stop_id_to_osm_node_id_mapping(self) -> dict[str, int]:
         return {
             gtfs_stop_id: next(iter(osm_node_ids))
             for gtfs_stop_id, osm_node_ids in self._stop_mapping.items()
@@ -319,14 +334,14 @@ class TramStopMapper:
         }
 
     @cached_property
-    def first_gtfs_stop_id_to_osm_node_ids(self):
+    def first_gtfs_stop_id_to_osm_node_ids(self) -> dict[str, list[int]]:
         return {
             gtfs_stop_id: sorted(node_ids)
             for gtfs_stop_id, node_ids in self._first_stop_mapping.items()
         }
 
     @cached_property
-    def last_gtfs_stop_id_to_osm_node_ids(self):
+    def last_gtfs_stop_id_to_osm_node_ids(self) -> dict[str, list[int]]:
         return {
             gtfs_stop_id: sorted(node_ids)
             for gtfs_stop_id, node_ids in self._last_stop_mapping.items()
@@ -334,7 +349,7 @@ class TramStopMapper:
 
     def _get_node_id_for_trip_stop(
         self, gtfs_stop_id: str, gtfs_stop_sequence: int, total_stops: int
-    ):
+    ) -> int:
         if gtfs_stop_id in self.gtfs_stop_id_to_osm_node_id_mapping:
             return self.gtfs_stop_id_to_osm_node_id_mapping[gtfs_stop_id]
 
@@ -358,7 +373,7 @@ class TramStopMapper:
             "TramStopMappingBuildError should have been raised but wasn't."
         )
 
-    def _get_stop_nodes_from_mapping(self, gtfs_trip_stops: list[str]):
+    def _get_stop_nodes_from_mapping(self, gtfs_trip_stops: list[str]) -> list[int]:
         custom_pair_mapping_last_used = False
         stop_pair_by_gtfs_stop_ids = (
             self._city_configuration.custom_stop_pair_by_gtfs_stop_ids
@@ -388,7 +403,7 @@ class TramStopMapper:
         return result
 
     @cached_property
-    def stop_nodes_by_gtfs_trip_id(self):
+    def stop_nodes_by_gtfs_trip_id(self) -> dict[str, list[int]]:
         result: dict[str, list[int]] = {}
 
         for (
@@ -418,8 +433,8 @@ class TramStopMapper:
         return result
 
     @cached_property
-    def gtfs_stop_ids_by_node_id(self):
-        result: dict[int, set[str]] = defaultdict(set)
+    def gtfs_stop_ids_by_node_id(self) -> defaultdict[int, set[str]]:
+        result: defaultdict[int, set[str]] = defaultdict(set)
 
         for gtfs_stop_id, node_id in self.gtfs_stop_id_to_osm_node_id_mapping.items():
             result[node_id].add(gtfs_stop_id)
@@ -435,21 +450,14 @@ class TramStopMapper:
         return result
 
     @cached_property
-    def trip_data_and_stops_by_trip_id(self):
-        trip_data_by_trip_id, trip_stops_by_trip_id = (
-            self._gtfs_package.trip_data_and_stops_by_trip_id
-        )
-
-        trip_stops_data: dict[str, list[tuple[int, int]]] = {}
-        for trip_id, trip_stops in trip_stops_by_trip_id.items():
-            if trip_id not in self.stop_nodes_by_gtfs_trip_id:
-                continue
-
-            trip_stops_data[trip_id] = [
-                (node_id, trip_stop[1])
-                for node_id, trip_stop in zip(
-                    self.stop_nodes_by_gtfs_trip_id[trip_id], trip_stops
+    def trip_stops_by_trip_id(self) -> dict[str, list[StopIDAndTime]]:
+        return {
+            trip_id: [
+                StopIDAndTime(stop_id=node_id, time=stop_time)
+                for node_id, stop_time in zip(
+                    self.stop_nodes_by_gtfs_trip_id[trip_id], stop_times
                 )
             ]
-
-        return trip_data_by_trip_id, trip_stops_data
+            for trip_id, stop_times, in self._gtfs_package.trip_stop_times_by_trip_id.items()
+            if trip_id in self.stop_nodes_by_gtfs_trip_id
+        }

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
-from src.tram_stop_mapper import GTFSPackage
+from tram_stop_mapper import GTFSPackage
 
 
 class TestGTFSPackage:
@@ -83,13 +83,13 @@ class TestGTFSPackage:
         columns: list[str],
         row_count: int,
         index_name: str | None = None,
-    ):
+    ) -> None:
         assert isinstance(data_frame, pd.DataFrame)
         assert data_frame.index.name == index_name
         assert list(data_frame.columns) == columns
         assert len(data_frame) == row_count
 
-    def test_from_file(self):
+    def test_from_file(self) -> None:
         # Act
         gtfs_package = GTFSPackage.from_file(self.GTFS_FILE_PATH)
 
@@ -128,7 +128,7 @@ class TestGTFSPackage:
         )
 
     @patch("requests.get")
-    def test_from_url(self, get_mock: MagicMock):
+    def test_from_url(self, get_mock: MagicMock) -> None:
         # Arrange
         url = "http://example.com/gtfs.zip"
 
@@ -173,7 +173,7 @@ class TestGTFSPackage:
             row_count=5,
         )
 
-    def test_stop_id_sequence_by_trip_id(self):
+    def test_stop_id_sequence_by_trip_id(self) -> None:
         # Arrange
         gtfs_package = GTFSPackage.from_file(self.GTFS_FILE_PATH)
 
@@ -201,21 +201,18 @@ class TestGTFSPackage:
         # Make sure the property isn't re-calculated every time for better performance
         assert stop_id_sequence_by_trip_id is gtfs_package.stop_id_sequence_by_trip_id
 
-    def test_trip_data_and_stops_by_trip_id(self):
+    def test_trip_stop_times_by_trip_id(self) -> None:
         # Arrange
         gtfs_package = GTFSPackage.from_file(self.GTFS_FILE_PATH)
 
         # Act
-        trip_data_by_trip_id, trip_stops_by_trip_id = (
-            gtfs_package.trip_data_and_stops_by_trip_id
-        )
+        trip_stop_times_by_trip_id = gtfs_package.trip_stop_times_by_trip_id
 
         # Assert
-        assert set(trip_data_by_trip_id.keys()) == set(gtfs_package.trips.index)
-        assert set(trip_stops_by_trip_id.keys()) == set(gtfs_package.trips.index)
+        assert set(trip_stop_times_by_trip_id.keys()) == set(gtfs_package.trips.index)
 
         assert all(
-            trip_stops[i][1] <= trip_stops[i + 1][1]
-            for trip_stops in trip_stops_by_trip_id.values()
+            trip_stops[i] <= trip_stops[i + 1]
+            for trip_stops in trip_stop_times_by_trip_id.values()
             for i in range(len(trip_stops) - 1)
         )

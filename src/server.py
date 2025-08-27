@@ -6,9 +6,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import ValidationError
 
-from src.city_data_builder import CityConfiguration, CityDataBuilder
-from src.city_data_cache import CityDataCache, ResponseCityData
-from src.tram_stop_mapper import Weekday
+from city_data_builder import CityConfiguration, CityDataBuilder
+from city_data_cache import CityDataCache, ResponseCityData
+from tram_stop_mapper import Weekday
 
 app = FastAPI()
 app.add_middleware(GZipMiddleware)
@@ -27,27 +27,28 @@ def cities() -> dict[str, CityConfiguration]:
 
 @app.get("/cities/{city_id}")
 def get_city_data(city_id: str, weekday: str | None = None) -> ResponseCityData:
-    weekday = (
-        Weekday.get_weekday_by_value(weekday)
-        if weekday
-        else Weekday.get_current_weekday()
-    )
+    try:
+        weekday_enum: Weekday = Weekday.get_by_value_with_default(weekday)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
 
     if (city_configuration := CityConfiguration.get_by_city_id(city_id)) is None:
         raise HTTPException(404, "City not found")
 
-    if not city_data_cache.is_fresh(city_id, weekday):
+    if not city_data_cache.is_fresh(city_id, weekday_enum):
         try:
-            city_data_builder = CityDataBuilder(city_configuration, weekday)
-            city_data_cache.store(city_id, weekday, city_data_builder)
+            city_data_builder = CityDataBuilder(city_configuration, weekday_enum)
+            city_data_cache.store(city_id, weekday_enum, city_data_builder)
         except Exception as exc:
             logger.exception(
-                f"Failed to build city data for city {city_id} and weekday {weekday}",
+                f"Failed to build city data for city {city_id} and weekday {weekday_enum}",
                 exc_info=exc,
             )
-            raise HTTPException(500, f"Data processing for {city_id} failed")
 
-    return city_data_cache.get(city_id, weekday)
+    if city_data := city_data_cache.get(city_id, weekday_enum):
+        return city_data
+
+    raise HTTPException(500, f"Data processing for {city_id} failed")
 
 
 if __name__ == "__main__":

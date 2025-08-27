@@ -2,11 +2,11 @@ FROM python:3.12.8-slim
 
 WORKDIR /app
 
-COPY requirements.txt requirements.txt
-RUN pip install -r requirements.txt
-RUN pip install gunicorn
-
+COPY ./pyproject.toml ./pyproject.toml
+COPY ./README.md ./README.md
 COPY ./src ./src
+
+RUN pip install --no-cache-dir . gunicorn
 
 EXPOSE 8000
 

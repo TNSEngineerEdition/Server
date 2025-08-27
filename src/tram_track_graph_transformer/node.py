@@ -1,8 +1,8 @@
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
-from src.tram_track_graph_transformer.node_type import NodeType
+from tram_track_graph_transformer.node_type import NodeType
 
 
 class Node(BaseModel):
@@ -23,10 +23,10 @@ class Node(BaseModel):
     name: Optional[str] = None
 
     @property
-    def coordinates(self):
-        return (self.lat, self.lon)
+    def coordinates(self) -> tuple[float, float]:
+        return self.lat, self.lon
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         match other:
             case Node():
                 return self.id == other.id
@@ -35,5 +35,5 @@ class Node(BaseModel):
             case _:
                 return False
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self.id)

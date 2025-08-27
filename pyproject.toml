@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=80.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tns-engineer-edition-server"
+version = "0.1.0"
+description = "server component of engineering thesis: 'Concurrent interactive simulator of Krakow's tram network'"
+readme = "README.md"
+requires-python = ">=3.12"
+license-files = ["LICENSE"]
+
+dependencies = [
+    "overpy>=0.7",
+    "pandas>=2.2.3",
+    "pydantic>=2.10.6",
+    "requests>=2.32.3",
+    "networkx>=3.4.2",
+    "pyproj>=3.7.1",
+    "shapely>=2.0.7",
+    "fastapi>=0.115.12",
+    "uvicorn>=0.34.0",
+    "types-requests>=2.32.4",
+    "types-networkx>=3.5.0",
+    "pytest-mypy-plugins>=3.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.4",
+    "pytest-cov>=6.0.0",
+    "httpx>=0.28.1",
+    "pre-commit>=4.1.0",
+    "freezegun>=1.5.5",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.flake8]
+# E501 - Line too long - already handled by black
+# W503 - Line break before binary operator - enforced by black
+# E203 - Whitespace before ':' - enforced by black
+ignore = ["E501", "W503", "E203"]
+
+[tool.isort]
+profile = "black"
+use_parentheses = true
+multi_line_output = 3
+include_trailing_comma = true
+force_alphabetical_sort_within_sections = true
+
+[tool.mypy]
+ignore_missing_imports = true
+strict = true

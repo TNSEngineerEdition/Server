@@ -1,5 +1,5 @@
 # TNSEngineerEdition - Server
-This repository contains source code, and tests for engineering thesis:  \
+This repository contains source code, and tests for server component of engineering thesis:  \
 **Concurrent interactive simulator of Krakow's tram network**
 
 ## Defining city configurations
@@ -67,7 +67,7 @@ tns-engineer-edition
 
 If everything is working correctly, install development dependencies (such as pre-commit) by running:
 ```
-pip install -r dev-requirements.txt
+pip install -e .[dev]
 ```
 
 ### Pre-commit

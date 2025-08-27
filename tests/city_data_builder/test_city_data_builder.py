@@ -3,27 +3,32 @@ from unittest.mock import MagicMock, patch
 import overpy
 import pytest
 
-from src.city_data_builder import CityConfiguration, CityDataBuilder
-from src.tram_stop_mapper.gtfs_package import GTFSPackage
-from src.tram_stop_mapper.weekday import Weekday
+from city_data_builder import CityConfiguration, CityDataBuilder
+from tram_stop_mapper.gtfs_package import GTFSPackage
+from tram_stop_mapper.weekday import Weekday
 
 
 class TestCityDataBuilder:
     @pytest.mark.parametrize(
-        ("weekday_enum", "expected_trip_count", "expected_stop_count"),
+        (
+            "weekday",
+            "expected_route_count",
+            "expected_trip_count",
+            "expected_stop_count",
+        ),
         [
-            (Weekday.MONDAY, 4440, 115299),
-            (Weekday.TUESDAY, 4440, 115299),
-            (Weekday.WEDNESDAY, 4440, 115299),
-            (Weekday.THURSDAY, 4440, 115299),
-            (Weekday.FRIDAY, 4532, 117637),
-            (Weekday.SATURDAY, 2666, 70424),
-            (Weekday.SUNDAY, 2400, 63013),
+            pytest.param(Weekday.MONDAY, 23, 4440, 115299, id=Weekday.MONDAY),
+            pytest.param(Weekday.TUESDAY, 23, 4440, 115299, id=Weekday.TUESDAY),
+            pytest.param(Weekday.WEDNESDAY, 23, 4440, 115299, id=Weekday.WEDNESDAY),
+            pytest.param(Weekday.THURSDAY, 23, 4440, 115299, id=Weekday.THURSDAY),
+            pytest.param(Weekday.FRIDAY, 26, 4532, 117637, id=Weekday.FRIDAY),
+            pytest.param(Weekday.SATURDAY, 23, 2666, 70424, id=Weekday.SATURDAY),
+            pytest.param(Weekday.SUNDAY, 23, 2400, 63013, id=Weekday.SUNDAY),
         ],
     )
-    @patch("src.tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
-    @patch("src.overpass_client.OverpassClient.get_tram_stops_and_tracks")
-    @patch("src.overpass_client.OverpassClient.get_relations_and_stops")
+    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
+    @patch("overpass_client.OverpassClient.get_relations_and_stops")
     def test_city_data_builder(
         self,
         get_relations_and_stops_mock: MagicMock,
@@ -33,10 +38,11 @@ class TestCityDataBuilder:
         relations_and_stops_overpass_query_result: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
         gtfs_package: GTFSPackage,
-        weekday_enum: Weekday,
+        weekday: Weekday,
+        expected_route_count: int,
         expected_trip_count: int,
         expected_stop_count: int,
-    ):
+    ) -> None:
         # Arrange
         get_relations_and_stops_mock.return_value = (
             relations_and_stops_overpass_query_result
@@ -49,9 +55,7 @@ class TestCityDataBuilder:
         expected_node_count, expected_edge_count = 43321, 46047
 
         # Act
-        city_data_builder = CityDataBuilder(
-            krakow_city_configuration, weekday=weekday_enum
-        )
+        city_data_builder = CityDataBuilder(krakow_city_configuration, weekday=weekday)
 
         # Assert
         assert len(city_data_builder.tram_track_graph_data) == expected_node_count
@@ -60,17 +64,31 @@ class TestCityDataBuilder:
             == expected_edge_count
         )
 
-        assert len(city_data_builder.tram_trips_data) == expected_trip_count
-        assert (
-            sum(len(trip.stops) for trip in city_data_builder.tram_trips_data)
-            == expected_stop_count
-        )
+        assert len(city_data_builder.tram_routes_data) == expected_route_count
 
-        assert all(trip.stops for trip in city_data_builder.tram_trips_data)
+        trip_count = sum(
+            len(route.trips) for route in city_data_builder.tram_routes_data
+        )
+        assert trip_count == expected_trip_count
+
+        trip_stop_count = sum(
+            len(trip.stops)
+            for route in city_data_builder.tram_routes_data
+            for trip in route.trips
+        )
+        assert trip_stop_count == expected_stop_count
+
+        assert all(route.trips for route in city_data_builder.tram_routes_data)
+
+        assert all(
+            trip.stops
+            for route in city_data_builder.tram_routes_data
+            for trip in route.trips
+        )
 
         get_relations_and_stops_mock.assert_called_once_with(
             krakow_city_configuration.osm_area_name,
-            list(krakow_city_configuration.custom_stop_mapping.values()),
+            [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
         )
         get_tram_stops_and_tracks_mock.assert_called_once_with(
             krakow_city_configuration.osm_area_name

@@ -1,14 +1,17 @@
-from src.city_data_builder.city_configuration import CityConfiguration
-from src.city_data_builder.model import (
+import networkx as nx
+
+from city_data_builder.city_configuration import CityConfiguration
+from city_data_builder.model import (
     ResponseGraphEdge,
     ResponseGraphNode,
     ResponseGraphTramStop,
+    ResponseTramRoute,
     ResponseTramTrip,
     ResponseTramTripStop,
 )
-from src.overpass_client import OverpassClient
-from src.tram_stop_mapper import GTFSPackage, TramStopMapper, Weekday
-from src.tram_track_graph_transformer import (
+from overpass_client import OverpassClient
+from tram_stop_mapper import GTFSPackage, TramStopMapper, Weekday
+from tram_track_graph_transformer import (
     Node,
     NodeType,
     TramTrackGraphInspector,
@@ -29,10 +32,17 @@ class CityDataBuilder:
         self._tram_stop_mapper = self._get_tram_stop_mapper()
         self._tram_track_graph = self._get_tram_track_graph()
 
-    def _get_tram_stop_mapper(self):
+    def _get_tram_stop_mapper(self) -> TramStopMapper:
+        custom_node_ids: list[int] = []
+        for item in self._city_configuration.custom_stop_mapping.values():
+            if isinstance(item, int):
+                custom_node_ids.append(item)
+            else:
+                custom_node_ids.extend(filter(lambda x: x is not None, item))  # type: ignore[arg-type]
+
         relations_and_stops = OverpassClient.get_relations_and_stops(
             self._city_configuration.osm_area_name,
-            list(self._city_configuration.custom_stop_mapping.values()),
+            custom_node_ids,
         )
 
         gtfs_package = GTFSPackage.from_url(self._city_configuration.gtfs_url)
@@ -43,7 +53,7 @@ class CityDataBuilder:
 
         return tram_stop_mapper
 
-    def _get_tram_track_graph(self):
+    def _get_tram_track_graph(self) -> "nx.DiGraph[Node]":
         tram_stops_and_tracks = OverpassClient.get_tram_stops_and_tracks(
             self._city_configuration.osm_area_name
         )
@@ -71,21 +81,20 @@ class CityDataBuilder:
         return tram_track_graph
 
     @property
-    def tram_track_graph_data(self):
-        response_data_edge_by_source: dict[Node, list[ResponseGraphEdge]] = {
-            node: [] for node in self._tram_track_graph.nodes
+    def tram_track_graph_data(self) -> list[ResponseGraphNode]:
+        response_data_edge_by_source: dict[Node, dict[int, ResponseGraphEdge]] = {
+            node: {} for node in self._tram_track_graph.nodes
         }
 
         for source, dest, data in self._tram_track_graph.edges.data():
-            response_data_edge_by_source[source].append(
-                ResponseGraphEdge(
-                    id=dest.id,
-                    length=data["length"],
-                    azimuth=data["azimuth"],
-                    max_speed=data["max_speed"],
-                )
+            response_data_edge_by_source[source][dest.id] = ResponseGraphEdge(
+                id=dest.id,
+                distance=data["distance"],
+                azimuth=data["azimuth"],
+                max_speed=data["max_speed"],
             )
 
+        response_node: ResponseGraphNode
         result: list[ResponseGraphNode] = []
         for node in response_data_edge_by_source:
             if node.type == NodeType.TRAM_STOP:
@@ -112,23 +121,33 @@ class CityDataBuilder:
         return result
 
     @property
-    def tram_trips_data(self):
-        trip_data_by_trip_id, trip_stops_data = (
-            self._tram_stop_mapper.trip_data_and_stops_by_trip_id
-        )
+    def tram_routes_data(self) -> list[ResponseTramRoute]:
+        trip_stops_by_trip_id = self._tram_stop_mapper.trip_stops_by_trip_id
 
-        return [
-            ResponseTramTrip(
-                route=str(trip_data["route_long_name"]),
-                trip_head_sign=trip_data["trip_headsign"],
-                stops=[
-                    ResponseTramTripStop(id=node_id, time=stop_time)
-                    for node_id, stop_time in trip_stops_data[trip_id]
-                ],
+        routes_by_route_id = {
+            str(route_id): ResponseTramRoute(
+                name=route_data["route_long_name"],
+                background_color=route_data["route_color"],
+                text_color=route_data["route_text_color"],
             )
-            for trip_id, trip_data in trip_data_by_trip_id.items()
-            if (
-                trip_id in trip_stops_data
-                and self._weekday.value in trip_data.get("service_days")
+            for route_id, route_data in self._tram_stop_mapper.gtfs_package.routes.iterrows()
+        }
+
+        for (
+            trip_id,
+            trip_data,
+        ) in self._tram_stop_mapper.gtfs_package.get_trips_for_weekday(self._weekday):
+            if trip_id not in trip_stops_by_trip_id:
+                continue
+
+            routes_by_route_id[trip_data["route_id"]].trips.append(
+                ResponseTramTrip(
+                    trip_head_sign=trip_data["trip_headsign"],
+                    stops=[
+                        ResponseTramTripStop(id=stop.stop_id, time=stop.time)
+                        for stop in trip_stops_by_trip_id[trip_id]
+                    ],
+                )
             )
-        ]
+
+        return list(filter(lambda x: x.trips, routes_by_route_id.values()))

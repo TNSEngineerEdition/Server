@@ -2,31 +2,19 @@ import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from pydantic import BaseModel, Field
-
-from src.city_data_builder import (
-    CityDataBuilder,
-    ResponseGraphNode,
-    ResponseGraphTramStop,
-    ResponseTramTrip,
-)
-from src.tram_stop_mapper import Weekday
-
-
-class ResponseCityData(BaseModel):
-    tram_track_graph: list[ResponseGraphNode | ResponseGraphTramStop]
-    tram_trips: list[ResponseTramTrip]
-    last_updated: datetime = Field(default_factory=datetime.now)
+from city_data_builder import CityDataBuilder
+from city_data_cache.model import ResponseCityData
+from tram_stop_mapper import Weekday
 
 
 class CityDataCache:
     def __init__(
         self,
-        cache_directory=Path(
+        cache_directory: Path = Path(
             os.environ.get("CITY_DATA_CACHE_DIRECTORY", "./cache/cities")
         ),
-        ttl_timedelta=timedelta(hours=24),
-    ):
+        ttl_timedelta: timedelta = timedelta(hours=24),
+    ) -> None:
         self.cache_directory = cache_directory
         self.ttl_timedelta = ttl_timedelta
 
@@ -61,7 +49,7 @@ class CityDataCache:
     ) -> None:
         data = ResponseCityData(
             tram_track_graph=city_data_builder.tram_track_graph_data,
-            tram_trips=city_data_builder.tram_trips_data,
+            tram_routes=city_data_builder.tram_routes_data,
         )
 
         cache_file_path = self._get_path_to_cache(city_id, weekday)
