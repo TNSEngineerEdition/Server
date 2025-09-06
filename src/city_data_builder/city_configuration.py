@@ -72,16 +72,10 @@ class CityConfiguration(BaseModel):
 
     @classmethod
     def get_by_city_id_and_date(cls, city_id: str, date: str) -> Self | None:
-        configuration_city = cls.CITIES_DIRECTORY_PATH / city_id
-        if not configuration_city.is_dir():
+        path = (cls.CITIES_DIRECTORY_PATH / city_id / date).with_suffix(".json")
+        if not path.is_file():
             return None
-
-        config_path = configuration_city / f"{date}.json"
-
-        if not config_path.is_file():
-            return None
-
-        return cls.from_path(config_path)
+        return cls.from_path(path)
 
     @cached_property
     def custom_tram_stop_pair_ratio_map(self) -> dict[tuple[int, int], float]:

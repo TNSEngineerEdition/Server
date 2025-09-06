@@ -20,9 +20,9 @@ city_data_cache = CityDataCache()
 
 
 @app.get("/cities")
-def cities() -> dict[str, CityConfiguration]:
+def cities() -> dict[str, dict[str, CityConfiguration]]:
     try:
-        return CityConfiguration.get_all()
+        return city_data_cache.get_all()
     except ValidationError:
         raise HTTPException(500, "Invalid configuration files")
 
@@ -83,3 +83,4 @@ if __name__ == "__main__":
         host=os.environ.get("APP_HOST", "127.0.0.1"),
         port=os.environ.get("APP_PORT", 8000),
     )
+    # cities()

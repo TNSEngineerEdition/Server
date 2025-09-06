@@ -2,7 +2,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
-from city_data_builder import CityDataBuilder
+from city_data_builder import CityConfiguration, CityDataBuilder
 from city_data_cache.model import ResponseCityData
 
 
@@ -47,7 +47,33 @@ class CityDataCache:
         if not cache_file_path.is_file():
             return None
 
-        return ResponseCityData.model_validate_json(cache_file_path.read_text())
+        return ResponseCityData.model_validate_json(
+            cache_file_path.read_text(encoding="utf-8")
+        )
+
+    def get_all(self) -> dict[str, dict[str, CityConfiguration]]:
+        return {
+            city_dir.name: dict(
+                sorted(
+                    (
+                        (city_by_date.stem, config)
+                        for city_by_date in city_dir.iterdir()
+                        if city_by_date.is_file()
+                        and city_by_date.suffix == ".json"
+                        and (
+                            config := CityConfiguration.get_by_city_id_and_date(
+                                city_dir.name, city_by_date.stem
+                            )
+                        )
+                        is not None
+                    ),
+                    key=lambda date: date[0],
+                    reverse=True,
+                )
+            )
+            for city_dir in self.cache_directory.iterdir()
+            if city_dir.is_dir()
+        }
 
     def store(
         self,
