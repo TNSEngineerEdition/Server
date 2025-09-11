@@ -66,7 +66,7 @@ def get_city_data(
                 exc_info=exc,
             )
 
-    if (cached_city_data := city_data_cache.get(city_id, date_resolved)) is not None:
+    if cached_city_data := city_data_cache.get(city_id, date_resolved):
         return cached_city_data
 
     raise HTTPException(500, f"Data processing for {city_id} failed")
