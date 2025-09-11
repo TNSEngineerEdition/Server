@@ -39,7 +39,7 @@ class CityConfiguration(BaseModel):
     @classmethod
     def from_path(cls, path: Path) -> Self:
         try:
-            return cls.model_validate_json(path.read_text())
+            return cls.model_validate_json(path.read_text(encoding="utf-8"))
         except ValidationError as exc:
             logger.exception(f"Invalid configuration file: {path}", exc_info=exc)
             raise

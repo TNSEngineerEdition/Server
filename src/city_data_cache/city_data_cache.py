@@ -1,4 +1,5 @@
 import os
+from datetime import date as d
 from datetime import timedelta
 from pathlib import Path
 
@@ -21,26 +22,6 @@ class CityDataCache:
 
     def _get_path_to_cache(self, city_id: str, date: str) -> Path:
         return self.cache_directory / city_id / f"{date}.json"
-
-    # def is_fresh(self, city_id: str, weekday: Weekday) -> bool:
-    #     cache_file_path = self._get_path_to_cache(city_id, weekday)
-    #     if not cache_file_path.is_file():
-    #         return False
-
-    #     timedelta_since_last_update = datetime.now() - datetime.fromtimestamp(
-    #         cache_file_path.stat().st_mtime
-    #     )
-
-    #     return timedelta_since_last_update < self.ttl_timedelta
-
-    # def get(self, city_id: str, weekday: Weekday) -> ResponseCityData | None:
-    #     cache_file_path = self._get_path_to_cache(city_id, weekday)
-    #     if not cache_file_path.is_file():
-    #         return None
-
-    #     return ResponseCityData.model_validate_json(
-    #         cache_file_path.read_text(encoding="utf-8")
-    #     )
 
     def get(self, city_id: str, date: str) -> ResponseCityData | None:
         cache_file_path = self._get_path_to_cache(city_id, date)
@@ -75,17 +56,24 @@ class CityDataCache:
             if city_dir.is_dir()
         }
 
-    def store(
+    def build_and_store(
         self,
         city_id: str,
         date: str,
         city_data_builder: CityDataBuilder,
-    ) -> None:
+    ) -> ResponseCityData:
         data = ResponseCityData(
             tram_track_graph=city_data_builder.tram_track_graph_data,
             tram_routes=city_data_builder.tram_routes_data,
         )
 
         cache_file_path = self._get_path_to_cache(city_id, date)
+        cache_dir = cache_file_path.parent
+
+        files_count = sum(1 for _ in cache_dir.iterdir()) if cache_dir.exists() else 0
+        if files_count >= 10 or date != d.today().strftime("%Y-%m-%d"):
+            return data
+
         cache_file_path.parent.mkdir(parents=True, exist_ok=True)
-        cache_file_path.write_text(data.model_dump_json())
+        cache_file_path.write_text(data.model_dump_json(), encoding="utf-8")
+        return data
