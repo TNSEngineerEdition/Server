@@ -40,7 +40,7 @@ def get_city_data(
             404, f"City date for {city_id} not found in cache for {date}"
         )
 
-    today_date_flag = weekday is None and date is None
+    today_date_flag = weekday is None
     today_date: str = d.today().strftime("%Y-%m-%d")
     try:
         weekday_enum: Weekday = Weekday.get_by_value_with_default(weekday)
