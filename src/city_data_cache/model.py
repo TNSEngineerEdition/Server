@@ -1,9 +1,10 @@
 import datetime
-from typing import TypedDict
+
+from pydantic import BaseModel
 
 from city_data_builder.city_configuration import CityConfiguration
 
 
-class CachedCityDates(TypedDict):
+class CachedCityDates(BaseModel):
     city_configuration: CityConfiguration
     available_dates: list[datetime.date]

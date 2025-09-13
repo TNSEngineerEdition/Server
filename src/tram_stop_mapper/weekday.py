@@ -1,6 +1,5 @@
 from datetime import date
 from enum import StrEnum
-from typing import Optional
 
 
 class Weekday(StrEnum):
@@ -13,14 +12,11 @@ class Weekday(StrEnum):
     SUNDAY = "sunday"
 
     @classmethod
-    def get_current(cls) -> Optional["Weekday"]:
+    def get_current(cls) -> "Weekday":
         return list(cls)[date.today().weekday()]
 
     @classmethod
-    def get_by_value(cls, weekday: str | None) -> Optional["Weekday"]:
-        if weekday is None:
-            return None
-
+    def get_by_value(cls, weekday: str) -> "Weekday":
         try:
             return cls(weekday.lower())
         except ValueError:
