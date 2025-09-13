@@ -33,9 +33,10 @@ def get_city_data(
     if date is not None and weekday is not None:
         raise HTTPException(400, "Provide either date or weekday")
 
-    if date and (cached_date := city_data_cache.get(city_id, date)) is not None:
-        return cached_date
     if date:
+        if cached_data := city_data_cache.get(city_id, date):
+            return cached_data
+
         raise HTTPException(
             404, f"City date for {city_id} not found in cache for {date}"
         )
