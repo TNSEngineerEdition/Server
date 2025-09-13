@@ -40,7 +40,24 @@ def validate_weekday(weekday: str | None = None) -> Weekday | None:
 @app.get("/cities")
 def cities() -> dict[str, CachedCityDates]:
     try:
-        return city_data_cache.get_all_cached_dates()
+        result: dict[str, CachedCityDates] = {}
+
+        for city_id in city_data_cache.list_cities():
+            city_config = CityConfiguration.get_by_city_id(city_id)
+            if city_config is None:
+                continue
+
+            dates = city_data_cache.get_cached_dates(city_id)
+
+            if not dates:
+                continue
+
+            result[city_id] = {
+                "city_configuration": city_config,
+                "available_dates": dates,
+            }
+
+        return result
     except ValidationError:
         raise HTTPException(500, "Invalid configuration files")
 
