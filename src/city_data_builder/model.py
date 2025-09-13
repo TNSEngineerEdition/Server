@@ -73,3 +73,8 @@ class ResponseTramRoute(BaseModel):
             return value.upper()
 
         return cls._DEFAULT_TEXT_COLOR
+
+
+class ResponseCityData(BaseModel):
+    tram_track_graph: list[ResponseGraphNode | ResponseGraphTramStop]
+    tram_routes: list[ResponseTramRoute]
