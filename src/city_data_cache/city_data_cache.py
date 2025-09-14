@@ -6,12 +6,10 @@ from city_data_builder import ResponseCityData
 
 
 class CityDataCache:
-    DEFAULT_CACHE_DIRECTORY: Path = Path(
+    DEFAULT_CACHE_DIRECTORY = Path(
         os.environ.get("CITY_DATA_CACHE_DIRECTORY", "./cache/cities")
     )
-    DEFAULT_MAX_FILE_COUNT: int = int(
-        os.environ.get("CITY_DATA_CACHE_MAX_FILE_COUNT", "10")
-    )
+    DEFAULT_MAX_FILE_COUNT = int(os.environ.get("CITY_DATA_CACHE_MAX_FILE_COUNT", "10"))
 
     def __init__(
         self,
@@ -48,9 +46,6 @@ class CityDataCache:
         )
 
     def _remove_redundant_files(self, city_cache_dir: Path) -> None:
-        if not city_cache_dir.exists():
-            return
-
         file_count = len(list(city_cache_dir.iterdir()))
         if file_count < self.max_file_count:
             return
@@ -74,6 +69,9 @@ class CityDataCache:
         city_data: ResponseCityData,
     ) -> ResponseCityData:
         cache_file_path = self._get_path_to_cache_for_file(city_id, date)
+
+        if not cache_file_path.parent.exists():
+            cache_file_path.parent.mkdir(parents=True, exist_ok=True)
 
         self._remove_redundant_files(cache_file_path.parent)
 

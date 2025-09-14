@@ -59,6 +59,41 @@ def cities() -> dict[str, CachedCityDates]:
     }
 
 
+def _get_city_data_by_date(city_id: str, date: datetime.date) -> ResponseCityData:
+    if cached_data := city_data_cache.get(city_id, date):
+        return cached_data
+    raise HTTPException(404, f"City data for {city_id} not found in cache for {date}")
+
+
+def _get_city_data_by_weekday(city_id: str, weekday: Weekday) -> ResponseCityData:
+    if (city_configuration := CityConfiguration.get_by_city_id(city_id)) is None:
+        raise HTTPException(404, f"City {city_id} not found")
+
+    try:
+        city_data_builder = CityDataBuilder(city_configuration, weekday)
+    except Exception as exc:
+        logger.exception(
+            "Failed to build city data for city %s for weekday %s",
+            city_id,
+            weekday,
+            exc_info=exc,
+        )
+        raise HTTPException(500, f"Data processing for {city_id} failed")
+
+    return city_data_builder.to_response_city_data()
+
+
+def _get_city_data_today(city_id: str) -> ResponseCityData:
+    today = datetime.date.today()
+    if cached := city_data_cache.get(city_id, today):
+        return cached
+
+    weekday = Weekday.get_current()
+    data = _get_city_data_by_weekday(city_id, weekday)
+    city_data_cache.store(city_id, today, data)
+    return data
+
+
 @app.get("/cities/{city_id}")
 def get_city_data(
     city_id: str,
@@ -79,42 +114,12 @@ def get_city_data(
         raise HTTPException(400, "Provide either date or weekday")
 
     if date:
-        if cached_data := city_data_cache.get(city_id, date):
-            return cached_data
+        return _get_city_data_by_date(city_id, date)
 
-        raise HTTPException(
-            404, f"City data for {city_id} not found in cache for {date}"
-        )
+    if weekday:
+        return _get_city_data_by_weekday(city_id, weekday)
 
-    is_today_build = weekday is None
-    if is_today_build:
-        date = datetime.date.today()
-        weekday = Weekday.get_current()
-
-        if today_cached_data := city_data_cache.get(city_id, date):
-            return today_cached_data
-
-    if (city_configuration := CityConfiguration.get_by_city_id(city_id)) is None:
-        raise HTTPException(404, f"City {city_id} not found")
-
-    assert weekday is not None
-    assert date is not None
-
-    try:
-        city_data_builder = CityDataBuilder(city_configuration, weekday)
-    except Exception as exc:
-        logger.exception(
-            "Failed to build city data for city %s for weekday %s",
-            city_id,
-            weekday
-            exc_info=exc,
-        )
-        raise HTTPException(500, f"Data processing for {city_id} failed")
-
-    city_data = city_data_builder.to_response_city_data()
-    if is_today_build:
-        city_data_cache.store(city_id, date, city_data)
-    return city_data
+    return _get_city_data_today(city_id)
 
 
 if __name__ == "__main__":
