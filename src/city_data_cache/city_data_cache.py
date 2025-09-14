@@ -46,10 +46,11 @@ class CityDataCache:
         )
 
     def _remove_redundant_files(self, city_cache_dir: Path) -> None:
-        files_count = (
-            sum(1 for _ in city_cache_dir.iterdir()) if city_cache_dir.exists() else 0
-        )
-        if files_count < self.max_file_count:
+        if not city_cache_dir.exists():
+            return
+            
+        file_count = len(list(city_cache_dir.iterdir()))
+        if file_count < self.max_file_count:
             return
 
         to_remove = files_count - self.max_file_count + 1
@@ -70,11 +71,9 @@ class CityDataCache:
         date: datetime.date,
         city_data: ResponseCityData,
     ) -> ResponseCityData:
-
         cache_file_path = self._get_path_to_cache_for_file(city_id, date)
-        cache_dir = self._get_path_to_city_cache(city_id)
 
-        self._remove_redundant_files(cache_dir)
+        self._remove_redundant_files(cache_file_path.parent)
 
         cache_file_path.parent.mkdir(parents=True, exist_ok=True)
         cache_file_path.write_text(city_data.model_dump_json(), encoding="utf-8")
