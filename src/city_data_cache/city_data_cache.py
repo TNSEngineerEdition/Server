@@ -75,6 +75,5 @@ class CityDataCache:
 
         self._remove_redundant_files(cache_file_path.parent)
 
-        cache_file_path.parent.mkdir(parents=True, exist_ok=True)
         cache_file_path.write_text(city_data.model_dump_json(), encoding="utf-8")
         return city_data
