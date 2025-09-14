@@ -22,7 +22,7 @@ def validate_date(date: str | None = None) -> datetime.date | None:
     if date is None:
         return None
     try:
-        return datetime.datetime.strptime(date, "%Y-%m-%d").date()
+        return datetime.date.fromisoformat(date)
     except ValueError:
         raise HTTPException(
             status_code=400,
