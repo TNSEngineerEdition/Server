@@ -70,7 +70,7 @@ def get_city_data(
 
     - Without parameters: returns data for the current day
     (from cache if available, otherwise built and cached).
-    - With `weekday`: builds and returns data for the given day of the week.
+    - With `weekday`: builds and returns data for the given day of the week using currently available GTFS Schedule and OpenStreetMap data.
     - With `date`: returns cached data for the given date if available,
     otherwise responds with 404.
     - With both `weekday` and `date`: responds with 400, only one parameter is allowed.
@@ -104,7 +104,9 @@ def get_city_data(
         city_data_builder = CityDataBuilder(city_configuration, weekday)
     except Exception as exc:
         logger.exception(
-            f"Failed to build city data for city {city_id} for weekday {weekday}",
+            "Failed to build city data for city %s for weekday %s",
+            city_id,
+            weekday
             exc_info=exc,
         )
         raise HTTPException(500, f"Data processing for {city_id} failed")
