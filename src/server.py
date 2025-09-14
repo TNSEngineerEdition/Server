@@ -42,6 +42,9 @@ def validate_weekday(weekday: str | None = None) -> Weekday | None:
 
 @app.get("/cities")
 def cities() -> dict[str, CachedCityDates]:
+    """
+    Returns all available cities with their latest configurations and cached dates.
+    """
     try:
         cities_config = CityConfiguration.get_all()
     except ValidationError:
@@ -62,6 +65,16 @@ def get_city_data(
     weekday: Weekday | None = Depends(validate_weekday),
     date: datetime.date | None = Depends(validate_date),
 ) -> ResponseCityData:
+    """
+    Returns processed data for a given city.
+
+    - Without parameters: returns data for the current day
+    (from cache if available, otherwise built and cached).
+    - With `weekday`: builds and returns data for the given day of the week.
+    - With `date`: returns cached data for the given date if available,
+    otherwise responds with 404.
+    - With both `weekday` and `date`: responds with 400, only one parameter is allowed.
+    """
     if date is not None and weekday is not None:
         raise HTTPException(400, "Provide either date or weekday")
 
@@ -73,8 +86,8 @@ def get_city_data(
             404, f"City data for {city_id} not found in cache for {date}"
         )
 
-    today_date_flag = weekday is None
-    if today_date_flag:
+    is_today_build = weekday is None
+    if is_today_build:
         date = datetime.date.today()
         weekday = Weekday.get_current()
 
@@ -84,9 +97,11 @@ def get_city_data(
     if (city_configuration := CityConfiguration.get_by_city_id(city_id)) is None:
         raise HTTPException(404, f"City {city_id} not found")
 
-    try:
-        city_data_builder = CityDataBuilder(city_configuration, weekday)  # type: ignore[arg-type]
+    assert weekday is not None
+    assert date is not None
 
+    try:
+        city_data_builder = CityDataBuilder(city_configuration, weekday)
     except Exception as exc:
         logger.exception(
             f"Failed to build city data for city {city_id} for weekday {weekday}",
@@ -95,8 +110,8 @@ def get_city_data(
         raise HTTPException(500, f"Data processing for {city_id} failed")
 
     city_data = city_data_builder.to_response_city_data()
-    if today_date_flag:
-        city_data_cache.store(city_id, date, city_data)  # type: ignore[arg-type]
+    if is_today_build:
+        city_data_cache.store(city_id, date, city_data)
     return city_data
 
 
