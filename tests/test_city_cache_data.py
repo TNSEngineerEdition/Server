@@ -1,7 +1,6 @@
+import datetime
 import shutil
 import tempfile
-import time
-from datetime import timedelta
 from pathlib import Path
 from typing import Any, Generator
 from unittest.mock import Mock
@@ -10,13 +9,13 @@ import pytest
 
 from city_data_builder import (
     CityDataBuilder,
+    ResponseCityData,
     ResponseGraphEdge,
     ResponseGraphNode,
     ResponseTramRoute,
     ResponseTramTrip,
 )
-from city_data_cache import CityDataCache, ResponseCityData
-from tram_stop_mapper import Weekday
+from city_data_cache import CityDataCache
 
 
 class TestCityDataCache:
@@ -54,29 +53,23 @@ class TestCityDataCache:
         yield directory_path
         shutil.rmtree(directory_path)
 
-    def test_is_cache_fresh_no_file(self, cache_directory: Path) -> None:
-        # Arrange
-        cache = CityDataCache(cache_directory, timedelta(hours=1))
-        city_id, weekday = "sample_city", Weekday.MONDAY
-
-        # Act
-        is_fresh = cache.is_fresh(city_id, weekday)
-
-        # Assert
-        assert not is_fresh
-
     def test_store_and_load_data(
         self,
         cache_directory: Path,
         city_data_builder_mock: CityDataBuilder,
     ) -> None:
         # Arrange
-        cache = CityDataCache(cache_directory, timedelta(hours=1))
-        city_id, weekday = "sample_city", Weekday.MONDAY
+        cache = CityDataCache(cache_directory)
+        city_id, date = "sample_city", datetime.date(2025, 9, 15)
+
+        data = ResponseCityData(
+            tram_track_graph=city_data_builder_mock.tram_track_graph_data,
+            tram_routes=city_data_builder_mock.tram_routes_data,
+        )
 
         # Act
-        cache.store(city_id, weekday, city_data_builder_mock)
-        loaded_data = cache.get(city_id, weekday)
+        cache.store(city_id, date, data)
+        loaded_data = cache.get(city_id, date)
 
         # Assert
         assert isinstance(loaded_data, ResponseCityData)
@@ -84,22 +77,19 @@ class TestCityDataCache:
             loaded_data.tram_track_graph == city_data_builder_mock.tram_track_graph_data
         )
         assert loaded_data.tram_routes == city_data_builder_mock.tram_routes_data
-        assert cache.is_fresh(city_id, weekday)
 
-    def test_is_cache_fresh_expired(
-        self, cache_directory: Path, city_data_builder_mock: CityDataBuilder
-    ) -> None:
+    def test_get_cached_dates(self, city_cache_dir: Path) -> None:
         # Arrange
-        cache = CityDataCache(cache_directory, timedelta())
-        city_id, weekday = "sample_city", Weekday.MONDAY
-
-        cache.store(city_id, weekday, city_data_builder_mock)
-
-        # Sleeping to make sure the cache expires
-        time.sleep(1)
+        cache = CityDataCache(city_cache_dir, 10)
 
         # Act
-        is_fresh = cache.is_fresh(city_id, weekday)
+        dates = cache.get_cached_dates("krakow")
 
         # Assert
-        assert not is_fresh
+        assert dates == [
+            datetime.date(2025, 9, 14),
+            datetime.date(2025, 9, 13),
+            datetime.date(2025, 9, 12),
+            datetime.date(2025, 9, 11),
+            datetime.date(2025, 9, 4),
+        ]

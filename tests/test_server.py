@@ -9,8 +9,7 @@ from fastapi.testclient import TestClient
 from freezegun import freeze_time
 from pydantic import ValidationError
 
-from city_data_builder import CityConfiguration
-from city_data_cache import ResponseCityData
+from city_data_builder import CityConfiguration, ResponseCityData
 from server import app
 from tram_stop_mapper import GTFSPackage, Weekday
 
