@@ -1,3 +1,4 @@
+import datetime
 import logging
 import urllib.parse
 from typing import Any
@@ -9,9 +10,10 @@ from fastapi.testclient import TestClient
 from freezegun import freeze_time
 from pydantic import ValidationError
 
-from city_data_builder import CityConfiguration, ResponseCityData
+from city_data_builder import CityConfiguration
+from city_data_builder.model import ResponseCityData
 from server import app
-from tram_stop_mapper import GTFSPackage, Weekday
+from tram_stop_mapper import GTFSPackage
 
 
 class TestServer:
@@ -34,15 +36,18 @@ class TestServer:
         assert len(cities) == 1
         assert "krakow" in cities
 
-        for city_id, city_configuration in cities.items():
+        for city_id, payload in cities.items():
             assert city_id
             assert isinstance(city_id, str)
 
-            osm_area_name = city_configuration["osm_area_name"]
+            configuration = payload["city_configuration"]
+            available_dates = payload["available_dates"]
+
+            osm_area_name = configuration["osm_area_name"]
             assert osm_area_name
             assert isinstance(osm_area_name, str)
 
-            gtfs_url = city_configuration["gtfs_url"]
+            gtfs_url = configuration["gtfs_url"]
             assert gtfs_url
             assert isinstance(gtfs_url, str)
 
@@ -50,12 +55,12 @@ class TestServer:
             assert url_parse_result.scheme
             assert url_parse_result.netloc
 
-            ignored_gtfs_lines = city_configuration["ignored_gtfs_lines"]
+            ignored_gtfs_lines = configuration["ignored_gtfs_lines"]
             assert isinstance(ignored_gtfs_lines, list)
             assert all(isinstance(line, str) for line in ignored_gtfs_lines)
             assert len(set(ignored_gtfs_lines)) == len(ignored_gtfs_lines)
 
-            custom_stop_mapping = city_configuration["custom_stop_mapping"]
+            custom_stop_mapping = configuration["custom_stop_mapping"]
             assert isinstance(custom_stop_mapping, dict)
             assert all(
                 isinstance(gtfs_stop_id, str) for gtfs_stop_id in custom_stop_mapping
@@ -65,9 +70,12 @@ class TestServer:
                 for osm_node_id in custom_stop_mapping.values()
             )
 
+            assert isinstance(available_dates, list)
+            assert all(isinstance(d, str) for d in available_dates)
+
         assert any(
-            city_configuration["osm_area_name"] == "Kraków"
-            for city_configuration in cities.values()
+            payload["city_configuration"]["osm_area_name"] == "Kraków"
+            for payload in cities.values()
         )
 
     @patch("city_data_builder.city_configuration.CityConfiguration.get_all")
@@ -171,15 +179,16 @@ class TestServer:
                     assert stop_time >= 0
                     assert isinstance(stop_time, int)
 
-    @freeze_time("2025-01-01")
     @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
     @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
-    @patch("city_data_cache.CityDataCache.is_fresh", return_value=False)
+    @patch("server.CityDataCache.get", return_value=None)
+    @patch("server.CityDataCache.store", return_value=None)
     def test_get_city_data(
         self,
-        cache_is_fresh_mock: MagicMock,
+        store_mock: MagicMock,
+        cache_get_mock: MagicMock,
         get_relations_and_stops_mock: MagicMock,
         get_tram_stops_and_tracks_mock: MagicMock,
         gtfs_package_from_url_mock: MagicMock,
@@ -206,7 +215,6 @@ class TestServer:
         assert response.status_code == 200
         self._assert_city_data_content(response.json())
 
-        cache_is_fresh_mock.assert_called_once_with("krakow", Weekday.WEDNESDAY)
         get_relations_and_stops_mock.assert_called_once_with(
             "Kraków",
             [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
@@ -217,22 +225,25 @@ class TestServer:
         )
         get_by_city_id_mock.assert_called_once_with("krakow")
 
+    @pytest.mark.parametrize("params", [{"weekday": "monday"}, {"date": "2025-01-01"}])
     @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
     @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
-    @patch("city_data_cache.CityDataCache.is_fresh", return_value=False)
-    def test_get_city_data_with_weekday(
+    @patch("server.CityDataCache.get")
+    def test_get_city_data_with_weekday_od_date(
         self,
-        cache_is_fresh_mock: MagicMock,
+        cache_get_mock: MagicMock,
         get_relations_and_stops_mock: MagicMock,
         get_tram_stops_and_tracks_mock: MagicMock,
         gtfs_package_from_url_mock: MagicMock,
         get_by_city_id_mock: MagicMock,
+        params: dict[str, str],
         relations_and_stops_overpass_query_result: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
         gtfs_package: GTFSPackage,
         krakow_city_configuration: CityConfiguration,
+        krakow_response_city_data: ResponseCityData,
     ) -> None:
         # Arrange
         get_relations_and_stops_mock.return_value = (
@@ -243,24 +254,36 @@ class TestServer:
         )
         gtfs_package_from_url_mock.return_value = gtfs_package
         get_by_city_id_mock.return_value = krakow_city_configuration
+        cache_get_mock.return_value = krakow_response_city_data
 
         # Act
-        response = self.client.get("/cities/krakow", params={"weekday": "monday"})
+        response = self.client.get("/cities/krakow", params=params)
 
         # Assert
         assert response.status_code == 200
         self._assert_city_data_content(response.json())
 
-        cache_is_fresh_mock.assert_called_once_with("krakow", Weekday.MONDAY)
-        get_relations_and_stops_mock.assert_called_once_with(
-            "Kraków",
-            [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
-        )
-        get_tram_stops_and_tracks_mock.assert_called_once_with("Kraków")
-        gtfs_package_from_url_mock.assert_called_once_with(
-            "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip"
-        )
-        get_by_city_id_mock.assert_called_once_with("krakow")
+        if "weekday" in params:
+            get_by_city_id_mock.assert_called_once_with("krakow")
+            get_relations_and_stops_mock.assert_called_once_with(
+                "Kraków",
+                [
+                    1770194211,
+                    2163355814,
+                    10020926691,
+                    2163355821,
+                    2375524420,
+                    629106153,
+                ],
+            )
+            get_tram_stops_and_tracks_mock.assert_called_once_with("Kraków")
+            gtfs_package_from_url_mock.assert_called_once_with(
+                "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip"
+            )
+        else:
+            get_relations_and_stops_mock.assert_not_called()
+            get_tram_stops_and_tracks_mock.assert_not_called()
+            gtfs_package_from_url_mock.assert_not_called()
 
     def test_get_city_data_unknown_city_id(self) -> None:
         # Act
@@ -268,7 +291,7 @@ class TestServer:
 
         # Assert
         assert response.status_code == 404
-        assert response.json()["detail"] == "City not found"
+        assert response.json()["detail"] == "City 1234567890 not found"
 
     def test_get_city_data_invalid_weekday(self) -> None:
         # Arrange
@@ -284,57 +307,39 @@ class TestServer:
         assert response.status_code == 400
         assert response.json()["detail"] == expected_response_detail
 
-    @freeze_time("2025-01-01")
-    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
-    @patch("overpass_client.OverpassClient.get_relations_and_stops")
-    @patch("city_data_cache.CityDataCache.is_fresh", return_value=False)
-    @patch("city_data_cache.CityDataCache.get")
-    def test_get_city_data_exception_during_data_build(
-        self,
-        cache_get_mock: MagicMock,
-        cache_is_fresh_mock: MagicMock,
-        get_relations_and_stops_mock: MagicMock,
-        get_by_city_id_mock: MagicMock,
-        krakow_response_city_data: ResponseCityData,
-        krakow_city_configuration: CityConfiguration,
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
+    def test_get_city_data_invalid_date(self) -> None:
         # Arrange
-        expected_log_message = (
-            "Failed to build city data for city krakow and weekday wednesday"
+        expected_response_detail = (
+            "Invalid date format: '2137-2137-2137', expected YYYY-MM-DD"
         )
-
-        cache_get_mock.return_value = krakow_response_city_data
-        get_relations_and_stops_mock.side_effect = Exception("Error")
-        get_by_city_id_mock.return_value = krakow_city_configuration
 
         # Act
-        with caplog.at_level(logging.ERROR, "server"):
-            response = self.client.get("/cities/krakow")
+        response = self.client.get("/cities/krakow", params={"date": "2137-2137-2137"})
 
         # Assert
-        assert response.status_code == 200
-        assert expected_log_message in caplog.text
+        assert response.status_code == 400
+        assert response.json()["detail"] == expected_response_detail
 
-        self._assert_city_data_content(response.json())
+    def test_get_city_data_both_params(self) -> None:
+        # Arrange
+        expected_response_detail = "Provide either date or weekday"
 
-        cache_get_mock.assert_called_once_with("krakow", Weekday.WEDNESDAY)
-        cache_is_fresh_mock.assert_called_once_with("krakow", Weekday.WEDNESDAY)
-        get_relations_and_stops_mock.assert_called_once_with(
-            "Kraków",
-            [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
+        # Act
+        response = self.client.get(
+            "/cities/krakow", params={"date": "2025-09-15", "weekday": "monday"}
         )
-        get_by_city_id_mock.assert_called_once_with("krakow")
+
+        # Assert
+        assert response.status_code == 400
+        assert response.json()["detail"] == expected_response_detail
 
     @freeze_time("2025-01-01")
     @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
-    @patch("city_data_cache.CityDataCache.is_fresh", return_value=False)
     @patch("city_data_cache.CityDataCache.get")
     def test_get_city_data_exception_during_data_build_empty_cache(
         self,
         cache_get_mock: MagicMock,
-        cache_is_fresh_mock: MagicMock,
         get_relations_and_stops_mock: MagicMock,
         get_by_city_id_mock: MagicMock,
         krakow_city_configuration: CityConfiguration,
@@ -342,7 +347,7 @@ class TestServer:
     ) -> None:
         # Arrange
         expected_log_message = (
-            "Failed to build city data for city krakow and weekday wednesday"
+            "Failed to build city data for city krakow for weekday wednesday"
         )
 
         cache_get_mock.return_value = None
@@ -358,8 +363,7 @@ class TestServer:
         assert expected_log_message in caplog.text
         assert response.json()["detail"] == "Data processing for krakow failed"
 
-        cache_get_mock.assert_called_once_with("krakow", Weekday.WEDNESDAY)
-        cache_is_fresh_mock.assert_called_once_with("krakow", Weekday.WEDNESDAY)
+        cache_get_mock.assert_called_once_with("krakow", datetime.date(2025, 1, 1))
         get_relations_and_stops_mock.assert_called_once_with(
             "Kraków",
             [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
