@@ -36,6 +36,8 @@ class CityDataCache:
         )
 
     def get_cached_dates(self, city_id: str) -> list[datetime.date]:
+        if not self._get_path_to_city_cache(city_id).exists():
+            return []
         return sorted(
             [
                 datetime.date.fromisoformat(city_by_date.stem)
