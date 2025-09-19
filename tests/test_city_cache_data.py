@@ -94,13 +94,13 @@ class TestCityDataCache:
             datetime.date(2025, 9, 4),
         ]
 
-    def test_remove_redundant_files(
+    def test_store_remove_redundant_files(
         self, city_cache_dir: Path, krakow_response_city_data: ResponseCityData
     ) -> None:
         # Arrange
         cache = CityDataCache(cache_directory=city_cache_dir, max_file_count=2)
         krakow_dir = city_cache_dir / "krakow"
-        initial_file_count = len([p for p in krakow_dir.iterdir()])
+        initial_file_count = len(list(krakow_dir.iterdir()))
 
         # Act
         cache.store("krakow", datetime.date(2025, 9, 19), krakow_response_city_data)
