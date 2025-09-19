@@ -1,6 +1,5 @@
 import json
 import pickle
-import shutil
 import tempfile
 import zipfile
 from pathlib import Path
@@ -86,11 +85,10 @@ def krakow_response_city_data() -> ResponseCityData:
 
 @pytest.fixture(scope="class")
 def city_cache_dir() -> Generator[Path, Any, None]:
-    directory_path = Path(tempfile.mkdtemp())
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        directory_path = Path(tmp_dir)
 
-    with zipfile.ZipFile("tests/assets/cached_data.zip") as zip_file:
-        zip_file.extractall(directory_path)
+        with zipfile.ZipFile("tests/assets/cached_data.zip") as zip_file:
+            zip_file.extractall(directory_path)
 
-    yield directory_path / "cached_data"
-
-    shutil.rmtree(directory_path)
+        yield directory_path / "cached_data"
