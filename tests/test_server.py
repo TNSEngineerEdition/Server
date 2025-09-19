@@ -74,7 +74,7 @@ class TestServer:
             assert all(isinstance(d, str) for d in available_dates)
 
         assert any(
-            payload["city_configuration"]["osm_area_name"] == "Kraków"
+            configuration["osm_area_name"] == "Kraków"
             for payload in cities.values()
         )
 
