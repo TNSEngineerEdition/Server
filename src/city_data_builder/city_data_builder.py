@@ -111,7 +111,7 @@ class CityDataBuilder:
                     lon=node.lon,
                     name=node.name or "",
                     neighbors=response_data_edge_by_source[node],
-                    gtfs_stop_ids=list(
+                    gtfs_stop_ids=sorted(
                         self._tram_stop_mapper.gtfs_stop_ids_by_node_id[node.id]
                     ),
                 )

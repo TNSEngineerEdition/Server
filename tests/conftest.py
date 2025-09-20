@@ -83,7 +83,7 @@ def krakow_response_city_data() -> ResponseCityData:
             return ResponseCityData.model_validate_json(file.read())
 
 
-@pytest.fixture(scope="class")
+@pytest.fixture
 def city_cache_dir() -> Generator[Path, Any, None]:
     with tempfile.TemporaryDirectory() as tmp_dir:
         directory_path = Path(tmp_dir)

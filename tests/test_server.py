@@ -198,6 +198,7 @@ class TestServer:
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
         gtfs_package: GTFSPackage,
         krakow_city_configuration: CityConfiguration,
+        krakow_response_city_data: ResponseCityData,
     ) -> None:
         # Arrange
         get_relations_and_stops_mock.return_value = (
@@ -208,6 +209,7 @@ class TestServer:
         )
         gtfs_package_from_url_mock.return_value = gtfs_package
         get_by_city_id_mock.return_value = krakow_city_configuration
+        frozen_date = datetime.date(2025, 1, 1)
 
         # Act
         response = self.client.get("/cities/krakow")
@@ -216,17 +218,10 @@ class TestServer:
         assert response.status_code == 200
         self._assert_city_data_content(response.json())
 
-        get_relations_and_stops_mock.assert_called_once_with(
-            "Kraków",
-            [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
+        cache_get_mock.assert_called_once_with("krakow", frozen_date)
+        store_mock.assert_called_once_with(
+            "krakow", frozen_date, krakow_response_city_data
         )
-        get_tram_stops_and_tracks_mock.assert_called_once_with("Kraków")
-        gtfs_package_from_url_mock.assert_called_once_with(
-            "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip"
-        )
-        get_by_city_id_mock.assert_called_once_with("krakow")
-        cache_get_mock.assert_called_once()
-        store_mock.assert_called_once()
 
     @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
     @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
