@@ -12,6 +12,11 @@ class ResponseGraphEdge(BaseModel):
     azimuth: float
     max_speed: float
 
+    @field_validator("distance", "azimuth", "max_speed", mode="after")
+    @classmethod
+    def round_to_7_decimal_places(cls, value: float) -> float:
+        return round(value, 7)
+
 
 class ResponseGraphNode(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -20,6 +25,11 @@ class ResponseGraphNode(BaseModel):
     lat: float
     lon: float
     neighbors: dict[int, ResponseGraphEdge]
+
+    @field_validator("lat", "lon", mode="after")
+    @classmethod
+    def round_to_7_decimal_places(cls, value: float) -> float:
+        return round(value, 7)
 
 
 class ResponseGraphTramStop(ResponseGraphNode):
