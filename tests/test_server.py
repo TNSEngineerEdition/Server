@@ -292,7 +292,7 @@ class TestServer:
         assert response.status_code == 200
         self._assert_city_data_content(response.json())
 
-        cache_get_mock.assert_called_once()
+        cache_get_mock.assert_called_once_with("krakow", datetime.date(2025, 1, 1))
 
     def test_get_city_data_unknown_city_id(self) -> None:
         # Act

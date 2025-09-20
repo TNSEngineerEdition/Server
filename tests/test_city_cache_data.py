@@ -11,16 +11,18 @@ class TestCityDataCache:
     def test_get_data(
         self,
         city_cache_dir: Path,
+        krakow_response_city_data: ResponseCityData,
     ) -> None:
         # Arrange
         cache = CityDataCache(city_cache_dir)
-        city_id, date = "krakow", datetime.date(2025, 9, 14)
+        city_id, date = "krakow", datetime.date(2025, 1, 1)
 
         # Act
         loaded_data = cache.get(city_id=city_id, date=date)
 
         # Assert
         assert isinstance(loaded_data, ResponseCityData)
+        assert loaded_data == krakow_response_city_data
 
     def test_store_data(
         self, city_cache_dir: Path, krakow_response_city_data: ResponseCityData
@@ -52,6 +54,7 @@ class TestCityDataCache:
             datetime.date(2025, 9, 12),
             datetime.date(2025, 9, 11),
             datetime.date(2025, 9, 4),
+            datetime.date(2025, 1, 1),
         ]
 
     def test_store_remove_redundant_files(
