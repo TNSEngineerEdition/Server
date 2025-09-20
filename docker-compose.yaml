@@ -9,3 +9,7 @@ services:
       - CITY_DATA_CACHE_DIRECTORY=${CITY_DATA_CACHE_DIRECTORY}
     volumes:
       - ${LOCAL_CITIES_DIRECTORY_PATH}:${CITIES_DIRECTORY_PATH}
+      - cache:${CITY_DATA_CACHE_DIRECTORY}
+
+volumes:
+  cache:
