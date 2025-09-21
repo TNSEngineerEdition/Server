@@ -198,7 +198,6 @@ class TestServer:
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
         gtfs_package: GTFSPackage,
         krakow_city_configuration: CityConfiguration,
-        krakow_response_city_data: ResponseCityData,
     ) -> None:
         # Arrange
         get_relations_and_stops_mock.return_value = (
@@ -220,7 +219,7 @@ class TestServer:
 
         cache_get_mock.assert_called_once_with("krakow", frozen_date)
         store_mock.assert_called_once_with(
-            "krakow", frozen_date, krakow_response_city_data
+            "krakow", frozen_date, ResponseCityData.model_validate(response.json())
         )
 
     @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
@@ -239,7 +238,6 @@ class TestServer:
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
         gtfs_package: GTFSPackage,
         krakow_city_configuration: CityConfiguration,
-        krakow_response_city_data: ResponseCityData,
     ) -> None:
         # Arrange
         get_relations_and_stops_mock.return_value = (
@@ -250,7 +248,6 @@ class TestServer:
         )
         gtfs_package_from_url_mock.return_value = gtfs_package
         get_by_city_id_mock.return_value = krakow_city_configuration
-        cache_get_mock.return_value = krakow_response_city_data
 
         # Act
         response = self.client.get("/cities/krakow", params={"weekday": "monday"})
@@ -275,6 +272,7 @@ class TestServer:
         gtfs_package_from_url_mock.assert_called_once_with(
             "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip"
         )
+        cache_get_mock.assert_not_called()
 
     @patch("server.CityDataCache.get")
     def test_get_city_data_with_date(
