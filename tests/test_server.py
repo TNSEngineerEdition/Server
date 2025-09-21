@@ -184,8 +184,8 @@ class TestServer:
     @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
-    @patch("server.CityDataCache.get", return_value=None)
-    @patch("server.CityDataCache.store", return_value=None)
+    @patch("city_data_cache.CityDataCache.get", return_value=None)
+    @patch("city_data_cache.CityDataCache.store", return_value=None)
     def test_get_city_data(
         self,
         store_mock: MagicMock,
@@ -226,7 +226,7 @@ class TestServer:
     @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
-    @patch("server.CityDataCache.get")
+    @patch("city_data_cache.CityDataCache.get")
     def test_get_city_data_with_weekday(
         self,
         cache_get_mock: MagicMock,
