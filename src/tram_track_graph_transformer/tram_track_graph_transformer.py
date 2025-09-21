@@ -1,16 +1,18 @@
 import math
 from itertools import chain
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 import networkx as nx
 import overpy
 from pyproj import Geod, Transformer
 from shapely.geometry import LineString
 
-from city_data_builder import CityConfiguration
 from tram_track_graph_transformer.exceptions import TrackDirectionChangeError
 from tram_track_graph_transformer.node import Node
 from tram_track_graph_transformer.node_type import NodeType
+
+if TYPE_CHECKING:
+    from city_data_builder import CityConfiguration
 
 
 class TramTrackGraphTransformer:
@@ -41,7 +43,7 @@ class TramTrackGraphTransformer:
     def __init__(
         self,
         tram_stops_and_tracks: overpy.Result,
-        city_configuration: CityConfiguration,
+        city_configuration: "CityConfiguration",
     ):
         self._city_configuration = city_configuration
         self._ways = tram_stops_and_tracks.get_ways()
