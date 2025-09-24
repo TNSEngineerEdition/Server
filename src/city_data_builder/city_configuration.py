@@ -39,7 +39,7 @@ class CityConfiguration(BaseModel):
     @classmethod
     def from_path(cls, path: Path) -> Self:
         try:
-            return cls.model_validate_json(path.read_text())
+            return cls.model_validate_json(path.read_text(encoding="utf-8"))
         except ValidationError as exc:
             logger.exception(f"Invalid configuration file: {path}", exc_info=exc)
             raise
@@ -59,7 +59,7 @@ class CityConfiguration(BaseModel):
         return {
             city_directory.name: cls._get_latest_in_directory(city_directory)
             for city_directory in cls.CITIES_DIRECTORY_PATH.iterdir()
-            if city_directory.is_dir()
+            if city_directory.is_dir() and any(city_directory.iterdir())
         }
 
     @classmethod

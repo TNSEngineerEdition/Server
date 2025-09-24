@@ -1,5 +1,4 @@
 import difflib
-import random
 import string
 from collections import defaultdict
 from functools import cached_property
@@ -358,15 +357,15 @@ class TramStopMapper:
             and gtfs_stop_id in self.last_gtfs_stop_id_to_osm_node_ids
         ):
             return (
-                random.choice(self.first_gtfs_stop_id_to_osm_node_ids[gtfs_stop_id])
+                self.first_gtfs_stop_id_to_osm_node_ids[gtfs_stop_id][0]
                 if gtfs_stop_sequence < total_stops / 2
-                else random.choice(self.last_gtfs_stop_id_to_osm_node_ids[gtfs_stop_id])
+                else self.last_gtfs_stop_id_to_osm_node_ids[gtfs_stop_id][0]
             )
 
         if gtfs_stop_id in self.first_gtfs_stop_id_to_osm_node_ids:
-            return random.choice(self.first_gtfs_stop_id_to_osm_node_ids[gtfs_stop_id])
+            return self.first_gtfs_stop_id_to_osm_node_ids[gtfs_stop_id][0]
         if gtfs_stop_id in self.last_gtfs_stop_id_to_osm_node_ids:
-            return random.choice(self.last_gtfs_stop_id_to_osm_node_ids[gtfs_stop_id])
+            return self.last_gtfs_stop_id_to_osm_node_ids[gtfs_stop_id][0]
 
         raise ValueError(  # pragma: no cover
             f"Stop {gtfs_stop_id} not found in any mapping.\n"

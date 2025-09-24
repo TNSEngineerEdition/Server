@@ -1,13 +1,14 @@
+import datetime
 import logging
 import os
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import ValidationError
 
-from city_data_builder import CityConfiguration, CityDataBuilder
-from city_data_cache import CityDataCache, ResponseCityData
+from city_data_builder import CityConfiguration, CityDataBuilder, ResponseCityData
+from city_data_cache import CachedCityDates, CityDataCache
 from tram_stop_mapper import Weekday
 
 app = FastAPI()
@@ -17,38 +18,108 @@ logger = logging.getLogger(__name__)
 city_data_cache = CityDataCache()
 
 
-@app.get("/cities")
-def cities() -> dict[str, CityConfiguration]:
+def validate_date(date: str | None = None) -> datetime.date | None:
+    if date is None:
+        return None
     try:
-        return CityConfiguration.get_all()
-    except ValidationError:
-        raise HTTPException(500, "Invalid configuration files")
+        return datetime.date.fromisoformat(date)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid date format: '{date}', expected YYYY-MM-DD",
+        )
 
 
-@app.get("/cities/{city_id}")
-def get_city_data(city_id: str, weekday: str | None = None) -> ResponseCityData:
+def validate_weekday(weekday: str | None = None) -> Weekday | None:
+    if weekday is None:
+        return None
+
     try:
-        weekday_enum: Weekday = Weekday.get_by_value_with_default(weekday)
+        return Weekday.get_by_value(weekday)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
 
+
+@app.get("/cities")
+def cities() -> dict[str, CachedCityDates]:
+    """
+    Returns all available cities with their latest configurations and cached dates.
+    """
+    try:
+        cities_config = CityConfiguration.get_all()
+    except ValidationError:
+        raise HTTPException(500, "Invalid configuration files")
+
+    return {
+        city_id: CachedCityDates(
+            city_configuration=city_config,
+            available_dates=city_data_cache.get_cached_dates(city_id),
+        )
+        for city_id, city_config in cities_config.items()
+    }
+
+
+def _get_city_data_by_date(city_id: str, date: datetime.date) -> ResponseCityData:
+    if cached_data := city_data_cache.get(city_id, date):
+        return cached_data
+    raise HTTPException(404, f"City data for {city_id} not found in cache for {date}")
+
+
+def _get_city_data_by_weekday(city_id: str, weekday: Weekday) -> ResponseCityData:
     if (city_configuration := CityConfiguration.get_by_city_id(city_id)) is None:
-        raise HTTPException(404, "City not found")
+        raise HTTPException(404, f"City {city_id} not found")
 
-    if not city_data_cache.is_fresh(city_id, weekday_enum):
-        try:
-            city_data_builder = CityDataBuilder(city_configuration, weekday_enum)
-            city_data_cache.store(city_id, weekday_enum, city_data_builder)
-        except Exception as exc:
-            logger.exception(
-                f"Failed to build city data for city {city_id} and weekday {weekday_enum}",
-                exc_info=exc,
-            )
+    try:
+        city_data_builder = CityDataBuilder(city_configuration, weekday)
+    except Exception as exc:
+        logger.exception(
+            "Failed to build city data for city %s for weekday %s",
+            city_id,
+            weekday,
+            exc_info=exc,
+        )
+        raise HTTPException(500, f"Data processing for {city_id} failed")
 
-    if city_data := city_data_cache.get(city_id, weekday_enum):
-        return city_data
+    return city_data_builder.to_response_city_data()
 
-    raise HTTPException(500, f"Data processing for {city_id} failed")
+
+def _get_city_data_today(city_id: str) -> ResponseCityData:
+    today = datetime.date.today()
+    if cached := city_data_cache.get(city_id, today):
+        return cached
+
+    weekday = Weekday.get_current()
+    data = _get_city_data_by_weekday(city_id, weekday)
+    city_data_cache.store(city_id, today, data)
+    return data
+
+
+@app.get("/cities/{city_id}")
+def get_city_data(
+    city_id: str,
+    weekday: Weekday | None = Depends(validate_weekday),
+    date: datetime.date | None = Depends(validate_date),
+) -> ResponseCityData:
+    """
+    Returns processed data for a given city.
+
+    - Without parameters: returns data for the current day
+    (from cache if available, otherwise built and cached).
+    - With `weekday`: builds and returns data for the given day of the week using currently available GTFS Schedule and OpenStreetMap data.
+    - With `date`: returns cached data for the given date if available,
+    otherwise responds with 404.
+    - With both `weekday` and `date`: responds with 400, only one parameter is allowed.
+    """
+    if date is not None and weekday is not None:
+        raise HTTPException(400, "Provide either date or weekday")
+
+    if date:
+        return _get_city_data_by_date(city_id, date)
+
+    if weekday:
+        return _get_city_data_by_weekday(city_id, weekday)
+
+    return _get_city_data_today(city_id)
 
 
 if __name__ == "__main__":

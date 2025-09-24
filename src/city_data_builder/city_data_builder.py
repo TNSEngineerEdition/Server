@@ -2,6 +2,7 @@ import networkx as nx
 
 from city_data_builder.city_configuration import CityConfiguration
 from city_data_builder.model import (
+    ResponseCityData,
     ResponseGraphEdge,
     ResponseGraphNode,
     ResponseGraphTramStop,
@@ -80,6 +81,12 @@ class CityDataBuilder:
 
         return tram_track_graph
 
+    def to_response_city_data(self) -> ResponseCityData:
+        return ResponseCityData(
+            tram_track_graph=self.tram_track_graph_data,
+            tram_routes=self.tram_routes_data,
+        )
+
     @property
     def tram_track_graph_data(self) -> list[ResponseGraphNode]:
         response_data_edge_by_source: dict[Node, dict[int, ResponseGraphEdge]] = {
@@ -104,7 +111,7 @@ class CityDataBuilder:
                     lon=node.lon,
                     name=node.name or "",
                     neighbors=response_data_edge_by_source[node],
-                    gtfs_stop_ids=list(
+                    gtfs_stop_ids=sorted(
                         self._tram_stop_mapper.gtfs_stop_ids_by_node_id[node.id]
                     ),
                 )

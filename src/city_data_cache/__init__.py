@@ -1,4 +1,4 @@
 from .city_data_cache import CityDataCache
-from .model import ResponseCityData
+from .model import CachedCityDates
 
-__all__ = ["CityDataCache", "ResponseCityData"]
+__all__ = ["CityDataCache", "CachedCityDates"]

@@ -1,15 +1,15 @@
 import json
 import pickle
+import tempfile
 import zipfile
 from pathlib import Path
-from typing import cast
+from typing import Any, cast, Generator
 
 import networkx as nx
 import overpy
 import pytest
 
-from city_data_builder import CityConfiguration
-from city_data_cache import ResponseCityData
+from city_data_builder import CityConfiguration, ResponseCityData
 from tram_stop_mapper import GTFSPackage
 from tram_track_graph_transformer import Node
 
@@ -81,3 +81,14 @@ def krakow_response_city_data() -> ResponseCityData:
     with zipfile.ZipFile("tests/assets/krakow_response_city_data.zip") as zip_file:
         with zip_file.open("krakow_response_city_data.json") as file:
             return ResponseCityData.model_validate_json(file.read())
+
+
+@pytest.fixture
+def city_cache_dir() -> Generator[Path, Any, None]:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        directory_path = Path(tmp_dir)
+
+        with zipfile.ZipFile("tests/assets/cached_data.zip") as zip_file:
+            zip_file.extractall(directory_path)
+
+        yield directory_path / "cached_data"
