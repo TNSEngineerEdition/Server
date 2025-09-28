@@ -33,11 +33,11 @@ class CityDataCache:
         if not city_zip_path.exists():
             return None
 
-        with ZipFile(city_zip_path, "r") as zip_file:
+        with ZipFile(city_zip_path) as zip_file:
             if file_name not in zip_file.namelist():
                 return None
             with zip_file.open(file_name) as file:
-                return ResponseCityData.model_validate_json(file.read().decode("utf-8"))
+                return ResponseCityData.model_validate_json(file.read())
 
     def get_cached_dates(self, city_id: str) -> list[datetime.date]:
         city_zip_path = self._zip_city_path(city_id)
