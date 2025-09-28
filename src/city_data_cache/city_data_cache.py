@@ -28,7 +28,7 @@ class CityDataCache:
 
     def get(self, city_id: str, date: datetime.date) -> ResponseCityData | None:
         city_zip_path = self._zip_city_path(city_id)
-        file_name = f"{date.isoformat()}.json"
+        file_name = date.isoformat()
 
         if not city_zip_path.exists():
             return None
@@ -44,25 +44,24 @@ class CityDataCache:
         if not city_zip_path.exists():
             return []
 
-        with ZipFile(city_zip_path, "r") as zip_file:
+        with ZipFile(city_zip_path) as zip_file:
             return sorted(
                 [
                     datetime.date.fromisoformat(name[:-5])
                     for name in zip_file.namelist()
-                    if name.endswith(".json")
                 ],
                 reverse=True,
             )
 
-    def _rebuild_zip(self, city_zip_path: Path, files_to_remove: list[str]) -> None:
-        remove_set = set(files_to_remove)
+    def _rebuild_zip(self, city_zip_path: Path, files_to_copy: list[str]) -> None:
+        copy_set = set(files_to_copy)
         with tempfile.NamedTemporaryFile("wb", delete=False) as temp_file:
             tmp_path = Path(temp_file.name)
 
-        with ZipFile(city_zip_path, "r") as zip_read:
+        with ZipFile(city_zip_path) as zip_read:
             with ZipFile(tmp_path, "w") as zip_write:
                 for item in zip_read.infolist():
-                    if item.filename not in remove_set:
+                    if item.filename in copy_set:
                         with zip_read.open(item.filename) as file_to_copy:
                             data = file_to_copy.read()
                         zip_write.writestr(item, data)
@@ -72,12 +71,11 @@ class CityDataCache:
         file_count = len(ZipFile(city_zip_path, "r").namelist())
         if file_count < self.max_file_count:
             return
-        to_remove = file_count - self.max_file_count + 1
-        with ZipFile(city_zip_path, "r") as zip_file:
-            files = [name for name in zip_file.namelist() if name.endswith(".json")]
-        files.sort()
-        files_to_remove = files[:to_remove]
-        self._rebuild_zip(city_zip_path, files_to_remove)
+        with ZipFile(city_zip_path) as zip_file:
+            files = [name for name in zip_file.namelist()]
+        files.sort(reverse=True)
+        files_to_copy = files[: self.max_file_count - 1]
+        self._rebuild_zip(city_zip_path, files_to_copy)
 
     def store(
         self,
@@ -86,8 +84,7 @@ class CityDataCache:
         city_data: ResponseCityData,
     ) -> ResponseCityData:
         city_zip_path = self._zip_city_path(city_id)
-        file_name = f"{date.isoformat()}.json"
-
+        file_name = date.isoformat()
         if not city_zip_path.exists():
             with ZipFile(city_zip_path, "w", compression=ZIP_DEFLATED) as zip_file:
                 zip_file.writestr(file_name, city_data.model_dump_json())
