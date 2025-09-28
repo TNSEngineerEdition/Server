@@ -62,8 +62,7 @@ class CityDataCache:
             for item in zip_file.infolist():
                 if item.filename in copy_set:
                     with zip_file.open(item.filename) as file_to_copy:
-                        data = file_to_copy.read()
-                    zip_write.writestr(item, data)
+                        zip_write.writestr(item, file_to_copy.read())
 
         return tmp_path
 
