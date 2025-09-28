@@ -1,6 +1,9 @@
 import datetime
 import os
+import shutil
+import tempfile
 from pathlib import Path
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from city_data_builder import ResponseCityData
 
@@ -20,49 +23,61 @@ class CityDataCache:
         self.cache_directory.mkdir(parents=True, exist_ok=True)
         self.max_file_count = max_file_count
 
-    def _get_path_to_cache_for_file(self, city_id: str, date: datetime.date) -> Path:
-        return self.cache_directory / city_id / f"{date.isoformat()}.json"
-
-    def _get_path_to_city_cache(self, city_id: str) -> Path:
-        return self.cache_directory / city_id
+    def _zip_city_path(self, city_id: str) -> Path:
+        return self.cache_directory / f"{city_id}.zip"
 
     def get(self, city_id: str, date: datetime.date) -> ResponseCityData | None:
-        cache_file_path = self._get_path_to_cache_for_file(city_id, date)
-        if not cache_file_path.is_file():
+        city_zip_path = self._zip_city_path(city_id)
+        file_name = f"{date.isoformat()}.json"
+
+        if not city_zip_path.exists():
             return None
 
-        return ResponseCityData.model_validate_json(
-            cache_file_path.read_text(encoding="utf-8")
-        )
+        with ZipFile(city_zip_path, "r") as zip_file:
+            if file_name not in zip_file.namelist():
+                return None
+            with zip_file.open(file_name) as file:
+                return ResponseCityData.model_validate_json(file.read().decode("utf-8"))
 
     def get_cached_dates(self, city_id: str) -> list[datetime.date]:
-        if not self._get_path_to_city_cache(city_id).exists():
+        city_zip_path = self._zip_city_path(city_id)
+        if not city_zip_path.exists():
             return []
-        return sorted(
-            [
-                datetime.date.fromisoformat(city_by_date.stem)
-                for city_by_date in self._get_path_to_city_cache(city_id).iterdir()
-                if city_by_date.is_file() and city_by_date.suffix == ".json"
-            ],
-            reverse=True,
-        )
 
-    def _remove_redundant_files(self, city_cache_dir: Path) -> None:
-        file_count = len(list(city_cache_dir.iterdir()))
+        with ZipFile(city_zip_path, "r") as zip_file:
+            return sorted(
+                [
+                    datetime.date.fromisoformat(name[:-5])
+                    for name in zip_file.namelist()
+                    if name.endswith(".json")
+                ],
+                reverse=True,
+            )
+
+    def _rebuild_zip(self, city_zip_path: Path, files_to_remove: list[str]) -> None:
+        remove_set = set(files_to_remove)
+        with tempfile.NamedTemporaryFile("wb", delete=False) as temp_file:
+            tmp_path = Path(temp_file.name)
+
+        with ZipFile(city_zip_path, "r") as zip_read:
+            with ZipFile(tmp_path, "w") as zip_write:
+                for item in zip_read.infolist():
+                    if item.filename not in remove_set:
+                        with zip_read.open(item.filename) as file_to_copy:
+                            data = file_to_copy.read()
+                        zip_write.writestr(item, data)
+        shutil.move(str(tmp_path), str(city_zip_path))
+
+    def _remove_redundant_files(self, city_zip_path: Path) -> None:
+        file_count = len(ZipFile(city_zip_path, "r").namelist())
         if file_count < self.max_file_count:
             return
-
         to_remove = file_count - self.max_file_count + 1
-        files = [
-            file
-            for file in city_cache_dir.iterdir()
-            if file.is_file() and file.suffix == ".json"
-        ]
-
-        files.sort(key=lambda file: file.stem)
-
-        for file in files[:to_remove]:
-            file.unlink()
+        with ZipFile(city_zip_path, "r") as zip_file:
+            files = [name for name in zip_file.namelist() if name.endswith(".json")]
+        files.sort()
+        files_to_remove = files[:to_remove]
+        self._rebuild_zip(city_zip_path, files_to_remove)
 
     def store(
         self,
@@ -70,12 +85,17 @@ class CityDataCache:
         date: datetime.date,
         city_data: ResponseCityData,
     ) -> ResponseCityData:
-        cache_file_path = self._get_path_to_cache_for_file(city_id, date)
+        city_zip_path = self._zip_city_path(city_id)
+        file_name = f"{date.isoformat()}.json"
 
-        if not cache_file_path.parent.exists():
-            cache_file_path.parent.mkdir(parents=True, exist_ok=True)
+        if not city_zip_path.exists():
+            with ZipFile(city_zip_path, "w", compression=ZIP_DEFLATED) as zip_file:
+                zip_file.writestr(file_name, city_data.model_dump_json())
+            return city_data
 
-        self._remove_redundant_files(cache_file_path.parent)
+        self._remove_redundant_files(city_zip_path)
 
-        cache_file_path.write_text(city_data.model_dump_json(), encoding="utf-8")
+        with ZipFile(city_zip_path, "a") as zip_file:
+            zip_file.writestr(file_name, city_data.model_dump_json())
+
         return city_data
