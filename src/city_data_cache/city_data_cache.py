@@ -54,24 +54,21 @@ class CityDataCache:
             )
 
     def _rebuild_zip(self, zip_file: ZipFile, files_to_copy: list[str]) -> Path:
-        copy_set = set(files_to_copy)
         with tempfile.NamedTemporaryFile("wb", delete=False) as temp_file:
             tmp_path = Path(temp_file.name)
 
-        with ZipFile(tmp_path, "w") as zip_write:
-            for item in zip_file.infolist():
-                if item.filename in copy_set:
-                    with zip_file.open(item.filename) as file_to_copy:
-                        zip_write.writestr(item, file_to_copy.read())
+        with ZipFile(tmp_path, "w", compression=ZIP_DEFLATED) as zip_write:
+            for item in files_to_copy:
+                with zip_file.open(item) as file_to_copy:
+                    zip_write.writestr(item, file_to_copy.read())
 
         return tmp_path
 
     def _remove_redundant_files(self, city_zip_path: Path) -> None:
-        file_count = len(ZipFile(city_zip_path, "r").namelist())
-        if file_count < self.max_file_count:
-            return
         with ZipFile(city_zip_path) as zip_file:
             files = [name for name in zip_file.namelist()]
+            if len(files) < self.max_file_count:
+                return
             files.sort(reverse=True)
             files_to_copy = files[: self.max_file_count - 1]
             tmp_path = self._rebuild_zip(zip_file, files_to_copy)
