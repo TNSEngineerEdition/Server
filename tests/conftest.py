@@ -1,9 +1,10 @@
+import io
 import json
 import pickle
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Any, cast, Generator
+from typing import Any, cast, Generator, IO
 
 import networkx as nx
 import overpy
@@ -17,6 +18,58 @@ from tram_track_graph_transformer import Node
 @pytest.fixture
 def gtfs_package() -> GTFSPackage:
     return GTFSPackage.from_file("tests/assets/gtfs_schedule.zip")
+
+
+@pytest.fixture
+def custom_gtfs_package_byte_buffer() -> Generator[IO[bytes], None, None]:
+    gtfs_package = GTFSPackage.from_file("tests/assets/gtfs_schedule.zip")
+
+    gtfs_package.routes = gtfs_package.routes[
+        gtfs_package.routes["route_short_name"] != 52
+    ]
+
+    removed_trips = gtfs_package.trips[gtfs_package.trips["route_id"] == "route_70"]
+    gtfs_package.trips = gtfs_package.trips[
+        gtfs_package.trips["route_id"] != "route_70"
+    ]
+
+    gtfs_package.stop_times = gtfs_package.stop_times[
+        ~gtfs_package.stop_times["trip_id"].isin(removed_trips.index)
+    ]
+
+    with io.BytesIO() as buffer:
+        gtfs_package.to_zip_file(buffer)
+        buffer.seek(0)
+        yield buffer
+
+
+@pytest.fixture
+def gtfs_package_byte_buffer_selected_files(
+    gtfs_package: GTFSPackage, excluded_file_name: str
+) -> Generator[IO[bytes], None, None]:
+    with io.BytesIO() as buffer:
+        with zipfile.ZipFile(buffer, "w") as zip_file:
+            if excluded_file_name != "stops.txt":
+                with zip_file.open("stops.txt", "w") as file:
+                    gtfs_package.stops.to_csv(file)
+
+            if excluded_file_name != "routes.txt":
+                with zip_file.open("routes.txt", "w") as file:
+                    gtfs_package.routes.to_csv(file)
+
+            if excluded_file_name != "trips.txt":
+                with zip_file.open("trips.txt", "w") as file:
+                    gtfs_package.trips.to_csv(file)
+
+            if excluded_file_name != "stop_times.txt":
+                with zip_file.open("stop_times.txt", "w") as file:
+                    gtfs_package.stop_times.to_csv(file, index=False)
+
+            if excluded_file_name != "calendar.txt":
+                with zip_file.open("calendar.txt", "w") as file:
+                    gtfs_package.calendar.to_csv(file, index=False)
+
+        yield buffer
 
 
 @pytest.fixture

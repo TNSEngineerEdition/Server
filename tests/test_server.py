@@ -1,7 +1,8 @@
 import datetime
+import io
 import logging
 import urllib.parse
-from typing import Any
+from typing import Any, IO
 from unittest.mock import MagicMock, patch
 
 import overpy
@@ -12,7 +13,11 @@ from pydantic import ValidationError
 
 from city_data_builder import CityConfiguration, ResponseCityData
 from server import app
-from tram_stop_mapper import GTFSPackage
+from tram_stop_mapper import (
+    GTFSPackage,
+    TramStopMappingBuildError,
+    TramStopMappingErrors,
+)
 
 
 class TestServer:
@@ -188,7 +193,7 @@ class TestServer:
     @patch("city_data_cache.CityDataCache.store", return_value=None)
     def test_get_city_data(
         self,
-        store_mock: MagicMock,
+        cache_store_mock: MagicMock,
         cache_get_mock: MagicMock,
         get_relations_and_stops_mock: MagicMock,
         get_tram_stops_and_tracks_mock: MagicMock,
@@ -208,7 +213,6 @@ class TestServer:
         )
         gtfs_package_from_url_mock.return_value = gtfs_package
         get_by_city_id_mock.return_value = krakow_city_configuration
-        frozen_date = datetime.date(2025, 1, 1)
 
         # Act
         response = self.client.get("/cities/krakow")
@@ -217,10 +221,83 @@ class TestServer:
         assert response.status_code == 200
         self._assert_city_data_content(response.json())
 
-        cache_get_mock.assert_called_once_with("krakow", frozen_date)
-        store_mock.assert_called_once_with(
-            "krakow", frozen_date, ResponseCityData.model_validate(response.json())
+        cache_get_mock.assert_called_once_with("krakow", datetime.date.today())
+        cache_store_mock.assert_called_once_with(
+            "krakow",
+            datetime.date.today(),
+            ResponseCityData.model_validate(response.json()),
         )
+
+    @freeze_time("2025-01-01")
+    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
+    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
+    @patch("overpass_client.OverpassClient.get_relations_and_stops")
+    @patch("city_data_cache.CityDataCache.get", return_value=None)
+    @patch("city_data_cache.CityDataCache.store", return_value=None)
+    def test_get_city_data_from_cache(
+        self,
+        cache_store_mock: MagicMock,
+        cache_get_mock: MagicMock,
+        get_relations_and_stops_mock: MagicMock,
+        get_tram_stops_and_tracks_mock: MagicMock,
+        gtfs_package_from_url_mock: MagicMock,
+        get_by_city_id_mock: MagicMock,
+        relations_and_stops_overpass_query_result: overpy.Result,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
+        gtfs_package: GTFSPackage,
+        krakow_city_configuration: CityConfiguration,
+        krakow_response_city_data: ResponseCityData,
+    ) -> None:
+        # Arrange
+        get_relations_and_stops_mock.return_value = (
+            relations_and_stops_overpass_query_result
+        )
+        get_tram_stops_and_tracks_mock.return_value = (
+            tram_stops_and_tracks_overpass_query_result
+        )
+        gtfs_package_from_url_mock.return_value = gtfs_package
+        get_by_city_id_mock.return_value = krakow_city_configuration
+        cache_get_mock.return_value = krakow_response_city_data
+
+        # Act
+        response = self.client.get("/cities/krakow")
+
+        # Assert
+        assert response.status_code == 200
+        self._assert_city_data_content(response.json())
+
+        cache_get_mock.assert_called_once_with("krakow", datetime.date.today())
+        cache_store_mock.assert_not_called()
+
+    @freeze_time("2025-01-01")
+    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
+    @patch("city_data_builder.city_data_builder.CityDataBuilder.__init__")
+    @patch("city_data_cache.CityDataCache.get", return_value=None)
+    def test_get_city_data_tram_stop_mapping_error(
+        self,
+        cache_get_mock: MagicMock,
+        city_data_builder_init_mock: MagicMock,
+        get_by_city_id_mock: MagicMock,
+        krakow_city_configuration: CityConfiguration,
+    ) -> None:
+        # Arrange
+        get_by_city_id_mock.return_value = krakow_city_configuration
+        city_data_builder_init_mock.side_effect = TramStopMappingBuildError(
+            TramStopMappingErrors(missing_relations_for_lines={"10"})
+        )
+
+        # Act
+        response = self.client.get("/cities/krakow")
+
+        # Assert
+        assert response.status_code == 500
+        assert response.json()["detail"] == (
+            "Unable to build correct mapping of GTFS stops to OSM nodes.\n"
+            "Missing relations for lines: 10"
+        )
+
+        cache_get_mock.assert_called_once_with("krakow", datetime.date.today())
 
     @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
     @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
@@ -327,6 +404,19 @@ class TestServer:
         assert response.status_code == 400
         assert response.json()["detail"] == expected_response_detail
 
+    def test_get_city_data_missing_date(self) -> None:
+        # Arrange
+        expected_response_detail = (
+            "City data for krakow not found in cache for 2025-12-10"
+        )
+
+        # Act
+        response = self.client.get("/cities/krakow", params={"date": "2025-12-10"})
+
+        # Assert
+        assert response.status_code == 404
+        assert response.json()["detail"] == expected_response_detail
+
     def test_get_city_data_both_params(self) -> None:
         # Arrange
         expected_response_detail = "Provide either date or weekday"
@@ -370,9 +460,139 @@ class TestServer:
         assert expected_log_message in caplog.text
         assert response.json()["detail"] == "Data processing for krakow failed"
 
-        cache_get_mock.assert_called_once_with("krakow", datetime.date(2025, 1, 1))
+        cache_get_mock.assert_called_once_with("krakow", datetime.date.today())
         get_relations_and_stops_mock.assert_called_once_with(
             "Kraków",
             [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
         )
         get_by_city_id_mock.assert_called_once_with("krakow")
+
+    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
+    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
+    @patch("overpass_client.OverpassClient.get_relations_and_stops")
+    def test_get_city_data_with_custom_schedule(
+        self,
+        get_relations_and_stops_mock: MagicMock,
+        get_tram_stops_and_tracks_mock: MagicMock,
+        gtfs_package_from_url_mock: MagicMock,
+        get_by_city_id_mock: MagicMock,
+        relations_and_stops_overpass_query_result: overpy.Result,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
+        gtfs_package: GTFSPackage,
+        custom_gtfs_package_byte_buffer: IO[bytes],
+        krakow_city_configuration: CityConfiguration,
+    ) -> None:
+        # Arrange
+        get_relations_and_stops_mock.return_value = (
+            relations_and_stops_overpass_query_result
+        )
+        get_tram_stops_and_tracks_mock.return_value = (
+            tram_stops_and_tracks_overpass_query_result
+        )
+        gtfs_package_from_url_mock.return_value = gtfs_package
+        get_by_city_id_mock.return_value = krakow_city_configuration
+
+        # Act
+        response = self.client.post(
+            "/cities/krakow",
+            files={
+                "custom_schedule_file": (
+                    "custom_schedule.zip",
+                    custom_gtfs_package_byte_buffer,
+                    "application/zip",
+                )
+            },
+        )
+
+        # Assert
+        assert response.status_code == 200
+
+        response_data = response.json()
+        self._assert_city_data_content(response_data)
+
+        assert all(item["name"] != "52" for item in response_data["tram_routes"])
+
+    def test_get_city_data_with_custom_schedule_invalid_content_type(
+        self, custom_gtfs_package_byte_buffer: IO[bytes]
+    ) -> None:
+        # Act
+        response = self.client.post(
+            "/cities/krakow",
+            files={
+                "custom_schedule_file": (
+                    "custom_schedule.zip",
+                    custom_gtfs_package_byte_buffer,
+                    "application/octet-stream",
+                )
+            },
+        )
+
+        # Assert
+        assert response.status_code == 400
+        assert response.json() == {"detail": "Custom schedule file must be a ZIP file"}
+
+    def test_get_city_data_with_custom_schedule_invalid_file(self) -> None:
+        # Act
+        response = self.client.post(
+            "/cities/krakow",
+            files={
+                "custom_schedule_file": (
+                    "custom_schedule.zip",
+                    b"1234567890987654321",
+                    "application/zip",
+                )
+            },
+        )
+
+        # Assert
+        assert response.status_code == 422
+        assert response.json() == {"detail": "File is not a ZIP file"}
+
+    def test_get_city_data_with_custom_schedule_invalid_file_checksum(
+        self, custom_gtfs_package_byte_buffer: IO[bytes]
+    ) -> None:
+        # Arrange
+        buffer_bytearray = bytearray(custom_gtfs_package_byte_buffer.read())
+        buffer_bytearray[125] ^= 0xFF
+        modified_custom_schedule = bytes(buffer_bytearray)
+
+        # Act
+        response = self.client.post(
+            "/cities/krakow",
+            files={
+                "custom_schedule_file": (
+                    "custom_schedule.zip",
+                    modified_custom_schedule,
+                    "application/zip",
+                )
+            },
+        )
+
+        # Assert
+        assert response.status_code == 422
+        assert response.json() == {"detail": "Invalid file: stops.txt"}
+
+    @pytest.mark.parametrize("excluded_file_name", GTFSPackage.FILE_NAMES)
+    def test_get_city_data_with_custom_schedule_missing_file(
+        self,
+        gtfs_package_byte_buffer_selected_files: io.BytesIO,
+        excluded_file_name: str,
+    ) -> None:
+        # Act
+        response = self.client.post(
+            "/cities/krakow",
+            files={
+                "custom_schedule_file": (
+                    "custom_schedule.zip",
+                    gtfs_package_byte_buffer_selected_files,
+                    "application/zip",
+                )
+            },
+        )
+
+        # Assert
+        assert response.status_code == 422
+        assert response.json() == {
+            "detail": f"\"There is no item named '{excluded_file_name}' in the archive\""
+        }

@@ -4,8 +4,7 @@ import overpy
 import pytest
 
 from city_data_builder import CityConfiguration, CityDataBuilder
-from tram_stop_mapper.gtfs_package import GTFSPackage
-from tram_stop_mapper.weekday import Weekday
+from tram_stop_mapper import GTFSPackage, Weekday
 
 
 class TestCityDataBuilder:

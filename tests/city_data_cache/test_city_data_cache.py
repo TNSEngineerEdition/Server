@@ -14,7 +14,7 @@ from city_data_builder import (
     ResponseTramRoute,
     ResponseTramTrip,
 )
-from city_data_cache import CityDataCache
+from city_data_cache.city_data_cache import CityDataCache
 
 
 class TestCityDataCache:

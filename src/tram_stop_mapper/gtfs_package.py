@@ -2,7 +2,7 @@ from collections import defaultdict
 from functools import cached_property
 from io import BytesIO
 from pathlib import Path
-from typing import Any, cast, ClassVar, Generator, IO, Self
+from typing import Any, cast, ClassVar, Generator, IO
 from zipfile import ZIP_DEFLATED, ZipFile
 
 import pandas as pd
@@ -109,33 +109,33 @@ class GTFSPackage(BaseModel):
 
         return data_frame
 
-    @field_validator("stops", mode="after")
+    @field_validator("stops", mode="before")
     @classmethod
-    def validate_stops_columns(cls, value: pd.DataFrame) -> Self:
+    def validate_stops_columns(cls, value: pd.DataFrame) -> pd.DataFrame:
         return cls._validate_columns("stops.txt", value, cls.STOPS_COLUMNS[1:])
 
-    @field_validator("routes", mode="after")
+    @field_validator("routes", mode="before")
     @classmethod
-    def validate_routes_columns(cls, value: pd.DataFrame) -> Self:
+    def validate_routes_columns(cls, value: pd.DataFrame) -> pd.DataFrame:
         return cls._validate_columns("routes.txt", value, cls.ROUTES_COLUMNS[1:])
 
-    @field_validator("trips", mode="after")
+    @field_validator("trips", mode="before")
     @classmethod
-    def validate_trips_columns(cls, value: pd.DataFrame) -> Self:
+    def validate_trips_columns(cls, value: pd.DataFrame) -> pd.DataFrame:
         return cls._validate_columns("trips.txt", value, cls.TRIPS_COLUMNS[1:])
 
-    @field_validator("stop_times", mode="after")
+    @field_validator("stop_times", mode="before")
     @classmethod
-    def validate_stop_times_columns(cls, value: pd.DataFrame) -> Self:
+    def validate_stop_times_columns(cls, value: pd.DataFrame) -> pd.DataFrame:
         return cls._validate_columns("stop_times.txt", value, cls.STOP_TIMES_COLUMNS)
 
-    @field_validator("calendar", mode="after")
+    @field_validator("calendar", mode="before")
     @classmethod
-    def validate_calendar_columns(cls, value: pd.DataFrame) -> Self:
+    def validate_calendar_columns(cls, value: pd.DataFrame) -> pd.DataFrame:
         return cls._validate_columns("calendar.txt", value, cls.CALENDAR_COLUMNS)
 
     @classmethod
-    def from_zip_file(cls, zip_file: ZipFile) -> Self:
+    def from_zip_file(cls, zip_file: ZipFile) -> "GTFSPackage":
         with zip_file.open("stops.txt") as file:
             stops = pd.read_csv(file).set_index("stop_id")
 
@@ -160,12 +160,12 @@ class GTFSPackage(BaseModel):
         )
 
     @classmethod
-    def from_file(cls, file_path: str | Path) -> Self:
+    def from_file(cls, file_path: str | Path) -> "GTFSPackage":
         with ZipFile(file_path) as zip_file:
             return cls.from_zip_file(zip_file)
 
     @classmethod
-    def from_url(cls, url: str) -> Self:
+    def from_url(cls, url: str) -> "GTFSPackage":
         response = requests.get(url, stream=True)
         zip_file = ZipFile(BytesIO(response.content))
         return cls.from_zip_file(zip_file)
