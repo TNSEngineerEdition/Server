@@ -22,13 +22,14 @@ dependencies = [
     "uvicorn>=0.34.0",
     "types-requests>=2.32.4",
     "types-networkx>=3.5.0",
-    "pytest-mypy-plugins>=3.2.0",
+    "python-multipart>=0.0.20"
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3.4",
     "pytest-cov>=6.0.0",
+    "pytest-mypy-plugins>=3.2.0",
     "httpx>=0.28.1",
     "pre-commit>=4.1.0",
     "freezegun>=1.5.5",

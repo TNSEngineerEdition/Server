@@ -449,7 +449,7 @@ class TramStopMapper:
         return result
 
     @cached_property
-    def trip_stops_by_trip_id(self) -> dict[str, list[StopIDAndTime]]:
+    def _trip_stops_by_trip_id(self) -> dict[str, list[StopIDAndTime]]:
         return {
             trip_id: [
                 StopIDAndTime(stop_id=node_id, time=stop_time)
@@ -457,6 +457,31 @@ class TramStopMapper:
                     self.stop_nodes_by_gtfs_trip_id[trip_id], stop_times
                 )
             ]
-            for trip_id, stop_times, in self._gtfs_package.trip_stop_times_by_trip_id.items()
+            for trip_id, stop_times in self._gtfs_package.trip_stop_times_by_trip_id.items()
             if trip_id in self.stop_nodes_by_gtfs_trip_id
+        }
+
+    def get_trip_stops_by_trip_id(
+        self, gtfs_package: GTFSPackage | None = None
+    ) -> dict[str, list[StopIDAndTime]]:
+        if gtfs_package is None:
+            return self._trip_stops_by_trip_id
+
+        stop_nodes_by_gtfs_trip_id: dict[str, list[int]] = {}
+
+        for gtfs_trip_id in map(str, gtfs_package.trips.index):
+            gtfs_trip_stops = gtfs_package.stop_id_sequence_by_trip_id[gtfs_trip_id]
+            stop_nodes_by_gtfs_trip_id[gtfs_trip_id] = (
+                self._get_stop_nodes_from_mapping(gtfs_trip_stops)
+            )
+
+        return {
+            trip_id: [
+                StopIDAndTime(stop_id=node_id, time=stop_time)
+                for node_id, stop_time in zip(
+                    stop_nodes_by_gtfs_trip_id[trip_id], stop_times
+                )
+            ]
+            for trip_id, stop_times in gtfs_package.trip_stop_times_by_trip_id.items()
+            if trip_id in stop_nodes_by_gtfs_trip_id
         }

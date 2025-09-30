@@ -9,35 +9,14 @@ from pydantic import ValidationError
 
 from city_data_builder import CityConfiguration, CityDataBuilder, ResponseCityData
 from city_data_cache import CachedCityDates, CityDataCache
-from tram_stop_mapper import Weekday
+from tram_stop_mapper import GTFSPackage, TramStopMappingBuildError, Weekday
+from validators import validate_custom_schedule_file, validate_date, validate_weekday
 
 app = FastAPI()
 app.add_middleware(GZipMiddleware)
 
 logger = logging.getLogger(__name__)
 city_data_cache = CityDataCache()
-
-
-def validate_date(date: str | None = None) -> datetime.date | None:
-    if date is None:
-        return None
-    try:
-        return datetime.date.fromisoformat(date)
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid date format: '{date}', expected YYYY-MM-DD",
-        )
-
-
-def validate_weekday(weekday: str | None = None) -> Weekday | None:
-    if weekday is None:
-        return None
-
-    try:
-        return Weekday.get_by_value(weekday)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc))
 
 
 @app.get("/cities")
@@ -62,15 +41,22 @@ def cities() -> dict[str, CachedCityDates]:
 def _get_city_data_by_date(city_id: str, date: datetime.date) -> ResponseCityData:
     if cached_data := city_data_cache.get(city_id, date):
         return cached_data
+
     raise HTTPException(404, f"City data for {city_id} not found in cache for {date}")
 
 
-def _get_city_data_by_weekday(city_id: str, weekday: Weekday) -> ResponseCityData:
+def _get_city_data_by_weekday(
+    city_id: str, weekday: Weekday, custom_gtfs_package: GTFSPackage | None = None
+) -> ResponseCityData:
     if (city_configuration := CityConfiguration.get_by_city_id(city_id)) is None:
         raise HTTPException(404, f"City {city_id} not found")
 
     try:
-        city_data_builder = CityDataBuilder(city_configuration, weekday)
+        city_data_builder = CityDataBuilder(
+            city_configuration, weekday, custom_gtfs_package
+        )
+    except TramStopMappingBuildError as exc:
+        raise HTTPException(500, str(exc))
     except Exception as exc:
         logger.exception(
             "Failed to build city data for city %s for weekday %s",
@@ -120,6 +106,17 @@ def get_city_data(
         return _get_city_data_by_weekday(city_id, weekday)
 
     return _get_city_data_today(city_id)
+
+
+@app.post("/cities/{city_id}")
+def get_city_data_with_custom_schedule(
+    city_id: str,
+    weekday: Weekday | None = Depends(validate_weekday),
+    custom_gtfs_package: GTFSPackage = Depends(validate_custom_schedule_file),
+) -> ResponseCityData:
+    return _get_city_data_by_weekday(
+        city_id, weekday or Weekday.get_current(), custom_gtfs_package
+    )
 
 
 if __name__ == "__main__":

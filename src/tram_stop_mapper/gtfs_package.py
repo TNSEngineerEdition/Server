@@ -2,17 +2,92 @@ from collections import defaultdict
 from functools import cached_property
 from io import BytesIO
 from pathlib import Path
-from typing import Any, cast, Generator, Self
-from zipfile import ZipFile
+from typing import Any, cast, ClassVar, Generator, IO, Self
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import pandas as pd
 import requests
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
+from tram_stop_mapper.exceptions import InvalidGTFSPackage
 from tram_stop_mapper.weekday import Weekday
 
 
 class GTFSPackage(BaseModel):
+    FILE_NAMES: ClassVar[list[str]] = [
+        "stops.txt",
+        "routes.txt",
+        "trips.txt",
+        "stop_times.txt",
+        "calendar.txt",
+    ]
+
+    STOPS_COLUMNS: ClassVar[list[str]] = [
+        "stop_id",
+        "stop_code",
+        "stop_name",
+        "stop_desc",
+        "stop_lat",
+        "stop_lon",
+        "zone_id",
+        "stop_url",
+        "location_type",
+        "parent_station",
+        "stop_timezone",
+        "wheelchair_boarding",
+        "platform_code",
+    ]
+
+    ROUTES_COLUMNS: ClassVar[list[str]] = [
+        "route_id",
+        "agency_id",
+        "route_short_name",
+        "route_long_name",
+        "route_desc",
+        "route_type",
+        "route_url",
+        "route_color",
+        "route_text_color",
+    ]
+
+    TRIPS_COLUMNS: ClassVar[list[str]] = [
+        "trip_id",
+        "route_id",
+        "service_id",
+        "trip_headsign",
+        "trip_short_name",
+        "direction_id",
+        "block_id",
+        "shape_id",
+        "wheelchair_accessible",
+    ]
+
+    STOP_TIMES_COLUMNS: ClassVar[list[str]] = [
+        "trip_id",
+        "arrival_time",
+        "departure_time",
+        "stop_id",
+        "stop_sequence",
+        "stop_headsign",
+        "pickup_type",
+        "drop_off_type",
+        "shape_dist_traveled",
+        "timepoint",
+    ]
+
+    CALENDAR_COLUMNS: ClassVar[list[str]] = [
+        "service_id",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+        "start_date",
+        "end_date",
+    ]
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     stops: pd.DataFrame
@@ -21,8 +96,46 @@ class GTFSPackage(BaseModel):
     stop_times: pd.DataFrame
     calendar: pd.DataFrame
 
+    @staticmethod
+    def _validate_columns(
+        file_name: str,
+        data_frame: pd.DataFrame,
+        expected_columns: list[str],
+    ) -> pd.DataFrame:
+        if (columns := list(data_frame.columns)) != expected_columns:
+            raise InvalidGTFSPackage(
+                f"File {file_name} should contain columns: {expected_columns}, instead got: {columns}"
+            )
+
+        return data_frame
+
+    @field_validator("stops", mode="after")
     @classmethod
-    def _from_zip_file(cls, zip_file: ZipFile) -> Self:
+    def validate_stops_columns(cls, value: pd.DataFrame) -> Self:
+        return cls._validate_columns("stops.txt", value, cls.STOPS_COLUMNS[1:])
+
+    @field_validator("routes", mode="after")
+    @classmethod
+    def validate_routes_columns(cls, value: pd.DataFrame) -> Self:
+        return cls._validate_columns("routes.txt", value, cls.ROUTES_COLUMNS[1:])
+
+    @field_validator("trips", mode="after")
+    @classmethod
+    def validate_trips_columns(cls, value: pd.DataFrame) -> Self:
+        return cls._validate_columns("trips.txt", value, cls.TRIPS_COLUMNS[1:])
+
+    @field_validator("stop_times", mode="after")
+    @classmethod
+    def validate_stop_times_columns(cls, value: pd.DataFrame) -> Self:
+        return cls._validate_columns("stop_times.txt", value, cls.STOP_TIMES_COLUMNS)
+
+    @field_validator("calendar", mode="after")
+    @classmethod
+    def validate_calendar_columns(cls, value: pd.DataFrame) -> Self:
+        return cls._validate_columns("calendar.txt", value, cls.CALENDAR_COLUMNS)
+
+    @classmethod
+    def from_zip_file(cls, zip_file: ZipFile) -> Self:
         with zip_file.open("stops.txt") as file:
             stops = pd.read_csv(file).set_index("stop_id")
 
@@ -49,13 +162,13 @@ class GTFSPackage(BaseModel):
     @classmethod
     def from_file(cls, file_path: str | Path) -> Self:
         with ZipFile(file_path) as zip_file:
-            return cls._from_zip_file(zip_file)
+            return cls.from_zip_file(zip_file)
 
     @classmethod
     def from_url(cls, url: str) -> Self:
         response = requests.get(url, stream=True)
         zip_file = ZipFile(BytesIO(response.content))
-        return cls._from_zip_file(zip_file)
+        return cls.from_zip_file(zip_file)
 
     @cached_property
     def _stop_times_as_dict(self) -> dict[str, dict[tuple[str, int], Any]]:
@@ -107,3 +220,20 @@ class GTFSPackage(BaseModel):
             for trip_id, trip_data in self.trips.iterrows()
             if weekday in self.weekdays_by_service_id[trip_data["service_id"]]
         )
+
+    def to_zip_file(self, file: IO[bytes]) -> None:
+        with ZipFile(file, "w", compression=ZIP_DEFLATED) as zip_file:
+            with zip_file.open("stops.txt", "w") as file:
+                self.stops.to_csv(file)
+
+            with zip_file.open("routes.txt", "w") as file:
+                self.routes.to_csv(file)
+
+            with zip_file.open("trips.txt", "w") as file:
+                self.trips.to_csv(file)
+
+            with zip_file.open("stop_times.txt", "w") as file:
+                self.stop_times.to_csv(file, index=False)
+
+            with zip_file.open("calendar.txt", "w") as file:
+                self.calendar.to_csv(file, index=False)
