@@ -46,10 +46,7 @@ class CityDataCache:
 
         with ZipFile(city_zip_path) as zip_file:
             return sorted(
-                [
-                    datetime.date.fromisoformat(name[:-5])
-                    for name in zip_file.namelist()
-                ],
+                [datetime.date.fromisoformat(name) for name in zip_file.namelist()],
                 reverse=True,
             )
 
