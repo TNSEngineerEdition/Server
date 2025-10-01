@@ -90,7 +90,7 @@ class TestCityDataCache:
         krakow_zip = city_cache_dir / "krakow.zip"
 
         with ZipFile(krakow_zip) as zip_file:
-            initial_file_count = len(list(zip_file.namelist()))
+            initial_file_count = len(zip_file.namelist())
 
         # Act
         cache.store("krakow", datetime.date(2025, 9, 19), krakow_response_city_data)
@@ -125,7 +125,7 @@ class TestCityDataCache:
         cache = CityDataCache(cache_directory=city_cache_dir, max_file_count=2)
         krakow_zip = city_cache_dir / "krakow.zip"
         with ZipFile(krakow_zip) as zip_file:
-            initial_file_count = len(list(zip_file.namelist()))
+            initial_file_count = len(zip_file.namelist())
 
         # Act
         cache.store("krakow", datetime.date(2025, 9, 19), krakow_response_city_data)
@@ -133,6 +133,6 @@ class TestCityDataCache:
         # Assert
         with ZipFile(krakow_zip) as zip_file:
             dates = zip_file.namelist()
-            assert len(list(zip_file.namelist())) == 2
+            assert len(dates) == 2
             assert "2025-09-19" in dates
-            len(dates) <= initial_file_count
+            assert len(dates) <= initial_file_count
