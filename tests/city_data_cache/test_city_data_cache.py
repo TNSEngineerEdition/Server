@@ -3,6 +3,7 @@ import shutil
 import tempfile
 from pathlib import Path
 from typing import Any, Generator
+from zipfile import ZipFile
 
 import pytest
 
@@ -86,16 +87,19 @@ class TestCityDataCache:
     ) -> None:
         # Arrange
         cache = CityDataCache(cache_directory=city_cache_dir)
-        krakow_dir = city_cache_dir / "krakow"
-        initial_file_count = len(list(krakow_dir.iterdir()))
+        krakow_zip = city_cache_dir / "krakow.zip"
+
+        with ZipFile(krakow_zip) as zip_file:
+            initial_file_count = len(zip_file.namelist())
 
         # Act
         cache.store("krakow", datetime.date(2025, 9, 19), krakow_response_city_data)
 
         # Assert
-        dates = [p.stem for p in krakow_dir.iterdir()]
-        assert "2025-09-19" in dates
-        assert len(list(krakow_dir.iterdir())) == initial_file_count + 1
+        with ZipFile(krakow_zip) as zip_file:
+            dates = zip_file.namelist()
+            assert "2025-09-19" in dates
+            assert len(dates) == initial_file_count + 1
 
     def test_get_cached_dates(self, city_cache_dir: Path) -> None:
         # Arrange
@@ -119,14 +123,16 @@ class TestCityDataCache:
     ) -> None:
         # Arrange
         cache = CityDataCache(cache_directory=city_cache_dir, max_file_count=2)
-        krakow_dir = city_cache_dir / "krakow"
-        initial_file_count = len(list(krakow_dir.iterdir()))
+        krakow_zip = city_cache_dir / "krakow.zip"
+        with ZipFile(krakow_zip) as zip_file:
+            initial_file_count = len(zip_file.namelist())
 
         # Act
         cache.store("krakow", datetime.date(2025, 9, 19), krakow_response_city_data)
 
         # Assert
-        dates = [p.stem for p in krakow_dir.iterdir()]
-        assert len(list(krakow_dir.iterdir())) == 2
-        assert "2025-09-19" in dates
-        assert len(dates) <= initial_file_count
+        with ZipFile(krakow_zip) as zip_file:
+            dates = zip_file.namelist()
+            assert len(dates) == 2
+            assert "2025-09-19" in dates
+            assert len(dates) <= initial_file_count
