@@ -6,7 +6,9 @@ import overpy
 import pytest
 
 from city_data_builder import CityConfiguration
-from tram_stop_mapper import GTFSPackage, TramStopMapper, TramStopMappingBuildError
+from tram_stop_mapper.exceptions import TramStopMappingBuildError
+from tram_stop_mapper.gtfs_package import GTFSPackage
+from tram_stop_mapper.tram_stop_mapper import TramStopMapper
 
 
 class TestTramStopMapper:
@@ -366,7 +368,7 @@ class TestTramStopMapper:
         )
 
         # Act
-        trip_stops_data = tram_stop_mapper.trip_stops_by_trip_id
+        trip_stops_data = tram_stop_mapper.get_trip_stops_by_trip_id()
 
         # Assert
         assert all(

@@ -25,11 +25,14 @@ class CityDataBuilder:
         self,
         city_configuration: CityConfiguration,
         weekday: Weekday,
-        max_distance_between_nodes: float = 5,
+        custom_gtfs_package: GTFSPackage | None = None,
+        max_distance_between_nodes: float = 5.0,
     ):
         self._city_configuration = city_configuration
-        self._max_distance_between_nodes = max_distance_between_nodes
         self._weekday = weekday
+        self._custom_gtfs_package = custom_gtfs_package
+        self._max_distance_between_nodes = max_distance_between_nodes
+
         self._tram_stop_mapper = self._get_tram_stop_mapper()
         self._tram_track_graph = self._get_tram_track_graph()
 
@@ -129,7 +132,11 @@ class CityDataBuilder:
 
     @property
     def tram_routes_data(self) -> list[ResponseTramRoute]:
-        trip_stops_by_trip_id = self._tram_stop_mapper.trip_stops_by_trip_id
+        trip_stops_by_trip_id = self._tram_stop_mapper.get_trip_stops_by_trip_id(
+            self._custom_gtfs_package
+        )
+
+        gtfs_package = self._custom_gtfs_package or self._tram_stop_mapper.gtfs_package
 
         routes_by_route_id = {
             str(route_id): ResponseTramRoute(
@@ -137,13 +144,13 @@ class CityDataBuilder:
                 background_color=route_data["route_color"],
                 text_color=route_data["route_text_color"],
             )
-            for route_id, route_data in self._tram_stop_mapper.gtfs_package.routes.iterrows()
+            for route_id, route_data in gtfs_package.routes.iterrows()
         }
 
         for (
             trip_id,
             trip_data,
-        ) in self._tram_stop_mapper.gtfs_package.get_trips_for_weekday(self._weekday):
+        ) in gtfs_package.get_trips_for_weekday(self._weekday):
             if trip_id not in trip_stops_by_trip_id:
                 continue
 
