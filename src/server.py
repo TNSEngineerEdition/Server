@@ -87,7 +87,7 @@ def get_city_data(
     date: datetime.date | None = Depends(validate_date),
 ) -> ResponseCityData:
     """
-    Returns processed data for a given city.
+    Returns tram track graph and tram routes data for the given city.
 
     - Without parameters: returns data for the current day
     (from cache if available, otherwise built and cached).
@@ -114,6 +114,11 @@ def get_city_data_with_custom_schedule(
     weekday: Weekday | None = Depends(validate_weekday),
     custom_gtfs_package: GTFSPackage = Depends(validate_custom_schedule_file),
 ) -> ResponseCityData:
+    """
+    Returns tram track graph and tram routes data for the given city.
+    Uses custom GTFS package to determine tram routes.
+    """
+
     return _get_city_data_by_weekday(
         city_id, weekday or Weekday.get_current(), custom_gtfs_package
     )
