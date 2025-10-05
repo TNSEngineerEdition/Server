@@ -21,7 +21,7 @@ def gtfs_package() -> GTFSPackage:
 
 
 @pytest.fixture
-def custom_gtfs_package_byte_buffer() -> Generator[IO[bytes], None, None]:
+def custom_gtfs_package() -> GTFSPackage:
     gtfs_package = GTFSPackage.from_file("tests/assets/gtfs_schedule.zip")
 
     gtfs_package.routes = gtfs_package.routes[
@@ -37,8 +37,15 @@ def custom_gtfs_package_byte_buffer() -> Generator[IO[bytes], None, None]:
         ~gtfs_package.stop_times["trip_id"].isin(removed_trips.index)
     ]
 
+    return gtfs_package
+
+
+@pytest.fixture
+def custom_gtfs_package_byte_buffer(
+    custom_gtfs_package: GTFSPackage,
+) -> Generator[IO[bytes], None, None]:
     with io.BytesIO() as buffer:
-        gtfs_package.to_zip_file(buffer)
+        custom_gtfs_package.to_zip_file(buffer)
         buffer.seek(0)
         yield buffer
 

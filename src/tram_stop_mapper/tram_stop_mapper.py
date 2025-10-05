@@ -367,10 +367,7 @@ class TramStopMapper:
         if gtfs_stop_id in self.last_gtfs_stop_id_to_osm_node_ids:
             return self.last_gtfs_stop_id_to_osm_node_ids[gtfs_stop_id][0]
 
-        raise ValueError(  # pragma: no cover
-            f"Stop {gtfs_stop_id} not found in any mapping.\n"
-            "TramStopMappingBuildError should have been raised but wasn't."
-        )
+        raise ValueError(f"Stop {gtfs_stop_id} not found in any mapping.")
 
     def _get_stop_nodes_from_mapping(self, gtfs_trip_stops: list[str]) -> list[int]:
         custom_pair_mapping_last_used = False

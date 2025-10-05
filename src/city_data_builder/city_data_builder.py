@@ -25,6 +25,7 @@ class CityDataBuilder:
         self,
         city_configuration: CityConfiguration,
         weekday: Weekday,
+        *,
         custom_gtfs_package: GTFSPackage | None = None,
         max_distance_between_nodes: float = 5.0,
     ):

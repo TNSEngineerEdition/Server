@@ -53,7 +53,7 @@ def _get_city_data_by_weekday(
 
     try:
         city_data_builder = CityDataBuilder(
-            city_configuration, weekday, custom_gtfs_package
+            city_configuration, weekday, custom_gtfs_package=custom_gtfs_package
         )
     except TramStopMappingBuildError as exc:
         raise HTTPException(500, str(exc))
@@ -74,8 +74,7 @@ def _get_city_data_today(city_id: str) -> ResponseCityData:
     if cached := city_data_cache.get(city_id, today):
         return cached
 
-    weekday = Weekday.get_current()
-    data = _get_city_data_by_weekday(city_id, weekday)
+    data = _get_city_data_by_weekday(city_id, Weekday.get_current())
     city_data_cache.store(city_id, today, data)
     return data
 
