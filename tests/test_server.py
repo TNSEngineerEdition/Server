@@ -379,29 +379,42 @@ class TestServer:
 
     def test_get_city_data_invalid_weekday(self) -> None:
         # Arrange
-        expected_response_detail = (
-            "Invalid weekday: 1234567890. Must be one of: "
-            "['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']"
-        )
+        expected_response_detail = [
+            {
+                "type": "enum",
+                "loc": ["query", "weekday"],
+                "msg": "Input should be 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday' or 'sunday'",
+                "input": "1234567890",
+                "ctx": {
+                    "expected": "'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday' or 'sunday'"
+                },
+            }
+        ]
 
         # Act
         response = self.client.get("/cities/krakow", params={"weekday": "1234567890"})
 
         # Assert
-        assert response.status_code == 400
+        assert response.status_code == 422
         assert response.json()["detail"] == expected_response_detail
 
     def test_get_city_data_invalid_date(self) -> None:
         # Arrange
-        expected_response_detail = (
-            "Invalid date format: '2025-13-13', expected YYYY-MM-DD"
-        )
+        expected_response_detail = [
+            {
+                "type": "date_from_datetime_parsing",
+                "loc": ["query", "date"],
+                "msg": "Input should be a valid date or datetime, month value is outside expected range of 1-12",
+                "input": "2025-13-13",
+                "ctx": {"error": "month value is outside expected range of 1-12"},
+            }
+        ]
 
         # Act
         response = self.client.get("/cities/krakow", params={"date": "2025-13-13"})
 
         # Assert
-        assert response.status_code == 400
+        assert response.status_code == 422
         assert response.json()["detail"] == expected_response_detail
 
     def test_get_city_data_missing_date(self) -> None:

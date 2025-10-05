@@ -1,16 +1,16 @@
 import datetime
 import logging
 import os
+from zipfile import BadZipFile, ZipFile
 
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query, UploadFile
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import ValidationError
 
 from city_data_builder import CityConfiguration, CityDataBuilder, ResponseCityData
 from city_data_cache import CachedCityDates, CityDataCache
 from tram_stop_mapper import GTFSPackage, TramStopMappingBuildError, Weekday
-from validators import validate_custom_schedule_file, validate_date, validate_weekday
 
 app = FastAPI()
 app.add_middleware(GZipMiddleware)
@@ -83,8 +83,8 @@ def _get_city_data_today(city_id: str) -> ResponseCityData:
 @app.get("/cities/{city_id}")
 def get_city_data(
     city_id: str,
-    weekday: Weekday | None = Depends(validate_weekday),
-    date: datetime.date | None = Depends(validate_date),
+    weekday: Weekday | None = Query(None),
+    date: datetime.date = Query(None),
 ) -> ResponseCityData:
     """
     Returns tram track graph and tram routes data for the given city.
@@ -108,20 +108,38 @@ def get_city_data(
     return _get_city_data_today(city_id)
 
 
+def _validate_custom_schedule_file(custom_schedule_file: UploadFile) -> GTFSPackage:
+    if custom_schedule_file.content_type != "application/zip":
+        raise HTTPException(
+            status_code=400, detail="Custom schedule file must be a ZIP file"
+        )
+
+    try:
+        zip_file = ZipFile(custom_schedule_file.file)
+    except BadZipFile:
+        raise HTTPException(422, detail="File is not a ZIP file")
+
+    if (invalid_file := zip_file.testzip()) is not None:
+        raise HTTPException(status_code=422, detail=f"Invalid file: {invalid_file}")
+
+    try:
+        return GTFSPackage.from_zip_file(zip_file)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
 @app.post("/cities/{city_id}")
 def get_city_data_with_custom_schedule(
     city_id: str,
-    weekday: Weekday | None = Depends(validate_weekday),
-    custom_gtfs_package: GTFSPackage = Depends(validate_custom_schedule_file),
+    weekday: Weekday = Query(default_factory=Weekday.get_current),
+    custom_gtfs_package: GTFSPackage = Depends(_validate_custom_schedule_file),
 ) -> ResponseCityData:
     """
     Returns tram track graph and tram routes data for the given city.
     Uses custom GTFS package to determine tram routes.
     """
 
-    return _get_city_data_by_weekday(
-        city_id, weekday or Weekday.get_current(), custom_gtfs_package
-    )
+    return _get_city_data_by_weekday(city_id, weekday, custom_gtfs_package)
 
 
 if __name__ == "__main__":
