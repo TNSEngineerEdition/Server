@@ -1,6 +1,8 @@
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import overpy
+import pandas as pd
 import pytest
 
 from city_data_builder import CityConfiguration, CityDataBuilder
@@ -175,6 +177,76 @@ class TestCityDataBuilder:
             expected_stop_count,
         )
 
+        get_relations_and_stops_mock.assert_called_once_with(
+            krakow_city_configuration.osm_area_name,
+            [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
+        )
+        get_tram_stops_and_tracks_mock.assert_called_once_with(
+            krakow_city_configuration.osm_area_name
+        )
+        gtfs_package_from_url_mock.assert_called_once_with(
+            krakow_city_configuration.gtfs_url
+        )
+
+    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
+    @patch("overpass_client.OverpassClient.get_relations_and_stops")
+    def test_tram_routes_data_with_custom_schedule_stop_not_found_in_mapping(
+        self,
+        get_relations_and_stops_mock: MagicMock,
+        get_tram_stops_and_tracks_mock: MagicMock,
+        gtfs_package_from_url_mock: MagicMock,
+        krakow_city_configuration: CityConfiguration,
+        relations_and_stops_overpass_query_result: overpy.Result,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
+        gtfs_package: GTFSPackage,
+        custom_gtfs_package: GTFSPackage,
+    ) -> None:
+        # Arrange
+        get_relations_and_stops_mock.return_value = (
+            relations_and_stops_overpass_query_result
+        )
+        get_tram_stops_and_tracks_mock.return_value = (
+            tram_stops_and_tracks_overpass_query_result
+        )
+        gtfs_package_from_url_mock.return_value = gtfs_package
+
+        custom_gtfs_package.stop_times = pd.concat(
+            [
+                custom_gtfs_package.stop_times,
+                pd.DataFrame(
+                    [
+                        [
+                            "block_4_trip_1_service_4",
+                            "06:23:00",
+                            "06:23:00",
+                            "stop_000_00000",
+                            19,
+                            np.nan,
+                            1,
+                            0,
+                            7.5,
+                            1,
+                        ]
+                    ],
+                    columns=custom_gtfs_package.stop_times.columns,
+                ),
+            ]
+        )
+
+        city_data_builder = CityDataBuilder(
+            krakow_city_configuration,
+            Weekday.MONDAY,
+            custom_gtfs_package=custom_gtfs_package,
+        )
+
+        # Act
+        with pytest.raises(
+            ValueError, match="Stop stop_000_00000 not found in any mapping."
+        ):
+            city_data_builder.tram_routes_data
+
+        # Assert
         get_relations_and_stops_mock.assert_called_once_with(
             krakow_city_configuration.osm_area_name,
             [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
