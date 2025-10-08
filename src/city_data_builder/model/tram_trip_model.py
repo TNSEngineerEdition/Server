@@ -8,7 +8,7 @@ class ResponseTramTripStop(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     id: int = Field(json_schema_extra={"x-go-type": "uint64", "x-go-name": "ID"})
-    time: int
+    time: int = Field(json_schema_extra={"x-go-type": "uint"})
 
 
 class ResponseTramTrip(BaseModel):
