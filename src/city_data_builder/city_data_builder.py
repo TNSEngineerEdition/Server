@@ -2,7 +2,6 @@ import networkx as nx
 
 from city_data_builder.city_configuration import CityConfiguration
 from city_data_builder.model import (
-    BaseGraphNode,
     ResponseCityData,
     ResponseGraphEdge,
     ResponseGraphNode,
@@ -92,6 +91,28 @@ class CityDataBuilder:
             tram_routes=self.tram_routes_data,
         )
 
+    def _get_response_node(
+        self, node: Node, neighbors: dict[int, ResponseGraphEdge]
+    ) -> ResponseGraphNode | ResponseGraphTramStop:
+        if node.type == NodeType.TRAM_STOP:
+            return ResponseGraphTramStop(
+                id=node.id,
+                lat=node.lat,
+                lon=node.lon,
+                name=node.name or "",
+                neighbors=neighbors,
+                gtfs_stop_ids=sorted(
+                    self._tram_stop_mapper.gtfs_stop_ids_by_node_id[node.id]
+                ),
+            )
+
+        return ResponseGraphNode(
+            id=node.id,
+            lat=node.lat,
+            lon=node.lon,
+            neighbors=neighbors,
+        )
+
     @property
     def tram_track_graph_data(self) -> list[ResponseGraphNode | ResponseGraphTramStop]:
         response_data_edge_by_source: dict[Node, dict[int, ResponseGraphEdge]] = {
@@ -106,31 +127,10 @@ class CityDataBuilder:
                 max_speed=data["max_speed"],
             )
 
-        response_node: BaseGraphNode
-        result: list[ResponseGraphNode | ResponseGraphTramStop] = []
-        for node in response_data_edge_by_source:
-            if node.type == NodeType.TRAM_STOP:
-                response_node = ResponseGraphTramStop(
-                    id=node.id,
-                    lat=node.lat,
-                    lon=node.lon,
-                    name=node.name or "",
-                    neighbors=response_data_edge_by_source[node],
-                    gtfs_stop_ids=sorted(
-                        self._tram_stop_mapper.gtfs_stop_ids_by_node_id[node.id]
-                    ),
-                )
-            else:
-                response_node = ResponseGraphNode(
-                    id=node.id,
-                    lat=node.lat,
-                    lon=node.lon,
-                    neighbors=response_data_edge_by_source[node],
-                )
-
-            result.append(response_node)
-
-        return result
+        return [
+            self._get_response_node(node, neighbors)
+            for node, neighbors in response_data_edge_by_source.items()
+        ]
 
     @property
     def tram_routes_data(self) -> list[ResponseTramRoute]:
