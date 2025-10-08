@@ -1,5 +1,6 @@
 import re
-from typing import Any, ClassVar
+from abc import ABC
+from typing import Annotated, Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -7,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class ResponseGraphEdge(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    id: int
+    id: int = Field(json_schema_extra={"x-go-type": "uint64", "x-go-name": "ID"})
     distance: float
     azimuth: float
     max_speed: float
@@ -18,13 +19,14 @@ class ResponseGraphEdge(BaseModel):
         return round(value, 4)
 
 
-class ResponseGraphNode(BaseModel):
+class BaseGraphNode(BaseModel, ABC):
     model_config = ConfigDict(frozen=True)
 
-    id: int
+    id: int = Field(json_schema_extra={"x-go-type": "uint64", "x-go-name": "ID"})
     lat: float
     lon: float
     neighbors: dict[int, ResponseGraphEdge]
+    node_type: Literal["node", "stop"]
 
     @field_validator("lat", "lon", mode="after")
     @classmethod
@@ -32,7 +34,13 @@ class ResponseGraphNode(BaseModel):
         return round(value, 7)
 
 
-class ResponseGraphTramStop(ResponseGraphNode):
+class ResponseGraphNode(BaseGraphNode):
+    node_type: Literal["node"] = Field(default="node")
+
+
+class ResponseGraphTramStop(BaseGraphNode):
+    node_type: Literal["stop"] = Field(default="stop")
+
     name: str
     gtfs_stop_ids: list[str]
 
@@ -40,7 +48,7 @@ class ResponseGraphTramStop(ResponseGraphNode):
 class ResponseTramTripStop(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    id: int
+    id: int = Field(json_schema_extra={"x-go-type": "uint64", "x-go-name": "ID"})
     time: int
 
 
@@ -86,5 +94,11 @@ class ResponseTramRoute(BaseModel):
 
 
 class ResponseCityData(BaseModel):
-    tram_track_graph: list[ResponseGraphNode | ResponseGraphTramStop]
+    tram_track_graph: list[
+        Annotated[
+            ResponseGraphNode | ResponseGraphTramStop,
+            Field(discriminator="node_type"),
+        ]
+    ]
+
     tram_routes: list[ResponseTramRoute]

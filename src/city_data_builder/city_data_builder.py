@@ -2,6 +2,7 @@ import networkx as nx
 
 from city_data_builder.city_configuration import CityConfiguration
 from city_data_builder.model import (
+    BaseGraphNode,
     ResponseCityData,
     ResponseGraphEdge,
     ResponseGraphNode,
@@ -92,7 +93,7 @@ class CityDataBuilder:
         )
 
     @property
-    def tram_track_graph_data(self) -> list[ResponseGraphNode]:
+    def tram_track_graph_data(self) -> list[ResponseGraphNode | ResponseGraphTramStop]:
         response_data_edge_by_source: dict[Node, dict[int, ResponseGraphEdge]] = {
             node: {} for node in self._tram_track_graph.nodes
         }
@@ -105,8 +106,8 @@ class CityDataBuilder:
                 max_speed=data["max_speed"],
             )
 
-        response_node: ResponseGraphNode
-        result: list[ResponseGraphNode] = []
+        response_node: BaseGraphNode
+        result: list[ResponseGraphNode | ResponseGraphTramStop] = []
         for node in response_data_edge_by_source:
             if node.type == NodeType.TRAM_STOP:
                 response_node = ResponseGraphTramStop(

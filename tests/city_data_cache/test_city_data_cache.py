@@ -20,7 +20,7 @@ from city_data_cache.city_data_cache import CityDataCache
 class TestCityDataCache:
     @pytest.fixture(scope="class")
     def response_city_data_mock(self) -> ResponseCityData:
-        tram_graph = [
+        tram_graph: list[ResponseGraphNode | ResponseGraphTramStop] = [
             ResponseGraphNode(
                 id=1,
                 lat=50.0,
