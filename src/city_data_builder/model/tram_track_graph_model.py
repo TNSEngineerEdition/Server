@@ -43,4 +43,4 @@ class ResponseGraphTramStop(BaseGraphNode):
     node_type: Literal["stop"] = Field(default_factory=lambda: "stop")
 
     name: str
-    gtfs_stop_ids: list[str]
+    gtfs_stop_ids: list[str] = Field(json_schema_extra={"x-go-name": "GTFSStopIDs"})
