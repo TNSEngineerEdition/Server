@@ -35,12 +35,18 @@ class BaseGraphNode(BaseModel, ABC):
 
 class ResponseGraphNode(BaseGraphNode):
     # Default factory hides default value in OpenAPI schema
-    node_type: Literal["node"] = Field(default_factory=lambda: "node")
+    node_type: Literal["node"] = Field(
+        default_factory=lambda: "node",
+        json_schema_extra={"x-go-type-skip-optional-pointer": True},
+    )
 
 
 class ResponseGraphTramStop(BaseGraphNode):
     # Default factory hides default value in OpenAPI schema
-    node_type: Literal["stop"] = Field(default_factory=lambda: "stop")
+    node_type: Literal["stop"] = Field(
+        default_factory=lambda: "stop",
+        json_schema_extra={"x-go-type-skip-optional-pointer": True},
+    )
 
     name: str
     gtfs_stop_ids: list[str] = Field(json_schema_extra={"x-go-name": "GTFSStopIDs"})
