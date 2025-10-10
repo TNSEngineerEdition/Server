@@ -27,6 +27,9 @@ class CityConfiguration(BaseModel):
         os.environ.get("CITIES_DIRECTORY_PATH", "./cities")
     )
 
+    city: str
+    country: str
+    image: str
     osm_area_name: str
     gtfs_url: str
     ignored_gtfs_lines: list[str]

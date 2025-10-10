@@ -14,12 +14,3 @@ class Weekday(StrEnum):
     @classmethod
     def get_current(cls) -> "Weekday":
         return list(cls)[date.today().weekday()]
-
-    @classmethod
-    def get_by_value(cls, weekday: str) -> "Weekday":
-        try:
-            return cls(weekday.lower())
-        except ValueError:
-            raise ValueError(
-                f"Invalid weekday: {weekday}. Must be one of: {list(map(str, cls))}"
-            )

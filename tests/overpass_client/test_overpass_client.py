@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import overpy
 import pytest
 
-from overpass_client import OverpassClient
+from overpass_client.overpass_client import OverpassClient
 
 
 class TestOverpassClient:

@@ -1,4 +1,7 @@
 {
+  "city": "Krak\u00f3w",
+  "country": "Poland",
+  "image": "https://some.image/tram.png",
   "osm_area_name": "Krak\u00f3w",
   "custom_stop_mapping": {
     "stop_272_46419": 1770194211,
