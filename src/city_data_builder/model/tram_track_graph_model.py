@@ -24,7 +24,9 @@ class BaseGraphNode(BaseModel, ABC):
     id: int = Field(json_schema_extra={"x-go-type": "uint64", "x-go-name": "ID"})
     lat: float
     lon: float
-    neighbors: dict[int, ResponseGraphEdge]
+    neighbors: dict[int, ResponseGraphEdge] = Field(
+        json_schema_extra={"x-go-type": "map[uint64]ResponseGraphEdge"}
+    )
     node_type: Literal["node", "stop"]
 
     @field_validator("lat", "lon", mode="after")
