@@ -60,9 +60,8 @@ def _get_city_data_by_weekday(
         city_data_builder = CityDataBuilder(
             city_configuration, weekday, custom_gtfs_package=custom_gtfs_package
         )
-    except (TramStopMappingBuildError, TramStopNotFound) as exc:
+    except TramStopMappingBuildError as exc:
         raise HTTPException(500, str(exc))
-
     except Exception as exc:
         logger.exception(
             "Failed to build city data for city %s for weekday %s",
@@ -72,7 +71,18 @@ def _get_city_data_by_weekday(
         )
         raise HTTPException(500, f"Data processing for {city_id} failed")
 
-    return city_data_builder.to_response_city_data()
+    try:
+        return city_data_builder.to_response_city_data()
+    except TramStopNotFound as exc:
+        raise HTTPException(500, str(exc))
+    except Exception as exc:
+        logger.exception(
+            "Failed to build response data for city %s for weekday %s",
+            city_id,
+            weekday,
+            exc_info=exc,
+        )
+        raise HTTPException(500, f"Data processing for {city_id} failed")
 
 
 def _get_city_data_today(city_id: str) -> ResponseCityData:
