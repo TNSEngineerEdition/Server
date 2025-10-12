@@ -7,7 +7,7 @@ from typing import Hashable, TYPE_CHECKING
 import overpy
 from pydantic import BaseModel
 
-from tram_stop_mapper.exceptions import TramStopMappingBuildError
+from tram_stop_mapper.exceptions import TramStopMappingBuildError, TramStopNotFound
 from tram_stop_mapper.gtfs_package import GTFSPackage
 from tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
 
@@ -367,7 +367,7 @@ class TramStopMapper:
         if gtfs_stop_id in self.last_gtfs_stop_id_to_osm_node_ids:
             return self.last_gtfs_stop_id_to_osm_node_ids[gtfs_stop_id][0]
 
-        raise ValueError(f"Stop {gtfs_stop_id} not found in any mapping.")
+        raise TramStopNotFound(gtfs_stop_id)
 
     def _get_stop_nodes_from_mapping(self, gtfs_trip_stops: list[str]) -> list[int]:
         custom_pair_mapping_last_used = False

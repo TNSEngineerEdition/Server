@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from city_data_builder import CityConfiguration, CityDataBuilder
-from tram_stop_mapper import GTFSPackage, Weekday
+from tram_stop_mapper import GTFSPackage, TramStopNotFound, Weekday
 
 
 class TestCityDataBuilder:
@@ -242,7 +242,7 @@ class TestCityDataBuilder:
 
         # Act
         with pytest.raises(
-            ValueError, match="Stop stop_000_00000 not found in any mapping."
+            TramStopNotFound, match="Stop stop_000_00000 not found in any mapping."
         ):
             city_data_builder.tram_routes_data
 

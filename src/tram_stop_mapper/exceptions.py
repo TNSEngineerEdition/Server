@@ -6,7 +6,7 @@ class TramStopMappingBuildError(ValueError):
     Failure to build correct mapping of GTFS stops to OSM nodes.
     """
 
-    def __init__(self, mapping_errors: TramStopMappingErrors):
+    def __init__(self, mapping_errors: TramStopMappingErrors) -> None:
         super().__init__(mapping_errors)
 
         self.mapping_errors = mapping_errors
@@ -18,12 +18,26 @@ class TramStopMappingBuildError(ValueError):
         )
 
 
-class InvalidGTFSPackage(ValueError):
+class TramStopNotFound(ValueError):
     """
-    Provided GTFS package contains invalid data
+    Stop with provided ID was not found in any mapping.
     """
 
-    def __init__(self, message: str):
+    def __init__(self, missing_stop_id: str) -> None:
+        super().__init__(missing_stop_id)
+
+        self.missing_stop_id = missing_stop_id
+
+    def __str__(self) -> str:
+        return f"Stop {self.missing_stop_id} not found in any mapping."
+
+
+class InvalidGTFSPackage(ValueError):
+    """
+    Provided GTFS package contains invalid data.
+    """
+
+    def __init__(self, message: str) -> None:
         super().__init__(message)
 
         self.message = message
