@@ -4,44 +4,11 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-class ResponseGraphEdge(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    id: int
-    distance: float
-    azimuth: float
-    max_speed: float
-
-    @field_validator("distance", "azimuth", "max_speed", mode="after")
-    @classmethod
-    def round_to_4_decimal_places(cls, value: float) -> float:
-        return round(value, 4)
-
-
-class ResponseGraphNode(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    id: int
-    lat: float
-    lon: float
-    neighbors: dict[int, ResponseGraphEdge]
-
-    @field_validator("lat", "lon", mode="after")
-    @classmethod
-    def round_to_7_decimal_places(cls, value: float) -> float:
-        return round(value, 7)
-
-
-class ResponseGraphTramStop(ResponseGraphNode):
-    name: str
-    gtfs_stop_ids: list[str]
-
-
 class ResponseTramTripStop(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    id: int
-    time: int
+    id: int = Field(json_schema_extra={"x-go-type": "uint64", "x-go-name": "ID"})
+    time: int = Field(json_schema_extra={"x-go-type": "uint"})
 
 
 class ResponseTramTrip(BaseModel):
@@ -83,8 +50,3 @@ class ResponseTramRoute(BaseModel):
             return value.upper()
 
         return cls._DEFAULT_TEXT_COLOR
-
-
-class ResponseCityData(BaseModel):
-    tram_track_graph: list[ResponseGraphNode | ResponseGraphTramStop]
-    tram_routes: list[ResponseTramRoute]

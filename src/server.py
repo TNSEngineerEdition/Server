@@ -1,43 +1,27 @@
 import datetime
 import logging
 import os
+from zipfile import BadZipFile, ZipFile
 
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query, UploadFile
 from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import ValidationError
 
 from city_data_builder import CityConfiguration, CityDataBuilder, ResponseCityData
 from city_data_cache import CachedCityDates, CityDataCache
-from tram_stop_mapper import Weekday
+from tram_stop_mapper import (
+    GTFSPackage,
+    TramStopMappingBuildError,
+    TramStopNotFound,
+    Weekday,
+)
 
 app = FastAPI()
 app.add_middleware(GZipMiddleware)
 
 logger = logging.getLogger(__name__)
 city_data_cache = CityDataCache()
-
-
-def validate_date(date: str | None = None) -> datetime.date | None:
-    if date is None:
-        return None
-    try:
-        return datetime.date.fromisoformat(date)
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid date format: '{date}', expected YYYY-MM-DD",
-        )
-
-
-def validate_weekday(weekday: str | None = None) -> Weekday | None:
-    if weekday is None:
-        return None
-
-    try:
-        return Weekday.get_by_value(weekday)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc))
 
 
 @app.get("/cities")
@@ -62,15 +46,22 @@ def cities() -> dict[str, CachedCityDates]:
 def _get_city_data_by_date(city_id: str, date: datetime.date) -> ResponseCityData:
     if cached_data := city_data_cache.get(city_id, date):
         return cached_data
+
     raise HTTPException(404, f"City data for {city_id} not found in cache for {date}")
 
 
-def _get_city_data_by_weekday(city_id: str, weekday: Weekday) -> ResponseCityData:
+def _get_city_data_by_weekday(
+    city_id: str, weekday: Weekday, custom_gtfs_package: GTFSPackage | None = None
+) -> ResponseCityData:
     if (city_configuration := CityConfiguration.get_by_city_id(city_id)) is None:
         raise HTTPException(404, f"City {city_id} not found")
 
     try:
-        city_data_builder = CityDataBuilder(city_configuration, weekday)
+        city_data_builder = CityDataBuilder(
+            city_configuration, weekday, custom_gtfs_package=custom_gtfs_package
+        )
+    except TramStopMappingBuildError as exc:
+        raise HTTPException(500, str(exc))
     except Exception as exc:
         logger.exception(
             "Failed to build city data for city %s for weekday %s",
@@ -80,7 +71,18 @@ def _get_city_data_by_weekday(city_id: str, weekday: Weekday) -> ResponseCityDat
         )
         raise HTTPException(500, f"Data processing for {city_id} failed")
 
-    return city_data_builder.to_response_city_data()
+    try:
+        return city_data_builder.to_response_city_data()
+    except TramStopNotFound as exc:
+        raise HTTPException(500, str(exc))
+    except Exception as exc:
+        logger.exception(
+            "Failed to build response data for city %s for weekday %s",
+            city_id,
+            weekday,
+            exc_info=exc,
+        )
+        raise HTTPException(500, f"Data processing for {city_id} failed")
 
 
 def _get_city_data_today(city_id: str) -> ResponseCityData:
@@ -88,8 +90,7 @@ def _get_city_data_today(city_id: str) -> ResponseCityData:
     if cached := city_data_cache.get(city_id, today):
         return cached
 
-    weekday = Weekday.get_current()
-    data = _get_city_data_by_weekday(city_id, weekday)
+    data = _get_city_data_by_weekday(city_id, Weekday.get_current())
     city_data_cache.store(city_id, today, data)
     return data
 
@@ -97,11 +98,11 @@ def _get_city_data_today(city_id: str) -> ResponseCityData:
 @app.get("/cities/{city_id}")
 def get_city_data(
     city_id: str,
-    weekday: Weekday | None = Depends(validate_weekday),
-    date: datetime.date | None = Depends(validate_date),
+    weekday: Weekday | None = Query(None),
+    date: datetime.date = Query(None),
 ) -> ResponseCityData:
     """
-    Returns processed data for a given city.
+    Returns tram track graph and tram routes data for the given city.
 
     - Without parameters: returns data for the current day
     (from cache if available, otherwise built and cached).
@@ -120,6 +121,40 @@ def get_city_data(
         return _get_city_data_by_weekday(city_id, weekday)
 
     return _get_city_data_today(city_id)
+
+
+def _validate_custom_schedule_file(custom_schedule_file: UploadFile) -> GTFSPackage:
+    if custom_schedule_file.content_type != "application/zip":
+        raise HTTPException(
+            status_code=400, detail="Custom schedule file must be a ZIP file"
+        )
+
+    try:
+        zip_file = ZipFile(custom_schedule_file.file)
+    except BadZipFile:
+        raise HTTPException(422, detail="File is not a ZIP file")
+
+    if (invalid_file := zip_file.testzip()) is not None:
+        raise HTTPException(status_code=422, detail=f"Invalid file: {invalid_file}")
+
+    try:
+        return GTFSPackage.from_zip_file(zip_file)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@app.post("/cities/{city_id}")
+def get_city_data_with_custom_schedule(
+    city_id: str,
+    weekday: Weekday = Query(default_factory=Weekday.get_current),
+    custom_gtfs_package: GTFSPackage = Depends(_validate_custom_schedule_file),
+) -> ResponseCityData:
+    """
+    Returns tram track graph and tram routes data for the given city.
+    Uses custom GTFS package to determine tram routes.
+    """
+
+    return _get_city_data_by_weekday(city_id, weekday, custom_gtfs_package)
 
 
 if __name__ == "__main__":

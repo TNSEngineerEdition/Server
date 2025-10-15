@@ -25,11 +25,15 @@ class CityDataBuilder:
         self,
         city_configuration: CityConfiguration,
         weekday: Weekday,
-        max_distance_between_nodes: float = 5,
+        *,
+        custom_gtfs_package: GTFSPackage | None = None,
+        max_distance_between_nodes: float = 5.0,
     ):
         self._city_configuration = city_configuration
-        self._max_distance_between_nodes = max_distance_between_nodes
         self._weekday = weekday
+        self._custom_gtfs_package = custom_gtfs_package
+        self._max_distance_between_nodes = max_distance_between_nodes
+
         self._tram_stop_mapper = self._get_tram_stop_mapper()
         self._tram_track_graph = self._get_tram_track_graph()
 
@@ -87,8 +91,30 @@ class CityDataBuilder:
             tram_routes=self.tram_routes_data,
         )
 
+    def _get_response_node(
+        self, node: Node, neighbors: dict[int, ResponseGraphEdge]
+    ) -> ResponseGraphNode | ResponseGraphTramStop:
+        if node.type == NodeType.TRAM_STOP:
+            return ResponseGraphTramStop(
+                id=node.id,
+                lat=node.lat,
+                lon=node.lon,
+                name=node.name or "",
+                neighbors=neighbors,
+                gtfs_stop_ids=sorted(
+                    self._tram_stop_mapper.gtfs_stop_ids_by_node_id[node.id]
+                ),
+            )
+
+        return ResponseGraphNode(
+            id=node.id,
+            lat=node.lat,
+            lon=node.lon,
+            neighbors=neighbors,
+        )
+
     @property
-    def tram_track_graph_data(self) -> list[ResponseGraphNode]:
+    def tram_track_graph_data(self) -> list[ResponseGraphNode | ResponseGraphTramStop]:
         response_data_edge_by_source: dict[Node, dict[int, ResponseGraphEdge]] = {
             node: {} for node in self._tram_track_graph.nodes
         }
@@ -101,35 +127,18 @@ class CityDataBuilder:
                 max_speed=data["max_speed"],
             )
 
-        response_node: ResponseGraphNode
-        result: list[ResponseGraphNode] = []
-        for node in response_data_edge_by_source:
-            if node.type == NodeType.TRAM_STOP:
-                response_node = ResponseGraphTramStop(
-                    id=node.id,
-                    lat=node.lat,
-                    lon=node.lon,
-                    name=node.name or "",
-                    neighbors=response_data_edge_by_source[node],
-                    gtfs_stop_ids=sorted(
-                        self._tram_stop_mapper.gtfs_stop_ids_by_node_id[node.id]
-                    ),
-                )
-            else:
-                response_node = ResponseGraphNode(
-                    id=node.id,
-                    lat=node.lat,
-                    lon=node.lon,
-                    neighbors=response_data_edge_by_source[node],
-                )
-
-            result.append(response_node)
-
-        return result
+        return [
+            self._get_response_node(node, neighbors)
+            for node, neighbors in response_data_edge_by_source.items()
+        ]
 
     @property
     def tram_routes_data(self) -> list[ResponseTramRoute]:
-        trip_stops_by_trip_id = self._tram_stop_mapper.trip_stops_by_trip_id
+        trip_stops_by_trip_id = self._tram_stop_mapper.get_trip_stops_by_trip_id(
+            self._custom_gtfs_package
+        )
+
+        gtfs_package = self._custom_gtfs_package or self._tram_stop_mapper.gtfs_package
 
         routes_by_route_id = {
             str(route_id): ResponseTramRoute(
@@ -137,13 +146,13 @@ class CityDataBuilder:
                 background_color=route_data["route_color"],
                 text_color=route_data["route_text_color"],
             )
-            for route_id, route_data in self._tram_stop_mapper.gtfs_package.routes.iterrows()
+            for route_id, route_data in gtfs_package.routes.iterrows()
         }
 
         for (
             trip_id,
             trip_data,
-        ) in self._tram_stop_mapper.gtfs_package.get_trips_for_weekday(self._weekday):
+        ) in gtfs_package.get_trips_for_weekday(self._weekday):
             if trip_id not in trip_stops_by_trip_id:
                 continue
 
