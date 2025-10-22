@@ -3,6 +3,7 @@ import logging
 import os
 from zipfile import BadZipFile, ZipFile
 
+import overpy
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query, UploadFile
 from fastapi.middleware.gzip import GZipMiddleware
@@ -62,6 +63,8 @@ def _get_city_data_by_weekday(
         )
     except TramStopMappingBuildError as exc:
         raise HTTPException(500, str(exc))
+    except overpy.exception.OverpassGatewayTimeout as exc:
+        raise HTTPException(500, f"Overpass gateway timeout: {str(exc)}")
     except Exception as exc:
         logger.exception(
             "Failed to build city data for city %s for weekday %s",
