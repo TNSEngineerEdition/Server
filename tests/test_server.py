@@ -480,6 +480,41 @@ class TestServer:
         )
         get_by_city_id_mock.assert_called_once_with("krakow")
 
+    @freeze_time("2025-01-01")
+    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
+    @patch("overpass_client.OverpassClient.get_relations_and_stops")
+    @patch("city_data_cache.CityDataCache.get")
+    def test_get_city_data_overpass_gateway_timeout_empty_cache(
+        self,
+        cache_get_mock: MagicMock,
+        get_relations_and_stops_mock: MagicMock,
+        get_by_city_id_mock: MagicMock,
+        krakow_city_configuration: CityConfiguration,
+    ) -> None:
+        # Arrange
+        cache_get_mock.return_value = None
+        get_relations_and_stops_mock.side_effect = (
+            overpy.exception.OverpassGatewayTimeout()
+        )
+        get_by_city_id_mock.return_value = krakow_city_configuration
+
+        # Act
+        response = self.client.get("/cities/krakow")
+
+        # Assert
+        assert response.status_code == 500
+        assert (
+            response.json()["detail"]
+            == "Overpass gateway timeout: Server load too high"
+        )
+
+        cache_get_mock.assert_called_once_with("krakow", datetime.date.today())
+        get_relations_and_stops_mock.assert_called_once_with(
+            "Kraków",
+            [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
+        )
+        get_by_city_id_mock.assert_called_once_with("krakow")
+
     @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
     @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
