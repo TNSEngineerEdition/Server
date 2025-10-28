@@ -15,6 +15,7 @@ class ResponseTramTrip(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     trip_head_sign: str
+    variant: str | None = Field(default=None)
     stops: list[ResponseTramTripStop]
 
 
@@ -28,6 +29,10 @@ class ResponseTramRoute(BaseModel):
     name: str
     background_color: str
     text_color: str
+    variants: dict[str, list[int]] = Field(
+        default_factory=dict,
+        json_schema_extra={"x-go-type": "map[string][]int64"},
+    )
     trips: list[ResponseTramTrip] = Field(default_factory=list)
 
     @field_validator("name", mode="before")

@@ -1,4 +1,5 @@
 import difflib
+import re
 import string
 from collections import defaultdict
 from functools import cached_property
@@ -7,7 +8,11 @@ from typing import Hashable, TYPE_CHECKING
 import overpy
 from pydantic import BaseModel
 
-from tram_stop_mapper.exceptions import TramStopMappingBuildError, TramStopNotFound
+from tram_stop_mapper.exceptions import (
+    InvalidRelationTag,
+    TramStopMappingBuildError,
+    TramStopNotFound,
+)
 from tram_stop_mapper.gtfs_package import GTFSPackage
 from tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
 
@@ -40,6 +45,8 @@ class TramStopMapper:
     properties. In order to efficiently use the mapping, the get_stop_nodes_by_gtfs_trip_id
     method is available.
     """
+
+    RELATION_NAME_REGEX = re.compile(r"^Tram [a-zA-Z0-9\(\) ]+: (.+)")
 
     def __init__(
         self,
@@ -485,3 +492,44 @@ class TramStopMapper:
             for trip_id, stop_times in gtfs_package.trip_stop_times_by_trip_id.items()
             if trip_id in stop_nodes_by_gtfs_trip_id
         }
+
+    def _get_route_variants_from_osm_data(
+        self, route_name: str
+    ) -> dict[str, list[int]]:
+        variants: dict[str, list[int]] = {}
+        invalid_relation_exceptions: list[InvalidRelationTag] = []
+
+        for relation in self._get_route_relations(route_name):
+            match_result = self.RELATION_NAME_REGEX.match(
+                str(relation.tags.get("name", ""))
+            )
+
+            if match_result is None:
+                invalid_relation_exceptions.append(
+                    InvalidRelationTag(
+                        relation=relation,
+                        tag_name="name",
+                        message=f"String '{relation.tags.get("name", "")}' doesn't match regular expression",
+                    )
+                )
+                continue
+
+            variant_name = match_result.group(1).replace("=>", "→").strip()
+
+            variants[variant_name] = [
+                node.id for node in self._stops_by_osm_relation[relation]
+            ]
+
+        if invalid_relation_exceptions:
+            raise ExceptionGroup("Invalid relations", invalid_relation_exceptions)
+
+        return variants
+
+    def get_variants_for_route(
+        self, route_name: str, gtfs_package: GTFSPackage
+    ) -> dict[str, list[int]]:
+        if gtfs_package == self._gtfs_package:
+            return self._get_route_variants_from_osm_data(route_name)
+
+        # TODO: Create variants from data if custom schedule is supplied
+        return {}
