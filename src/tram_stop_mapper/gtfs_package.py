@@ -223,7 +223,7 @@ class GTFSPackage(BaseModel):
 
     def get_route_names_and_ids(
         self, *, ignored_route_names: set[str]
-    ) -> Generator[tuple[str, pd.Series], None, None]:
+    ) -> Generator[tuple[str, str], None, None]:
         for gtfs_route_id, gtfs_route_row in self.routes.iterrows():
             route_name = str(gtfs_route_row["route_short_name"])
             if route_name in ignored_route_names:

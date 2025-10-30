@@ -16,7 +16,7 @@ from tram_stop_mapper.exceptions import (
 from tram_stop_mapper.gtfs_package import GTFSPackage
 from tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from city_data_builder import CityConfiguration
 
 
@@ -528,7 +528,7 @@ class TramStopMapper:
     def get_variants_for_route(
         self, route_name: str, gtfs_package: GTFSPackage
     ) -> dict[str, list[int]]:
-        if gtfs_package == self._gtfs_package:
+        if gtfs_package is self._gtfs_package:
             return self._get_route_variants_from_osm_data(route_name)
 
         # TODO: Create variants from data if custom schedule is supplied

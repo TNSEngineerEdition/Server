@@ -255,3 +255,30 @@ class TestGTFSPackage:
             for trip_stops in trip_stop_times_by_trip_id.values()
             for i in range(len(trip_stops) - 1)
         )
+
+    @pytest.mark.parametrize(
+        ("ignored_route_names", "route_count"),
+        [(set(), 26), ({"13"}, 25), ({"1", "194"}, 25)],
+    )
+    def test_get_route_names_and_ids(
+        self, ignored_route_names: set[str], route_count: int
+    ) -> None:
+        # Arrange
+        gtfs_package = GTFSPackage.from_file(self.GTFS_FILE_PATH)
+
+        # Act
+        route_names_and_ids = gtfs_package.get_route_names_and_ids(
+            ignored_route_names=ignored_route_names
+        )
+
+        # Assert
+        assert isinstance(route_names_and_ids, Generator)
+
+        routes = list(route_names_and_ids)
+        assert len(routes) == route_count
+
+        for route_name, route_id in routes:
+            assert route_name not in ignored_route_names
+
+            route_row = gtfs_package.routes.loc[route_id]
+            assert str(route_row["route_short_name"]) == route_name
