@@ -1,6 +1,6 @@
 import math
 from itertools import chain
-from typing import Any, TYPE_CHECKING
+from typing import cast, TYPE_CHECKING
 
 import networkx as nx
 import overpy
@@ -175,7 +175,7 @@ class TramTrackGraphTransformer:
 
     def _find_path_between_permanent_nodes(
         self, permanent_node: Node, successor: Node
-    ) -> tuple[list[Node], Any]:
+    ) -> tuple[list[Node], float | None]:
         """
         Finds the first different permanent node reachable from provided
         `permanent_node` via provided `successor` without backtracking.
@@ -203,7 +203,7 @@ class TramTrackGraphTransformer:
         path_coordinates.append(current_node)
 
         edge_attributes = self._tram_track_graph[permanent_node][path_coordinates[1]]
-        max_speed: float | None = edge_attributes.get("max_speed")
+        max_speed = cast(float | None, edge_attributes.get("max_speed"))
 
         return path_coordinates, max_speed
 
@@ -247,7 +247,7 @@ class TramTrackGraphTransformer:
         graph: "nx.DiGraph[Node]",
         source_node: Node,
         dest_node: Node,
-        max_speed: Any,
+        max_speed: float | None,
     ) -> None:
         azimuth, _, distance = cls._geod.inv(
             source_node.lon,
@@ -270,7 +270,7 @@ class TramTrackGraphTransformer:
         nodes_by_coordinates: dict[tuple[float, float], Node],
         first_node: Node,
         last_node: Node,
-        max_speed: float,
+        max_speed: float | None,
     ) -> None:
         previous_graph_node = first_node
 
@@ -291,9 +291,9 @@ class TramTrackGraphTransformer:
             )
             previous_graph_node = new_node
 
-        lat, lon = interpolated_node_coordinates[-1]
-        if (lat, lon) in nodes_by_coordinates:
-            last_node = nodes_by_coordinates[(lat, lon)]
+        last_node = nodes_by_coordinates.get(
+            interpolated_node_coordinates[-1], last_node
+        )
 
         self._add_geodetic_edge(
             densified_graph, previous_graph_node, last_node, max_speed
