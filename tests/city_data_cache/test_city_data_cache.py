@@ -42,6 +42,26 @@ class TestCityDataCache:
         assert loaded_data == krakow_response_city_data
 
     @pytest.mark.parametrize(
+        ("city_id", "date"),
+        [
+            pytest.param("some_city", datetime.date(2025, 9, 1), id="city_not_found"),
+            pytest.param("krakow", datetime.date(2025, 9, 30), id="date_not_found"),
+            pytest.param("some_city", datetime.date(2025, 9, 30), id="both_not_found"),
+        ],
+    )
+    def test_get_data_not_found(
+        self, city_cache_directory: Path, city_id: str, date: datetime.date
+    ) -> None:
+        # Arrange
+        cache = CityDataCache(city_cache_directory)
+
+        # Act
+        loaded_data = cache.get(city_id=city_id, date=date)
+
+        # Assert
+        assert loaded_data is None
+
+    @pytest.mark.parametrize(
         ("city_id", "expected_file_count"),
         [
             pytest.param("krakow", 6, id="krakow"),
