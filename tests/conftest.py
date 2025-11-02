@@ -1,10 +1,9 @@
 import io
 import json
 import pickle
-import tempfile
 import zipfile
 from pathlib import Path
-from typing import Any, cast, Generator, IO
+from typing import cast, Generator, IO
 
 import networkx as nx
 import overpy
@@ -141,22 +140,3 @@ def krakow_response_city_data() -> ResponseCityData:
     with zipfile.ZipFile("tests/assets/krakow_response_city_data.zip") as zip_file:
         with zip_file.open("krakow_response_city_data.json") as file:
             return ResponseCityData.model_validate_json(file.read())
-
-
-@pytest.fixture
-def city_cache_dir(
-    krakow_response_city_data: ResponseCityData,
-) -> Generator[Path, Any, None]:
-    response_city_data_str = krakow_response_city_data.model_dump_json()
-    dates = ["2025-09-01", "2025-09-02", "2025-09-03", "2025-09-04", "2025-09-05"]
-
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        directory_path = Path(tmp_dir)
-
-        with zipfile.ZipFile(
-            directory_path / "krakow.zip", "w", zipfile.ZIP_DEFLATED
-        ) as zip_file:
-            for date in dates:
-                zip_file.writestr(date, response_city_data_str)
-
-        yield directory_path
