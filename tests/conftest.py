@@ -26,6 +26,8 @@ def custom_gtfs_package() -> GTFSPackage:
     gtfs_package.routes = gtfs_package.routes[
         gtfs_package.routes["route_short_name"] != 52
     ]
+    gtfs_package.routes["route_color"] = ""
+    gtfs_package.routes["route_text_color"] = ""
 
     removed_trips = gtfs_package.trips[gtfs_package.trips["route_id"] == "route_70"]
     gtfs_package.trips = gtfs_package.trips[
