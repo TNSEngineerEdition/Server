@@ -55,13 +55,13 @@ class TestCityDataBuilder:
             "expected_stop_count",
         ),
         [
-            pytest.param(Weekday.MONDAY, 23, 4440, 115299, id=Weekday.MONDAY),
-            pytest.param(Weekday.TUESDAY, 23, 4440, 115299, id=Weekday.TUESDAY),
-            pytest.param(Weekday.WEDNESDAY, 23, 4440, 115299, id=Weekday.WEDNESDAY),
-            pytest.param(Weekday.THURSDAY, 23, 4440, 115299, id=Weekday.THURSDAY),
-            pytest.param(Weekday.FRIDAY, 26, 4532, 117637, id=Weekday.FRIDAY),
-            pytest.param(Weekday.SATURDAY, 23, 2666, 70424, id=Weekday.SATURDAY),
-            pytest.param(Weekday.SUNDAY, 23, 2400, 63013, id=Weekday.SUNDAY),
+            pytest.param(Weekday.MONDAY, 23, 4407, 115266, id=Weekday.MONDAY),
+            pytest.param(Weekday.TUESDAY, 23, 4407, 115266, id=Weekday.TUESDAY),
+            pytest.param(Weekday.WEDNESDAY, 23, 4407, 115266, id=Weekday.WEDNESDAY),
+            pytest.param(Weekday.THURSDAY, 23, 4407, 115266, id=Weekday.THURSDAY),
+            pytest.param(Weekday.FRIDAY, 26, 4497, 117602, id=Weekday.FRIDAY),
+            pytest.param(Weekday.SATURDAY, 23, 2641, 70399, id=Weekday.SATURDAY),
+            pytest.param(Weekday.SUNDAY, 23, 2375, 62988, id=Weekday.SUNDAY),
         ],
     )
     @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
@@ -124,13 +124,13 @@ class TestCityDataBuilder:
             "expected_stop_count",
         ),
         [
-            pytest.param(Weekday.MONDAY, 22, 4144, 105853, id=Weekday.MONDAY),
-            pytest.param(Weekday.TUESDAY, 22, 4144, 105853, id=Weekday.TUESDAY),
-            pytest.param(Weekday.WEDNESDAY, 22, 4144, 105853, id=Weekday.WEDNESDAY),
-            pytest.param(Weekday.THURSDAY, 22, 4144, 105853, id=Weekday.THURSDAY),
-            pytest.param(Weekday.FRIDAY, 25, 4232, 108146, id=Weekday.FRIDAY),
-            pytest.param(Weekday.SATURDAY, 22, 2453, 63712, id=Weekday.SATURDAY),
-            pytest.param(Weekday.SUNDAY, 22, 2223, 57561, id=Weekday.SUNDAY),
+            pytest.param(Weekday.MONDAY, 22, 4111, 105820, id=Weekday.MONDAY),
+            pytest.param(Weekday.TUESDAY, 22, 4111, 105820, id=Weekday.TUESDAY),
+            pytest.param(Weekday.WEDNESDAY, 22, 4111, 105820, id=Weekday.WEDNESDAY),
+            pytest.param(Weekday.THURSDAY, 22, 4111, 105820, id=Weekday.THURSDAY),
+            pytest.param(Weekday.FRIDAY, 25, 4197, 108111, id=Weekday.FRIDAY),
+            pytest.param(Weekday.SATURDAY, 22, 2428, 63687, id=Weekday.SATURDAY),
+            pytest.param(Weekday.SUNDAY, 22, 2198, 57536, id=Weekday.SUNDAY),
         ],
     )
     @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
