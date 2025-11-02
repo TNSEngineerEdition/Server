@@ -41,22 +41,32 @@ class TestCityDataCache:
         assert isinstance(loaded_data, ResponseCityData)
         assert loaded_data == krakow_response_city_data
 
+    @pytest.mark.parametrize(
+        ("city_id", "expected_file_count"),
+        [
+            pytest.param("krakow", 6, id="krakow"),
+            pytest.param("some_city", 1, id="unknown_city"),
+        ],
+    )
     def test_store_data(
-        self, city_cache_directory: Path, krakow_response_city_data: ResponseCityData
+        self,
+        city_cache_directory: Path,
+        krakow_response_city_data: ResponseCityData,
+        city_id: str,
+        expected_file_count: int,
     ) -> None:
         # Arrange
         cache = CityDataCache(cache_directory=city_cache_directory)
-        krakow_zip = city_cache_directory / "krakow.zip"
 
         # Act
-        cache.store("krakow", datetime.date(2025, 9, 19), krakow_response_city_data)
+        cache.store(city_id, datetime.date(2025, 9, 19), krakow_response_city_data)
 
-        with ZipFile(krakow_zip) as zip_file:
+        with ZipFile(city_cache_directory / f"{city_id}.zip") as zip_file:
             dates = zip_file.namelist()
 
         # Assert
         assert "2025-09-19" in dates
-        assert len(dates) == 6
+        assert len(dates) == expected_file_count
 
     @pytest.mark.parametrize(
         ("city_id", "expected_dates"),
