@@ -23,7 +23,7 @@ jobs:
         pip install -e .[dev]
 
     - name: Run tests
-      run: pytest -vv tests
+      run: pytest -vv --cov --cov-fail-under=100 tests
       working-directory: ${{github.workspace}}
       env:
         PYTHONPATH: ${{github.workspace}}
