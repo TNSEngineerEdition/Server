@@ -5,7 +5,7 @@ from zipfile import ZipFile
 import overpy
 import pytest
 
-from city_data_builder import CityConfiguration
+from city_data_builder import CityConfiguration, CustomTramStopPairMapping
 from tram_stop_mapper.exceptions import TramStopMappingBuildError
 from tram_stop_mapper.gtfs_package import GTFSPackage
 from tram_stop_mapper.tram_stop_mapper import TramStopMapper
@@ -33,6 +33,41 @@ class TestTramStopMapper:
                 last_mapping: dict[str, list[int]] = json.load(file)
 
         return single_mapping, first_mapping, last_mapping
+
+    def test_tram_stop_mapper_with_ignored_lines(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        gtfs_package: GTFSPackage,
+        relations_and_stops_overpass_query_result: overpy.Result,
+        tram_stop_mapping: tuple[
+            dict[str, int], dict[str, list[int]], dict[str, list[int]]
+        ],
+    ) -> None:
+        # Arrange
+        krakow_city_configuration.ignored_gtfs_lines.append("17")
+
+        del relations_and_stops_overpass_query_result._relations[172973]
+        del relations_and_stops_overpass_query_result._relations[3147263]
+
+        # Act
+        tram_stop_mapper = TramStopMapper(
+            krakow_city_configuration,
+            gtfs_package,
+            relations_and_stops_overpass_query_result,
+        )
+
+        # Assert
+        assert (
+            tram_stop_mapper.gtfs_stop_id_to_osm_node_id_mapping == tram_stop_mapping[0]
+        )
+
+        assert (
+            tram_stop_mapper.first_gtfs_stop_id_to_osm_node_ids == tram_stop_mapping[1]
+        )
+
+        assert (
+            tram_stop_mapper.last_gtfs_stop_id_to_osm_node_ids == tram_stop_mapping[2]
+        )
 
     def test_tram_stop_mapper(
         self,
@@ -285,6 +320,98 @@ class TestTramStopMapper:
 
         unique_trips_from_gtfs = self._get_unique_trips_from_stop_nodes(
             gtfs_package.stop_id_sequence_by_trip_id.values()
+        )
+
+        tram_stop_mapper = TramStopMapper(
+            krakow_city_configuration,
+            gtfs_package,
+            relations_and_stops_overpass_query_result,
+        )
+
+        # Act
+        stop_nodes_by_gtfs_trip_id = tram_stop_mapper.stop_nodes_by_gtfs_trip_id
+        unique_trips = self._get_unique_trips_from_stop_nodes(
+            stop_nodes_by_gtfs_trip_id.values()
+        )
+
+        # Assert
+        assert set(stop_nodes_by_gtfs_trip_id.keys()) == set(gtfs_package.trips.index)
+
+        # Since GTFS stop_id may map to multiple OSM node_ids, the count of
+        # generated unique trips cannot be less than what's in the GTFS dataset
+        assert len(unique_trips) >= len(unique_trips_from_gtfs)
+
+        for gtfs_trip_id, expected_stop_count in expected_trip_stop_count.items():
+            assert len(stop_nodes_by_gtfs_trip_id[gtfs_trip_id]) == expected_stop_count
+
+    @pytest.mark.parametrize(
+        ("gtfs_stop_id", "custom_stop_mapping"),
+        [
+            pytest.param("stop_274_46619", (2163355821, None, None), id="first"),
+            pytest.param("stop_274_46619", (None, None, 2163355821), id="last"),
+        ],
+    )
+    def test_stop_nodes_by_gtfs_trip_id_stop_only_in_terminus_mapping(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        gtfs_package: GTFSPackage,
+        relations_and_stops_overpass_query_result: overpy.Result,
+        gtfs_stop_id: str,
+        custom_stop_mapping: tuple[int | None, int | None, int | None],
+    ) -> None:
+        # Arrange
+        krakow_city_configuration.custom_stop_mapping[gtfs_stop_id] = (
+            custom_stop_mapping
+        )
+
+        expected_trip_stop_count = gtfs_package.stop_times.value_counts("trip_id")
+
+        unique_trips_from_gtfs = self._get_unique_trips_from_stop_nodes(
+            gtfs_package.stop_id_sequence_by_trip_id.values()
+        )
+
+        tram_stop_mapper = TramStopMapper(
+            krakow_city_configuration,
+            gtfs_package,
+            relations_and_stops_overpass_query_result,
+        )
+
+        # Act
+        stop_nodes_by_gtfs_trip_id = tram_stop_mapper.stop_nodes_by_gtfs_trip_id
+        unique_trips = self._get_unique_trips_from_stop_nodes(
+            stop_nodes_by_gtfs_trip_id.values()
+        )
+
+        # Assert
+        assert set(stop_nodes_by_gtfs_trip_id.keys()) == set(gtfs_package.trips.index)
+
+        # Since GTFS stop_id may map to multiple OSM node_ids, the count of
+        # generated unique trips cannot be less than what's in the GTFS dataset
+        assert len(unique_trips) >= len(unique_trips_from_gtfs)
+
+        for gtfs_trip_id, expected_stop_count in expected_trip_stop_count.items():
+            assert len(stop_nodes_by_gtfs_trip_id[gtfs_trip_id]) == expected_stop_count
+
+    def test_stop_nodes_by_gtfs_trip_id_custom_stop_pair_mapping(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        gtfs_package: GTFSPackage,
+        relations_and_stops_overpass_query_result: overpy.Result,
+    ) -> None:
+        # Arrange
+        expected_trip_stop_count = gtfs_package.stop_times.value_counts("trip_id")
+
+        unique_trips_from_gtfs = self._get_unique_trips_from_stop_nodes(
+            gtfs_package.stop_id_sequence_by_trip_id.values()
+        )
+
+        krakow_city_configuration.custom_stop_pair_mapping.append(
+            CustomTramStopPairMapping(
+                source_gtfs_stop_id="stop_331_254819",
+                source_osm_node_id=10757365408,
+                destination_gtfs_stop_id="stop_259_44919",
+                destination_osm_node_id=2194801607,
+            )
         )
 
         tram_stop_mapper = TramStopMapper(
