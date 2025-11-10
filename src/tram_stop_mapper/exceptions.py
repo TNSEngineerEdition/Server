@@ -1,3 +1,5 @@
+import overpy
+
 from tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
 
 
@@ -44,3 +46,19 @@ class InvalidGTFSPackage(ValueError):
 
     def __str__(self) -> str:
         return f"Invalid GTFS data: {self.message}"
+
+
+class InvalidRelationTag(ValueError):
+    """
+    Provided tag of the provided relation is invalid.
+    """
+
+    def __init__(self, relation: overpy.Relation, *, tag_name: str, message: str):
+        super().__init__(relation, tag_name, message)
+
+        self.relation = relation
+        self.tag_name = tag_name
+        self.message = message
+
+    def __str__(self) -> str:
+        return f"Relation {self.relation.id} has invalid tag {self.tag_name}: {self.message}"

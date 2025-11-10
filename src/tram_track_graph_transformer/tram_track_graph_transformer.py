@@ -11,7 +11,7 @@ from tram_track_graph_transformer.exceptions import TrackDirectionChangeError
 from tram_track_graph_transformer.node import Node
 from tram_track_graph_transformer.node_type import NodeType
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from city_data_builder import CityConfiguration
 
 

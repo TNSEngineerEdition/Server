@@ -165,12 +165,18 @@ class TestServer:
             assert isinstance(text_color, str)
             assert len(text_color) == 6
 
+            variants = tram_route["variants"]
+            assert isinstance(variants, dict)
+
             trips = tram_route["trips"]
             assert isinstance(trips, list)
             for trip in trips:
                 trip_head_sign = trip["trip_head_sign"]
                 assert trip_head_sign
                 assert isinstance(trip_head_sign, str)
+
+                variant = trip["variant"]
+                assert variant is None or variant in variants
 
                 stops = trip["stops"]
                 assert stops

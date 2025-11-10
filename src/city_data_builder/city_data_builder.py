@@ -11,7 +11,7 @@ from city_data_builder.model import (
     ResponseTramTripStop,
 )
 from overpass_client import OverpassClient
-from tram_stop_mapper import GTFSPackage, TramStopMapper, Weekday
+from tram_stop_mapper import GTFSPackage, StopIDAndTime, TramStopMapper, Weekday
 from tram_track_graph_transformer import (
     Node,
     NodeType,
@@ -36,6 +36,10 @@ class CityDataBuilder:
 
         self._tram_stop_mapper = self._get_tram_stop_mapper()
         self._tram_track_graph = self._get_tram_track_graph()
+
+    @property
+    def _gtfs_package(self) -> GTFSPackage:
+        return self._custom_gtfs_package or self._tram_stop_mapper.gtfs_package
 
     def _get_tram_stop_mapper(self) -> TramStopMapper:
         custom_node_ids: list[int] = []
@@ -132,24 +136,14 @@ class CityDataBuilder:
             for node, neighbors in response_data_edge_by_source.items()
         ]
 
-    @property
-    def tram_routes_data(self) -> list[ResponseTramRoute]:
-        trip_stops_by_trip_id = self._tram_stop_mapper.get_trip_stops_by_trip_id(
-            self._custom_gtfs_package
-        )
-
-        gtfs_package = self._custom_gtfs_package or self._tram_stop_mapper.gtfs_package
-
-        routes_by_route_id = {
-            str(route_id): ResponseTramRoute(
-                name=route_data["route_long_name"],
-                background_color=route_data["route_color"],
-                text_color=route_data["route_text_color"],
-            )
-            for route_id, route_data in gtfs_package.routes.iterrows()
-        }
-
-        for trip_id, trip_data in gtfs_package.get_trips_for_weekday(self._weekday):
+    def _add_trips_to_routes(
+        self,
+        trip_stops_by_trip_id: dict[str, list[StopIDAndTime]],
+        routes_by_route_id: dict[str, ResponseTramRoute],
+    ) -> None:
+        for trip_id, trip_data in self._gtfs_package.get_trips_for_weekday(
+            self._weekday
+        ):
             trip_stops = [
                 ResponseTramTripStop(id=stop.stop_id, time=stop.time)
                 for stop in trip_stops_by_trip_id.get(trip_id, [])
@@ -157,10 +151,45 @@ class CityDataBuilder:
             if len(trip_stops) <= 1:
                 continue
 
-            routes_by_route_id[trip_data["route_id"]].trips.append(
+            route = routes_by_route_id[str(trip_data["route_id"])]
+
+            trip_stop_ids = [stop.stop_id for stop in trip_stops_by_trip_id[trip_id]]
+            variant = next(
+                (
+                    name
+                    for name, stops in route.variants.items()
+                    if stops == trip_stop_ids
+                ),
+                None,
+            )
+
+            route.trips.append(
                 ResponseTramTrip(
-                    trip_head_sign=trip_data["trip_headsign"], stops=trip_stops
+                    trip_head_sign=trip_data["trip_headsign"],
+                    variant=variant,
+                    stops=trip_stops,
                 )
             )
+
+    @property
+    def tram_routes_data(self) -> list[ResponseTramRoute]:
+        trip_stops_by_trip_id = self._tram_stop_mapper.get_trip_stops_by_trip_id(
+            self._custom_gtfs_package
+        )
+
+        routes_by_route_id: dict[str, ResponseTramRoute] = {}
+        for route_id, route_data in self._gtfs_package.routes.iterrows():
+            route_name = str(route_data["route_short_name"])
+
+            routes_by_route_id[str(route_id)] = ResponseTramRoute(
+                name=route_name,
+                background_color=route_data["route_color"],
+                text_color=route_data["route_text_color"],
+                variants=self._tram_stop_mapper.get_variants_for_route(
+                    route_name, self._gtfs_package
+                ),
+            )
+
+        self._add_trips_to_routes(trip_stops_by_trip_id, routes_by_route_id)
 
         return list(filter(lambda x: x.trips, routes_by_route_id.values()))

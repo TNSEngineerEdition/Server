@@ -142,3 +142,10 @@ def krakow_response_city_data() -> ResponseCityData:
     with zipfile.ZipFile("tests/assets/krakow_response_city_data.zip") as zip_file:
         with zip_file.open("krakow_response_city_data.json") as file:
             return ResponseCityData.model_validate_json(file.read())
+
+
+@pytest.fixture
+def expected_route_variants() -> dict[str, dict[str, list[int]]]:
+    with zipfile.ZipFile("tests/assets/expected_route_variants.zip") as zip_file:
+        with zip_file.open("expected_route_variants.json") as file:
+            return cast(dict[str, dict[str, list[int]]], json.load(file))

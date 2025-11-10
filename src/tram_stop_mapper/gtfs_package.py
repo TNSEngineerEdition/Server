@@ -221,6 +221,16 @@ class GTFSPackage(BaseModel):
             if weekday in self.weekdays_by_service_id[trip_data["service_id"]]
         )
 
+    def get_route_names_and_ids(
+        self, *, ignored_route_names: set[str]
+    ) -> Generator[tuple[str, str], None, None]:
+        for gtfs_route_id, gtfs_route_row in self.routes.iterrows():
+            route_name = str(gtfs_route_row["route_short_name"])
+            if route_name in ignored_route_names:
+                continue
+
+            yield route_name, str(gtfs_route_id)
+
     def to_zip_file(self, file: IO[bytes]) -> None:
         with ZipFile(file, "w", compression=ZIP_DEFLATED) as zip_file:
             with zip_file.open("stops.txt", "w") as file:
