@@ -1,4 +1,5 @@
 import difflib
+import re
 import string
 from collections import defaultdict
 from functools import cached_property
@@ -7,11 +8,15 @@ from typing import Hashable, TYPE_CHECKING
 import overpy
 from pydantic import BaseModel
 
-from tram_stop_mapper.exceptions import TramStopMappingBuildError, TramStopNotFound
+from tram_stop_mapper.exceptions import (
+    InvalidRelationTag,
+    TramStopMappingBuildError,
+    TramStopNotFound,
+)
 from tram_stop_mapper.gtfs_package import GTFSPackage
 from tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: no cover
     from city_data_builder import CityConfiguration
 
 
@@ -40,6 +45,8 @@ class TramStopMapper:
     properties. In order to efficiently use the mapping, the get_stop_nodes_by_gtfs_trip_id
     method is available.
     """
+
+    RELATION_NAME_REGEX = re.compile(r"^Tram [a-zA-Z0-9\(\) ]+: (.+)")
 
     def __init__(
         self,
@@ -151,8 +158,8 @@ class TramStopMapper:
         current_result: overpy.Relation,
     ) -> bool:
         """
-        Let's imagine a line which has two variants: A -> B and A -> B -> C.
-        This occurs for example on line 50, which may terminate at Kurdwanów P+R (B)
+        Let's imagine a route which has two variants: A -> B and A -> B -> C.
+        This occurs for example on route 50, which may terminate at Kurdwanów P+R (B)
         or at Borek Fałęcki (C). Both of these variants are represented by their own
         OSM relation.
 
@@ -183,12 +190,12 @@ class TramStopMapper:
 
     def _find_longest_matching_relation(
         self,
-        line_relations: list[overpy.Relation],
+        route_relations: list[overpy.Relation],
         gtfs_trip_stop_names: list[str],
     ) -> tuple[difflib.Match, overpy.Relation]:
-        longest_match, longest_relation = difflib.Match(0, 0, 0), line_relations[0]
+        longest_match, longest_relation = difflib.Match(0, 0, 0), route_relations[0]
 
-        for relation in line_relations:
+        for relation in route_relations:
             sequence_matcher = difflib.SequenceMatcher(
                 None,
                 gtfs_trip_stop_names,
@@ -210,7 +217,7 @@ class TramStopMapper:
         return longest_match, longest_relation
 
     def _add_trip_to_mapping(
-        self, gtfs_trip_id: str, line_relations: list[overpy.Relation]
+        self, gtfs_trip_id: str, route_relations: list[overpy.Relation]
     ) -> tuple[int, overpy.Relation]:
         gtfs_trip_stop_ids = self._gtfs_package.stop_id_sequence_by_trip_id[
             gtfs_trip_id
@@ -221,7 +228,7 @@ class TramStopMapper:
         )
 
         longest_match, longest_relation = self._find_longest_matching_relation(
-            line_relations, gtfs_trip_stop_names
+            route_relations, gtfs_trip_stop_names
         )
 
         matched_gtfs_trip_stops = gtfs_trip_stop_data.iloc[
@@ -254,32 +261,35 @@ class TramStopMapper:
 
         return longest_match.size, longest_relation
 
+    def _get_route_relations(self, route_name: str) -> list[overpy.Relation]:
+        return [
+            item
+            for item in self._stops_by_osm_relation
+            if item.tags.get("ref") == route_name
+        ]
+
     def _update_relations_for_route(
         self,
-        route_number: str,
+        route_name: str,
         gtfs_route_id: Hashable,
     ) -> None:
         gtfs_trips_for_route = self._gtfs_package.trips[
             self._gtfs_package.trips["route_id"] == gtfs_route_id
         ]
 
-        line_relations = [
-            item
-            for item in self._stops_by_osm_relation
-            if item.tags.get("ref") == route_number
-        ]
+        route_relations = self._get_route_relations(route_name)
 
-        if len(gtfs_trips_for_route) and not line_relations:
-            self._mapping_errors.missing_relations_for_lines.add(route_number)
+        if len(gtfs_trips_for_route) and not route_relations:
+            self._mapping_errors.missing_relations_for_lines.add(route_name)
 
-        has_data_to_process = bool(len(gtfs_trips_for_route) and line_relations)
+        has_data_to_process = bool(len(gtfs_trips_for_route) and route_relations)
         if not has_data_to_process:
             return
 
         for gtfs_trip_id in gtfs_trips_for_route.index:
             longest_match_size, longest_relation = self._add_trip_to_mapping(
                 str(gtfs_trip_id),
-                line_relations,
+                route_relations,
             )
 
             self._longest_match_size_by_osm_relation[longest_relation] = max(
@@ -290,12 +300,12 @@ class TramStopMapper:
             self._longest_osm_relation_by_trip_id[gtfs_trip_id] = longest_relation
 
     def _build_tram_stop_mapping(self) -> None:
-        for gtfs_route_id, gtfs_route_row in self._gtfs_package.routes.iterrows():
-            route_number = str(gtfs_route_row["route_long_name"])
-            if route_number in self._city_configuration.ignored_gtfs_lines:
-                continue
+        route_names_and_ids = self._gtfs_package.get_route_names_and_ids(
+            ignored_route_names=set(self._city_configuration.ignored_gtfs_lines)
+        )
 
-            self._update_relations_for_route(route_number, gtfs_route_id)
+        for gtfs_route_name, gtfs_route_id in route_names_and_ids:
+            self._update_relations_for_route(gtfs_route_name, gtfs_route_id)
 
         for gtfs_stop_id, osm_node_ids in self._stop_mapping.items():
             match len(osm_node_ids):
@@ -482,3 +492,44 @@ class TramStopMapper:
             for trip_id, stop_times in gtfs_package.trip_stop_times_by_trip_id.items()
             if trip_id in stop_nodes_by_gtfs_trip_id
         }
+
+    def _get_route_variants_from_osm_data(
+        self, route_name: str
+    ) -> dict[str, list[int]]:
+        variants: dict[str, list[int]] = {}
+        invalid_relation_exceptions: list[InvalidRelationTag] = []
+
+        for relation in self._get_route_relations(route_name):
+            match_result = self.RELATION_NAME_REGEX.match(
+                str(relation.tags.get("name", ""))
+            )
+
+            if match_result is None:
+                invalid_relation_exceptions.append(
+                    InvalidRelationTag(
+                        relation=relation,
+                        tag_name="name",
+                        message=f"String '{relation.tags.get("name", "")}' doesn't match regular expression",
+                    )
+                )
+                continue
+
+            variant_name = match_result.group(1).replace("=>", "→").strip()
+
+            variants[variant_name] = [
+                node.id for node in self._stops_by_osm_relation[relation]
+            ]
+
+        if invalid_relation_exceptions:
+            raise ExceptionGroup("Invalid relations", invalid_relation_exceptions)
+
+        return variants
+
+    def get_variants_for_route(
+        self, route_name: str, gtfs_package: GTFSPackage
+    ) -> dict[str, list[int]]:
+        if gtfs_package is self._gtfs_package:
+            return self._get_route_variants_from_osm_data(route_name)
+
+        # TODO: Create variants from data if custom schedule is supplied
+        return {}

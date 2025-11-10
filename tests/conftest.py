@@ -152,3 +152,10 @@ def city_cache_dir() -> Generator[Path, Any, None]:
             zip_file.extractall(directory_path)
 
         yield directory_path / "cached_data"
+
+
+@pytest.fixture
+def expected_route_variants() -> dict[str, dict[str, list[int]]]:
+    with zipfile.ZipFile("tests/assets/expected_route_variants.zip") as zip_file:
+        with zip_file.open("expected_route_variants.json") as file:
+            return cast(dict[str, dict[str, list[int]]], json.load(file))

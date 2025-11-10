@@ -6,7 +6,7 @@ import overpy
 import pytest
 
 from city_data_builder import CityConfiguration
-from tram_stop_mapper.exceptions import TramStopMappingBuildError
+from tram_stop_mapper.exceptions import InvalidRelationTag, TramStopMappingBuildError
 from tram_stop_mapper.gtfs_package import GTFSPackage
 from tram_stop_mapper.tram_stop_mapper import TramStopMapper
 
@@ -374,4 +374,81 @@ class TestTramStopMapper:
         assert all(
             len(trip_stops_data[trip_id]) == expected_stop_count
             for trip_id, expected_stop_count in expected_trip_stop_count.items()
+        )
+
+    def test_get_variants_from_route(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        gtfs_package: GTFSPackage,
+        relations_and_stops_overpass_query_result: overpy.Result,
+        expected_route_variants: dict[str, dict[str, list[int]]],
+    ) -> None:
+        # Arrange
+        tram_stop_mapper = TramStopMapper(
+            krakow_city_configuration,
+            gtfs_package,
+            relations_and_stops_overpass_query_result,
+        )
+
+        # Act
+        variants_by_route = {
+            item: tram_stop_mapper.get_variants_for_route(item, gtfs_package)
+            for item in map(str, gtfs_package.routes["route_short_name"])
+        }
+
+        # Assert
+        assert variants_by_route == expected_route_variants
+
+    def test_get_variants_from_route_with_custom_gtfs_package(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        gtfs_package: GTFSPackage,
+        custom_gtfs_package: GTFSPackage,
+        relations_and_stops_overpass_query_result: overpy.Result,
+    ) -> None:
+        # Arrange
+        tram_stop_mapper = TramStopMapper(
+            krakow_city_configuration,
+            gtfs_package,
+            relations_and_stops_overpass_query_result,
+        )
+
+        expected_routes = list(map(str, custom_gtfs_package.routes["route_short_name"]))
+
+        # Act
+        variants_by_route = {
+            item: tram_stop_mapper.get_variants_for_route(item, custom_gtfs_package)
+            for item in map(str, custom_gtfs_package.routes["route_short_name"])
+        }
+
+        # Assert
+        assert list(variants_by_route.keys()) == expected_routes
+        assert sum(map(len, variants_by_route.values())) == 0
+
+    def test_get_variants_from_route_invalid_relation_tag(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        gtfs_package: GTFSPackage,
+        relations_and_stops_overpass_query_result: overpy.Result,
+    ) -> None:
+        # Arrange
+        relation = relations_and_stops_overpass_query_result.get_relation(172969)
+        relation.tags["name"] = "Incorrect tram name"
+
+        tram_stop_mapper = TramStopMapper(
+            krakow_city_configuration,
+            gtfs_package,
+            relations_and_stops_overpass_query_result,
+        )
+
+        # Act
+        with pytest.raises(ExceptionGroup) as exc_info:
+            tram_stop_mapper.get_variants_for_route("3", gtfs_package)
+
+        # Assert
+        assert len(exc_info.value.exceptions) == 1
+        assert isinstance(exc_info.value.exceptions[0], InvalidRelationTag)
+        assert str(exc_info.value.exceptions[0]) == (
+            "Relation 172969 has invalid tag name: "
+            "String 'Incorrect tram name' doesn't match regular expression"
         )
