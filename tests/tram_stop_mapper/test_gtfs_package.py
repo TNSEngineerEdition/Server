@@ -39,6 +39,8 @@ class TestGTFSPackage:
                 gtfs_package.calendar.drop(
                     columns=[GTFSPackage.CALENDAR_COLUMNS[-1]], inplace=True
                 )
+            case _:  # pragma: no cover
+                pytest.fail(f"Unknown file name: {invalid_file_name}")
 
         with io.BytesIO() as file:
             gtfs_package.to_zip_file(file)
