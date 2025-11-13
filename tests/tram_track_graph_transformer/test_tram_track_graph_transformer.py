@@ -68,9 +68,6 @@ class TestTramTrackGraphTransformer:
             prev_node = next_node
             next_node = list(graph.successors(prev_node))[0]
 
-        if not distances:
-            return
-
         mean = sum(distances) / len(distances)
         sigma = sqrt(sum((x - mean) ** 2 for x in distances) / len(distances))
         assert sigma < mean * m

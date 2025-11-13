@@ -144,8 +144,11 @@ class CityDataBuilder:
         for trip_id, trip_data in self._gtfs_package.get_trips_for_weekday(
             self._weekday
         ):
-            if trip_id not in trip_stops_by_trip_id:
-                # This happens when we ignore a route in the city configuration
+            trip_stops = [
+                ResponseTramTripStop(id=stop.stop_id, time=stop.time)
+                for stop in trip_stops_by_trip_id.get(trip_id, [])
+            ]
+            if len(trip_stops) <= 1:
                 continue
 
             route = routes_by_route_id[str(trip_data["route_id"])]
@@ -164,10 +167,7 @@ class CityDataBuilder:
                 ResponseTramTrip(
                     trip_head_sign=trip_data["trip_headsign"],
                     variant=variant,
-                    stops=[
-                        ResponseTramTripStop(id=stop.stop_id, time=stop.time)
-                        for stop in trip_stops_by_trip_id[trip_id]
-                    ],
+                    stops=trip_stops,
                 )
             )
 

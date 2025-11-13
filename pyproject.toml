@@ -57,3 +57,11 @@ force_alphabetical_sort_within_sections = true
 [tool.mypy]
 ignore_missing_imports = true
 strict = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "with pytest.raises",
+]

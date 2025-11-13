@@ -1,10 +1,9 @@
 import io
 import json
 import pickle
-import tempfile
 import zipfile
 from pathlib import Path
-from typing import Any, cast, Generator, IO
+from typing import cast, Generator, IO
 
 import networkx as nx
 import overpy
@@ -27,6 +26,8 @@ def custom_gtfs_package() -> GTFSPackage:
     gtfs_package.routes = gtfs_package.routes[
         gtfs_package.routes["route_short_name"] != 52
     ]
+    gtfs_package.routes["route_color"] = ""
+    gtfs_package.routes["route_text_color"] = ""
 
     removed_trips = gtfs_package.trips[gtfs_package.trips["route_id"] == "route_70"]
     gtfs_package.trips = gtfs_package.trips[
@@ -141,17 +142,6 @@ def krakow_response_city_data() -> ResponseCityData:
     with zipfile.ZipFile("tests/assets/krakow_response_city_data.zip") as zip_file:
         with zip_file.open("krakow_response_city_data.json") as file:
             return ResponseCityData.model_validate_json(file.read())
-
-
-@pytest.fixture
-def city_cache_dir() -> Generator[Path, Any, None]:
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        directory_path = Path(tmp_dir)
-
-        with zipfile.ZipFile("tests/assets/cached_data.zip") as zip_file:
-            zip_file.extractall(directory_path)
-
-        yield directory_path / "cached_data"
 
 
 @pytest.fixture
