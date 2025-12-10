@@ -110,6 +110,22 @@ class CityDataBuilder:
                 ),
             )
 
+        # If non tram stop node was added in custom mapping
+        if node.id in self._tram_stop_mapper.gtfs_stop_ids_by_node_id:
+            gtfs_stop_ids = sorted(
+                self._tram_stop_mapper.gtfs_stop_ids_by_node_id[node.id]
+            )
+            stop_row = self._tram_stop_mapper.gtfs_package.stops.loc[gtfs_stop_ids[0]]
+
+            return ResponseGraphTramStop(
+                id=node.id,
+                lat=node.lat,
+                lon=node.lon,
+                name=stop_row["stop_name"],
+                neighbors=neighbors,
+                gtfs_stop_ids=gtfs_stop_ids,
+            )
+
         return ResponseGraphNode(
             id=node.id,
             lat=node.lat,
