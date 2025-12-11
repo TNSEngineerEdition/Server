@@ -5,7 +5,7 @@ import overpy
 import pandas as pd
 import pytest
 
-from city_data_builder import CityConfiguration, CityDataBuilder
+from city_data_builder import CityConfiguration, CityDataBuilder, ResponseGraphTramStop
 from tram_stop_mapper import GTFSPackage, TramStopNotFound, Weekday
 
 
@@ -45,6 +45,17 @@ class TestCityDataBuilder:
             trip.stops
             for route in city_data_builder.tram_routes_data
             for trip in route.trips
+        )
+
+        nodes_by_id = {
+            node.id: node for node in city_data_builder.tram_track_graph_data
+        }
+
+        assert all(
+            isinstance(nodes_by_id[trip_stop.id], ResponseGraphTramStop)
+            for route in city_data_builder.tram_routes_data
+            for trip in route.trips
+            for trip_stop in trip.stops
         )
 
     @pytest.mark.parametrize(
