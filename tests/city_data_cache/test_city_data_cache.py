@@ -140,3 +140,17 @@ class TestCityDataCache:
         # Assert
         assert len(dates) <= max_file_count
         assert "2025-09-19" in dates
+
+    def test_store_returns_cached_when_date_already_exists(
+        self, city_cache_directory: Path, krakow_response_city_data: ResponseCityData
+    ) -> None:
+        # Arrange
+        cache = CityDataCache(cache_directory=city_cache_directory)
+
+        # Act
+        returned_data = cache.store(
+            "krakow", datetime.date(2025, 9, 1), krakow_response_city_data
+        )
+
+        # Assert
+        assert returned_data == krakow_response_city_data
