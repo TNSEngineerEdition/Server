@@ -95,36 +95,40 @@ class CityDataBuilder:
             tram_routes=self.tram_routes_data,
         )
 
+    def _get_tram_stop_node(
+        self, node: Node, neighbors: dict[int, ResponseGraphEdge]
+    ) -> ResponseGraphTramStop:
+        gtfs_stop_ids = sorted(self._tram_stop_mapper.gtfs_stop_ids_by_node_id[node.id])
+
+        if node.type == NodeType.TRAM_STOP:
+            stop_name = node.name or ""
+        else:
+            stop_row = self._tram_stop_mapper.gtfs_package.stops.loc[gtfs_stop_ids[0]]
+            stop_name = str(stop_row["stop_name"])
+
+        stop_group_name = self._tram_stop_mapper.get_stop_group_name_by_gtfs_stop_ids(
+            gtfs_stop_ids
+        )
+
+        return ResponseGraphTramStop(
+            id=node.id,
+            lat=node.lat,
+            lon=node.lon,
+            name=stop_name,
+            stop_group_name=stop_group_name,
+            neighbors=neighbors,
+            gtfs_stop_ids=gtfs_stop_ids,
+        )
+
     def _get_response_node(
         self, node: Node, neighbors: dict[int, ResponseGraphEdge]
     ) -> ResponseGraphNode | ResponseGraphTramStop:
-        if node.type == NodeType.TRAM_STOP:
-            return ResponseGraphTramStop(
-                id=node.id,
-                lat=node.lat,
-                lon=node.lon,
-                name=node.name or "",
-                neighbors=neighbors,
-                gtfs_stop_ids=sorted(
-                    self._tram_stop_mapper.gtfs_stop_ids_by_node_id[node.id]
-                ),
-            )
-
-        # If non tram stop node was added in custom mapping
-        if node.id in self._tram_stop_mapper.gtfs_stop_ids_by_node_id:
-            gtfs_stop_ids = sorted(
-                self._tram_stop_mapper.gtfs_stop_ids_by_node_id[node.id]
-            )
-            stop_row = self._tram_stop_mapper.gtfs_package.stops.loc[gtfs_stop_ids[0]]
-
-            return ResponseGraphTramStop(
-                id=node.id,
-                lat=node.lat,
-                lon=node.lon,
-                name=stop_row["stop_name"],
-                neighbors=neighbors,
-                gtfs_stop_ids=gtfs_stop_ids,
-            )
+        if (
+            node.type == NodeType.TRAM_STOP
+            # If non tram stop node was added in custom mapping
+            or node.id in self._tram_stop_mapper.gtfs_stop_ids_by_node_id
+        ):
+            return self._get_tram_stop_node(node, neighbors)
 
         return ResponseGraphNode(
             id=node.id,
