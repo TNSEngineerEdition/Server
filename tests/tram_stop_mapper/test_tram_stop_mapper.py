@@ -579,3 +579,26 @@ class TestTramStopMapper:
             "Relation 172969 has invalid tag name: "
             "String 'Incorrect tram name' doesn't match regular expression"
         )
+
+    def test_stop_group_name_by_gtfs_stop_id(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        gtfs_package: GTFSPackage,
+        relations_and_stops_overpass_query_result: overpy.Result,
+        expected_stop_groups: dict[str, str],
+    ) -> None:
+        # Arrange
+        tram_stop_mapper = TramStopMapper(
+            krakow_city_configuration,
+            gtfs_package,
+            relations_and_stops_overpass_query_result,
+        )
+
+        # Act
+        stop_group_name_by_gtfs_stop_id = {
+            stop_id: tram_stop_mapper.get_stop_group_name_by_gtfs_stop_ids([stop_id])
+            for stop_id in expected_stop_groups
+        }
+
+        # Assert
+        assert stop_group_name_by_gtfs_stop_id == expected_stop_groups

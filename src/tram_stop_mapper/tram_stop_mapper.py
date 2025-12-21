@@ -1,4 +1,5 @@
 import difflib
+import os
 import re
 import string
 from collections import defaultdict
@@ -139,6 +140,45 @@ class TramStopMapper:
             .replace(".", "")
             .replace(" ", "")
             .replace("(nż)", "")
+        )
+
+    @cached_property
+    def _stop_group_name_by_gtfs_stop_id(self) -> dict[str, str]:
+        stop_ids_by_universal_stop_name: defaultdict[str, set[str]] = defaultdict(set)
+
+        for stop_id, stop_row in self.gtfs_package.stops.iterrows():
+            universal_stop_name = self._to_universal_stop_name(
+                str(stop_row["stop_name"])
+            )
+
+            stop_ids_by_universal_stop_name[universal_stop_name].add(stop_id)
+
+        stop_group_name_by_stop_id: dict[str, str] = {}
+        for stop_ids in stop_ids_by_universal_stop_name.values():
+            stops_series = self.gtfs_package.stops.loc[list(stop_ids), "stop_name"]
+            stop_names = list(map(str, stops_series))
+            stop_group_name = (
+                os.path.commonprefix(stop_names).rstrip(string.digits).strip()
+            )
+
+            for stop_id in stop_ids:
+                stop_group_name_by_stop_id[stop_id] = stop_group_name
+
+        return stop_group_name_by_stop_id
+
+    def get_stop_group_name_by_gtfs_stop_ids(self, stop_ids: list[str]) -> str | None:
+        if not stop_ids:
+            return None
+
+        group_names = {
+            self._stop_group_name_by_gtfs_stop_id[stop_id] for stop_id in stop_ids
+        }
+
+        if len(group_names) == 1:
+            return next(iter(group_names))
+
+        raise ValueError(  # pragma: no cover
+            f"Duplicate group names {group_names} found for stop IDs {stop_ids}"
         )
 
     @cached_property
