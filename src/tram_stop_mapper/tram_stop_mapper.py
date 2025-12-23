@@ -167,19 +167,21 @@ class TramStopMapper:
         return stop_group_name_by_stop_id
 
     def get_stop_group_name_by_gtfs_stop_ids(self, stop_ids: list[str]) -> str | None:
-        if not stop_ids:
-            return None
-
         group_names = {
-            self._stop_group_name_by_gtfs_stop_id[stop_id] for stop_id in stop_ids
+            self._stop_group_name_by_gtfs_stop_id[stop_id]
+            for stop_id in stop_ids
+            if stop_id in self._stop_group_name_by_gtfs_stop_id
         }
 
-        if len(group_names) == 1:
-            return next(iter(group_names))
-
-        raise ValueError(  # pragma: no cover
-            f"Duplicate group names {group_names} found for stop IDs {stop_ids}"
-        )
+        match len(group_names):
+            case 0:
+                return None
+            case 1:
+                return next(iter(group_names))
+            case _:
+                raise ValueError(  # pragma: no cover
+                    f"Duplicate group names {group_names} found for stop IDs {stop_ids}"
+                )
 
     @cached_property
     def _universal_stop_names_by_osm_relation(self) -> dict[overpy.Relation, list[str]]:

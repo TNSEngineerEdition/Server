@@ -47,7 +47,9 @@ class CityDataBuilder:
             if isinstance(item, int):
                 custom_node_ids.append(item)
             else:
-                custom_node_ids.extend(filter(lambda x: x is not None, item))  # type: ignore[arg-type]
+                custom_node_ids.extend(
+                    node_id for node_id in item if node_id is not None
+                )
 
         relations_and_stops = OverpassClient.get_relations_and_stops(
             self._city_configuration.osm_area_name,
