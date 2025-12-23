@@ -178,8 +178,8 @@ class TramStopMapper:
                 return None
             case 1:
                 return next(iter(group_names))
-            case _:
-                raise ValueError(  # pragma: no cover
+            case _:  # pragma: no cover
+                raise ValueError(
                     f"Duplicate group names {group_names} found for stop IDs {stop_ids}"
                 )
 
