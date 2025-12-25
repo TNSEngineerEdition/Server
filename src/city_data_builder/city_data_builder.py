@@ -1,3 +1,5 @@
+import datetime
+
 import networkx as nx
 
 from city_data_builder.city_configuration import CityConfiguration
@@ -26,11 +28,13 @@ class CityDataBuilder:
         city_configuration: CityConfiguration,
         weekday: Weekday,
         *,
+        is_today: bool,
         custom_gtfs_package: GTFSPackage | None = None,
         max_distance_between_nodes: float = 5.0,
     ):
         self._city_configuration = city_configuration
         self._weekday = weekday
+        self._is_today = is_today
         self._custom_gtfs_package = custom_gtfs_package
         self._max_distance_between_nodes = max_distance_between_nodes
 
@@ -157,8 +161,14 @@ class CityDataBuilder:
         trip_stops_by_trip_id: dict[str, list[StopIDAndTime]],
         routes_by_route_id: dict[str, ResponseTramRoute],
     ) -> None:
-        for trip_id, trip_data in self._gtfs_package.get_trips_for_weekday(
-            self._weekday
+        service_ids = (
+            self._gtfs_package.get_service_ids_for_date(datetime.date.today())
+            if self._is_today
+            else self._gtfs_package.service_ids_by_weekday[self._weekday]
+        )
+
+        for trip_id, trip_data in self._gtfs_package.get_trips_for_service_ids(
+            service_ids
         ):
             trip_stops = [
                 ResponseTramTripStop(id=stop.stop_id, time=stop.time)
