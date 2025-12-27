@@ -96,11 +96,14 @@ def _get_city_data_by_weekday(
 
 def _get_city_data_today(city_id: str) -> ResponseCityData:
     today = datetime.date.today()
-    if cached := city_data_cache.get(city_id, today):
-        return cached
 
-    data = _get_city_data_by_weekday(city_id, Weekday.get_current(), is_today=True)
-    city_data_cache.store(city_id, today, data)
+    with city_data_cache.lock(city_id):
+        if cached := city_data_cache.get(city_id, today):
+            return cached
+
+        data = _get_city_data_by_weekday(city_id, Weekday.get_current(), is_today=True)
+        city_data_cache.store(city_id, today, data)
+
     return data
 
 

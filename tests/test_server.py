@@ -427,11 +427,11 @@ class TestServer:
     def test_get_city_data_missing_date(self) -> None:
         # Arrange
         expected_response_detail = (
-            "City data for krakow not found in cache for 2025-12-10"
+            "City data for krakow not found in cache for 1970-01-01"
         )
 
         # Act
-        response = self.client.get("/cities/krakow", params={"date": "2025-12-10"})
+        response = self.client.get("/cities/krakow", params={"date": "1970-01-01"})
 
         # Assert
         assert response.status_code == 404
