@@ -28,8 +28,8 @@ class CityDataCache:
     def _zip_city_path(self, city_id: str) -> Path:
         return self.cache_directory / f"{city_id}.zip"
 
-    def _lock_path(self, city_id: str) -> Path:
-        return self.cache_directory / f"{city_id}.lock"
+    def lock(self, city_id: str) -> FileLock:
+        return FileLock(self._zip_city_path(city_id).with_suffix(".lock"))
 
     def get(self, city_id: str, date: datetime.date) -> ResponseCityData | None:
         city_zip_path = self._zip_city_path(city_id)
@@ -84,23 +84,12 @@ class CityDataCache:
         city_data: ResponseCityData,
     ) -> ResponseCityData:
         city_zip_path = self._zip_city_path(city_id)
-        lock = FileLock(self._lock_path(city_id))
         file_name = date.isoformat()
 
-        with lock:
-            if not city_zip_path.exists():
-                with ZipFile(city_zip_path, "w", compression=ZIP_DEFLATED) as zip_file:
-                    zip_file.writestr(file_name, city_data.model_dump_json())
-                return city_data
-
+        if city_zip_path.exists():
             self._remove_redundant_files(city_zip_path)
 
-            with ZipFile(city_zip_path, "a", compression=ZIP_DEFLATED) as zip_file:
-                cached_dates = zip_file.namelist()
-                if file_name in cached_dates:
-                    with zip_file.open(file_name) as f:
-                        return ResponseCityData.model_validate_json(f.read())
-
-                zip_file.writestr(file_name, city_data.model_dump_json())
+        with ZipFile(city_zip_path, "a", compression=ZIP_DEFLATED) as zip_file:
+            zip_file.writestr(file_name, city_data.model_dump_json())
 
         return city_data

@@ -149,3 +149,10 @@ def expected_route_variants() -> dict[str, dict[str, list[int]]]:
     with zipfile.ZipFile("tests/assets/expected_route_variants.zip") as zip_file:
         with zip_file.open("expected_route_variants.json") as file:
             return cast(dict[str, dict[str, list[int]]], json.load(file))
+
+
+@pytest.fixture
+def expected_stop_groups() -> dict[str, str]:
+    with zipfile.ZipFile("tests/assets/expected_stop_groups.zip") as zip_file:
+        with zip_file.open("expected_stop_groups.json") as file:
+            return cast(dict[str, str], json.load(file))
