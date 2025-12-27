@@ -490,7 +490,7 @@ class TestServer:
     @freeze_time("2025-01-01")
     @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
     @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
-    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.get_trips_for_weekday")
+    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.get_trips_for_service_ids")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     @patch("city_data_cache.CityDataCache.get", return_value=None)
@@ -499,7 +499,7 @@ class TestServer:
         cache_get_mock: MagicMock,
         get_relations_and_stops_mock: MagicMock,
         get_tram_stops_and_tracks_mock: MagicMock,
-        gtfs_package_get_trips_for_weekday_mock: MagicMock,
+        gtfs_package_get_trips_for_service_ids_mock: MagicMock,
         gtfs_package_from_url_mock: MagicMock,
         get_by_city_id_mock: MagicMock,
         relations_and_stops_overpass_query_result: overpy.Result,
@@ -520,7 +520,7 @@ class TestServer:
         get_tram_stops_and_tracks_mock.return_value = (
             tram_stops_and_tracks_overpass_query_result
         )
-        gtfs_package_get_trips_for_weekday_mock.side_effect = Exception("Error")
+        gtfs_package_get_trips_for_service_ids_mock.side_effect = Exception("Error")
         gtfs_package_from_url_mock.return_value = gtfs_package
         get_by_city_id_mock.return_value = krakow_city_configuration
 

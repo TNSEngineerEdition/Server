@@ -4,6 +4,7 @@ import numpy as np
 import overpy
 import pandas as pd
 import pytest
+from freezegun import freeze_time
 
 from city_data_builder import CityConfiguration, CityDataBuilder, ResponseGraphTramStop
 from tram_stop_mapper import GTFSPackage, TramStopNotFound, Weekday
@@ -104,7 +105,9 @@ class TestCityDataBuilder:
         expected_node_count, expected_edge_count = 43321, 46047
 
         # Act
-        city_data_builder = CityDataBuilder(krakow_city_configuration, weekday)
+        city_data_builder = CityDataBuilder(
+            krakow_city_configuration, weekday, is_today=False
+        )
 
         # Assert
         self._assert_city_data_builder(
@@ -114,6 +117,58 @@ class TestCityDataBuilder:
             expected_route_count,
             expected_trip_count,
             expected_stop_count,
+        )
+
+        get_relations_and_stops_mock.assert_called_once_with(
+            krakow_city_configuration.osm_area_name,
+            [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
+        )
+        get_tram_stops_and_tracks_mock.assert_called_once_with(
+            krakow_city_configuration.osm_area_name
+        )
+        gtfs_package_from_url_mock.assert_called_once_with(
+            krakow_city_configuration.gtfs_url
+        )
+
+    @freeze_time("2025-05-01")
+    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
+    @patch("overpass_client.OverpassClient.get_relations_and_stops")
+    def test_city_data_builder_today(
+        self,
+        get_relations_and_stops_mock: MagicMock,
+        get_tram_stops_and_tracks_mock: MagicMock,
+        gtfs_package_from_url_mock: MagicMock,
+        krakow_city_configuration: CityConfiguration,
+        relations_and_stops_overpass_query_result: overpy.Result,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
+        gtfs_package: GTFSPackage,
+    ) -> None:
+        # Arrange
+        get_relations_and_stops_mock.return_value = (
+            relations_and_stops_overpass_query_result
+        )
+        get_tram_stops_and_tracks_mock.return_value = (
+            tram_stops_and_tracks_overpass_query_result
+        )
+        gtfs_package_from_url_mock.return_value = gtfs_package
+
+        expected_node_count, expected_edge_count = 43321, 46047
+
+        # Act
+        city_data_builder = CityDataBuilder(
+            krakow_city_configuration, Weekday.THURSDAY, is_today=True
+        )
+
+        # Assert
+        # Although the weekday is Thursday, the schedule should be for Sunday
+        self._assert_city_data_builder(
+            city_data_builder,
+            expected_node_count,
+            expected_edge_count,
+            expected_route_count=23,
+            expected_trip_count=2375,
+            expected_stop_count=62988,
         )
 
         get_relations_and_stops_mock.assert_called_once_with(
@@ -175,7 +230,10 @@ class TestCityDataBuilder:
 
         # Act
         city_data_builder = CityDataBuilder(
-            krakow_city_configuration, weekday, custom_gtfs_package=custom_gtfs_package
+            krakow_city_configuration,
+            weekday,
+            is_today=False,
+            custom_gtfs_package=custom_gtfs_package,
         )
 
         # Assert
@@ -248,6 +306,7 @@ class TestCityDataBuilder:
         city_data_builder = CityDataBuilder(
             krakow_city_configuration,
             Weekday.MONDAY,
+            is_today=False,
             custom_gtfs_package=custom_gtfs_package,
         )
 

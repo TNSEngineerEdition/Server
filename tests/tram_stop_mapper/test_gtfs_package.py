@@ -1,3 +1,4 @@
+import datetime
 import io
 from collections import defaultdict
 from pathlib import Path
@@ -9,6 +10,7 @@ import pandas as pd
 import pytest
 
 from tram_stop_mapper.gtfs_package import GTFSPackage
+from tram_stop_mapper.weekday import Weekday
 
 
 class TestGTFSPackage:
@@ -284,3 +286,42 @@ class TestGTFSPackage:
 
             route_row = gtfs_package.routes.loc[route_id]
             assert str(route_row["route_short_name"]) == route_name
+
+    def test_service_ids_by_weekday(self) -> None:
+        # Arrange
+        gtfs_package = GTFSPackage.from_file(self.GTFS_FILE_PATH)
+
+        # Act
+        service_ids_by_weekday = gtfs_package.service_ids_by_weekday
+
+        # Assert
+        assert service_ids_by_weekday == {
+            Weekday.MONDAY: {"service_1"},
+            Weekday.TUESDAY: {"service_1"},
+            Weekday.WEDNESDAY: {"service_1"},
+            Weekday.THURSDAY: {"service_5"},
+            Weekday.FRIDAY: {"service_4"},
+            Weekday.SATURDAY: {"service_2"},
+            Weekday.SUNDAY: {"service_3"},
+        }
+
+    @pytest.mark.parametrize(
+        ("date", "expected_service_ids"),
+        [
+            pytest.param(datetime.date(2025, 4, 18), {"service_4"}, id="2025-04-18"),
+            pytest.param(datetime.date(2025, 4, 21), {"service_3"}, id="2025-04-21"),
+            pytest.param(datetime.date(2025, 5, 1), {"service_3"}, id="2025-05-01"),
+            pytest.param(datetime.date(2025, 5, 3), {"service_3"}, id="2025-05-03"),
+        ],
+    )
+    def test_service_ids_for_date(
+        self, date: datetime.date, expected_service_ids: set[str]
+    ) -> None:
+        # Arrange
+        gtfs_package = GTFSPackage.from_file(self.GTFS_FILE_PATH)
+
+        # Act
+        service_ids = gtfs_package.get_service_ids_for_date(date)
+
+        # Assert
+        assert service_ids == expected_service_ids
