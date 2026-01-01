@@ -1,4 +1,4 @@
-from datetime import date
+import datetime
 from enum import StrEnum
 
 
@@ -12,5 +12,9 @@ class Weekday(StrEnum):
     SUNDAY = "sunday"
 
     @classmethod
+    def from_date(cls, date: datetime.date) -> "Weekday":
+        return list(cls)[date.weekday()]
+
+    @classmethod
     def get_current(cls) -> "Weekday":
-        return list(cls)[date.today().weekday()]
+        return cls.from_date(datetime.date.today())

@@ -1,3 +1,4 @@
+import datetime
 from collections import defaultdict
 from functools import cached_property
 from io import BytesIO
@@ -88,6 +89,12 @@ class GTFSPackage(BaseModel):
         "end_date",
     ]
 
+    CALENDAR_DATES_COLUMNS: ClassVar[list[str]] = [
+        "service_id",
+        "date",
+        "exception_type",
+    ]
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     stops: pd.DataFrame
@@ -95,6 +102,7 @@ class GTFSPackage(BaseModel):
     trips: pd.DataFrame
     stop_times: pd.DataFrame
     calendar: pd.DataFrame
+    calendar_dates: pd.DataFrame
 
     @staticmethod
     def _validate_columns(
@@ -134,6 +142,13 @@ class GTFSPackage(BaseModel):
     def validate_calendar_columns(cls, value: pd.DataFrame) -> pd.DataFrame:
         return cls._validate_columns("calendar.txt", value, cls.CALENDAR_COLUMNS)
 
+    @field_validator("calendar_dates", mode="before")
+    @classmethod
+    def validate_calendar_dates_columns(cls, value: pd.DataFrame) -> pd.DataFrame:
+        return cls._validate_columns(
+            "calendar_dates.txt", value, cls.CALENDAR_DATES_COLUMNS
+        )
+
     @classmethod
     def from_zip_file(cls, zip_file: ZipFile) -> "GTFSPackage":
         with zip_file.open("stops.txt") as file:
@@ -151,12 +166,16 @@ class GTFSPackage(BaseModel):
         with zip_file.open("calendar.txt") as file:
             calendar = pd.read_csv(file)
 
+        with zip_file.open("calendar_dates.txt") as file:
+            calendar_dates = pd.read_csv(file)
+
         return cls(
             stops=stops,
             routes=routes,
             trips=trips,
             stop_times=stop_times,
             calendar=calendar,
+            calendar_dates=calendar_dates,
         )
 
     @classmethod
@@ -178,10 +197,14 @@ class GTFSPackage(BaseModel):
         )
 
     @cached_property
-    def weekdays_by_service_id(self) -> dict[str, set[Weekday]]:
+    def service_ids_by_weekday(self) -> dict[Weekday, set[str]]:
         return {
-            str(row["service_id"]): {day for day in list(Weekday) if row[day] == 1}
-            for _, row in self.calendar.iterrows()
+            weekday: {
+                str(row["service_id"])
+                for _, row in self.calendar.iterrows()
+                if row[weekday] == 1
+            }
+            for weekday in Weekday
         }
 
     @cached_property
@@ -212,13 +235,13 @@ class GTFSPackage(BaseModel):
 
         return dict(result)
 
-    def get_trips_for_weekday(
-        self, weekday: Weekday
+    def get_trips_for_service_ids(
+        self, service_ids: set[str]
     ) -> Generator[tuple[str, pd.Series], None, None]:
         return (
             (str(trip_id), trip_data)
             for trip_id, trip_data in self.trips.iterrows()
-            if weekday in self.weekdays_by_service_id[trip_data["service_id"]]
+            if trip_data["service_id"] in service_ids
         )
 
     def get_route_names_and_ids(
@@ -247,3 +270,25 @@ class GTFSPackage(BaseModel):
 
             with zip_file.open("calendar.txt", "w") as file:
                 self.calendar.to_csv(file, index=False)
+
+            with zip_file.open("calendar_dates.txt", "w") as file:
+                self.calendar_dates.to_csv(file, index=False)
+
+    def get_service_ids_for_date(self, date: datetime.date) -> set[str]:
+        service_ids = self.service_ids_by_weekday[Weekday.from_date(date)]
+
+        exceptions_for_date = self.calendar_dates[
+            self.calendar_dates["date"] == int(date.strftime("%Y%m%d"))
+        ]
+
+        service_ids_to_add = exceptions_for_date[
+            exceptions_for_date["exception_type"] == 1
+        ]["service_id"]
+        service_ids_to_remove = exceptions_for_date[
+            exceptions_for_date["exception_type"] == 2
+        ]["service_id"]
+
+        service_ids = service_ids.union(map(str, service_ids_to_add))
+        service_ids = service_ids.difference(map(str, service_ids_to_remove))
+
+        return service_ids

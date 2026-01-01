@@ -52,14 +52,20 @@ def _get_city_data_by_date(city_id: str, date: datetime.date) -> ResponseCityDat
 
 
 def _get_city_data_by_weekday(
-    city_id: str, weekday: Weekday, custom_gtfs_package: GTFSPackage | None = None
+    city_id: str,
+    weekday: Weekday,
+    custom_gtfs_package: GTFSPackage | None = None,
+    is_today: bool = False,
 ) -> ResponseCityData:
     if (city_configuration := CityConfiguration.get_by_city_id(city_id)) is None:
         raise HTTPException(404, f"City {city_id} not found")
 
     try:
         city_data_builder = CityDataBuilder(
-            city_configuration, weekday, custom_gtfs_package=custom_gtfs_package
+            city_configuration,
+            weekday,
+            is_today=is_today,
+            custom_gtfs_package=custom_gtfs_package,
         )
     except TramStopMappingBuildError as exc:
         raise HTTPException(500, str(exc))
@@ -95,7 +101,7 @@ def _get_city_data_today(city_id: str) -> ResponseCityData:
         if cached := city_data_cache.get(city_id, today):
             return cached
 
-        data = _get_city_data_by_weekday(city_id, Weekday.get_current())
+        data = _get_city_data_by_weekday(city_id, Weekday.get_current(), is_today=True)
         city_data_cache.store(city_id, today, data)
 
     return data

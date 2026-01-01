@@ -31,7 +31,7 @@ class ResponseTramRoute(BaseModel):
     text_color: str
     variants: dict[str, list[int]] = Field(
         default_factory=dict,
-        json_schema_extra={"x-go-type": "map[string][]int64"},
+        json_schema_extra={"x-go-type": "map[string][]uint64"},
     )
     trips: list[ResponseTramTrip] = Field(default_factory=list)
 
