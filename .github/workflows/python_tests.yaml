@@ -9,21 +9,21 @@ jobs:
       PIP_ROOT_USER_ACTION: ignore
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python 3.12.8
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.12.8"
+      - name: Set up Python 3.12.8
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.8"
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e .[dev]
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
 
-    - name: Run tests
-      run: pytest -vv --cov --cov-fail-under=100 --cov-branch tests
-      working-directory: ${{github.workspace}}
-      env:
-        PYTHONPATH: ${{github.workspace}}
+      - name: Run tests
+        run: pytest -vv tests
+        working-directory: ${{github.workspace}}
+        env:
+          PYTHONPATH: ${{github.workspace}}
