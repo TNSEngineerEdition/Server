@@ -6,7 +6,10 @@ from typing import ClassVar, Self
 
 from pydantic import BaseModel, ValidationError
 
-from city_configuration.models import CustomTramStopPairMapping, TramStopPairCheck
+from city_configuration.models import (
+    GTFSConfiguration,
+    TramStopPairCheck,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +23,8 @@ class CityConfiguration(BaseModel):
     country: str
     image: str
     osm_area_name: str
-    gtfs_url: str
-    ignored_gtfs_lines: list[str]
+    gtfs_configurations: list[GTFSConfiguration]
     ignored_osm_relations: list[int]
-    custom_stop_mapping: dict[str, int | tuple[int | None, int | None, int | None]]
-    custom_stop_pair_mapping: list[CustomTramStopPairMapping]
     max_distance_ratio: float
     custom_tram_stop_pair_max_distance_checks: list[TramStopPairCheck]
 
@@ -67,16 +67,4 @@ class CityConfiguration(BaseModel):
         return {
             (item.source, item.destination): item.ratio
             for item in self.custom_tram_stop_pair_max_distance_checks
-        }
-
-    @cached_property
-    def custom_stop_pair_by_gtfs_stop_ids(
-        self,
-    ) -> dict[tuple[str, str], tuple[int, int]]:
-        return {
-            (item.source_gtfs_stop_id, item.destination_gtfs_stop_id): (
-                item.source_osm_node_id,
-                item.destination_osm_node_id,
-            )
-            for item in self.custom_stop_pair_mapping
         }

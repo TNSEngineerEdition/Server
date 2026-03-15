@@ -1,4 +1,9 @@
-from pydantic import BaseModel
+from functools import cached_property
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+type StopMapping = int | tuple[int | None, int | None, int | None]
 
 
 class CustomTramStopPairMapping(BaseModel):
@@ -12,3 +17,33 @@ class TramStopPairCheck(BaseModel):
     source: int
     destination: int
     ratio: float
+
+
+class GTFSConfiguration(BaseModel):
+    file_url: str
+    ignored_route_names: list[str] = Field(default_factory=list)
+    custom_stop_mapping: dict[str, StopMapping] = Field(default_factory=dict)
+    custom_stop_pair_mapping: list[CustomTramStopPairMapping] = Field(
+        default_factory=list
+    )
+
+    @cached_property
+    def custom_stop_pair_by_gtfs_stop_ids(
+        self,
+    ) -> dict[tuple[str, str], tuple[int, int]]:
+        return {
+            (item.source_gtfs_stop_id, item.destination_gtfs_stop_id): (
+                item.source_osm_node_id,
+                item.destination_osm_node_id,
+            )
+            for item in self.custom_stop_pair_mapping
+        }
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, GTFSConfiguration):
+            return False
+
+        return self.file_url == other.file_url
+
+    def __hash__(self) -> int:
+        return hash(self.file_url)

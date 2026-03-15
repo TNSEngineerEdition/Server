@@ -21,6 +21,16 @@ def gtfs_package() -> GTFSPackage:
 
 
 @pytest.fixture
+def gtfs_package_byte_buffer(
+    gtfs_package: GTFSPackage,
+) -> Generator[IO[bytes], None, None]:
+    with io.BytesIO() as buffer:
+        gtfs_package.to_zip_file(buffer)
+        buffer.seek(0)
+        yield buffer
+
+
+@pytest.fixture
 def custom_gtfs_package() -> GTFSPackage:
     gtfs_package = GTFSPackage.from_file("tests/assets/gtfs_schedule.zip")
 

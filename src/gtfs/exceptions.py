@@ -1,4 +1,4 @@
-from gtfs.models import GTFSPackageConfig
+from city_configuration import GTFSConfiguration
 
 
 class MissingGTFSPackage(Exception):
@@ -6,10 +6,9 @@ class MissingGTFSPackage(Exception):
     GTFS Schedule file couldn't be downloaded from the provided URL.
     """
 
-    def __init__(self, config: GTFSPackageConfig) -> None:
+    def __init__(self, config: GTFSConfiguration) -> None:
         super().__init__(
-            f"GTFS Schedule file for {config.name} "
-            f"couldn't be downloaded from URL: {config.file_url}"
+            f"GTFS Schedule file couldn't be downloaded from URL: {config.file_url}"
         )
 
 

@@ -99,11 +99,12 @@ class TramTrackGraphTransformer:
         each node can potentially act as a tram stop, even when it has a different type
         assigned to it by OSM.
         """
-        return (
-            NodeType.TRAM_STOP
-            if node.id in self._city_configuration.custom_stop_mapping.values()
-            else NodeType.get_by_value_safe(node.tags.get("railway"))
-        )
+
+        for gtfs_config in self._city_configuration.gtfs_configurations:
+            if node.id in gtfs_config.custom_stop_mapping.values():
+                return NodeType.TRAM_STOP
+
+        return NodeType.get_by_value_safe(node.tags.get("railway"))
 
     def _get_tram_stop_node_ids_in_graph(self) -> set[Node]:
         """

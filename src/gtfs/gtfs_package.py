@@ -186,9 +186,39 @@ class GTFSPackage(BaseModel):
     @classmethod
     def from_url(cls, url: str) -> "GTFSPackage":
         response = requests.get(url, stream=True, timeout=600)
+        response.raise_for_status()
 
         with ZipFile(BytesIO(response.content)) as zip_file:
             return cls.from_zip_file(zip_file)
+
+    @staticmethod
+    def _compare_attribute(attr_name: str, self_attr: Any, other_attr: Any) -> None:
+        match self_attr:
+            case pd.DataFrame():
+                assert self_attr.equals(other_attr)
+            case list():
+                assert self_attr == other_attr
+            case None:
+                assert other_attr is None
+            case _:  # pragma: no cover
+                raise TypeError(
+                    f"Unknown attribute {attr_name} type: {type(self_attr)}"
+                )
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, type(self)):
+            return False
+
+        for attr_name in self.__annotations__:
+            self_attr = getattr(self, attr_name)
+            other_attr = getattr(other, attr_name)
+
+            try:
+                self._compare_attribute(attr_name, self_attr, other_attr)
+            except AssertionError:
+                return False
+
+        return True
 
     def replace_file(self, target_file_path: Path) -> None:
         new_file_path = target_file_path.with_suffix(".new")

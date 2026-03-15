@@ -1,7 +1,6 @@
 from .exceptions import InvalidGTFSPackage, MissingGTFSPackage
 from .gtfs_package import GTFSPackage
-from .gtfs_schedule_store import GTFSPackageStore
-from .models import GTFSPackageConfig
+from .gtfs_package_store import GTFSPackageStore
 from .weekday import Weekday
 
 __all__ = [
@@ -9,6 +8,5 @@ __all__ = [
     "MissingGTFSPackage",
     "InvalidGTFSPackage",
     "GTFSPackageStore",
-    "GTFSPackageConfig",
     "Weekday",
 ]

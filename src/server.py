@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from city_configuration import CityConfiguration
 from city_data_builder import CityDataBuilder, ResponseCityData
 from city_data_cache import CachedCityDates, CityDataCache
-from gtfs import GTFSPackage, Weekday
+from gtfs import GTFSPackage, GTFSPackageStore, Weekday
 from tram_stop_mapper import TramStopMappingBuildError, TramStopNotFound
 
 app = FastAPI()
@@ -20,6 +20,7 @@ app.add_middleware(GZipMiddleware)
 
 logger = logging.getLogger(__name__)
 city_data_cache = CityDataCache()
+gtfs_package_store = GTFSPackageStore()
 
 
 @app.get("/cities")
@@ -61,6 +62,7 @@ def _get_city_data_by_weekday(
         city_data_builder = CityDataBuilder(
             city_configuration,
             weekday,
+            gtfs_package_store,
             is_today=is_today,
             custom_gtfs_package=custom_gtfs_package,
         )
