@@ -6,9 +6,9 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from constants import FROZEN_DATA_DIRECTORY
 
-from city_data_builder import CityConfiguration
+from city_configuration import CityConfiguration
+from gtfs import GTFSPackage
 from overpass_client import OverpassClient
-from tram_stop_mapper import GTFSPackage
 
 
 def main(city_configuration_path: Path) -> None:

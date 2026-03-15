@@ -9,8 +9,7 @@ from zipfile import ZipFile
 import pandas as pd
 import pytest
 
-from tram_stop_mapper.gtfs_package import GTFSPackage
-from tram_stop_mapper.weekday import Weekday
+from gtfs import GTFSPackage, Weekday
 
 
 class TestGTFSPackage:
@@ -181,7 +180,7 @@ class TestGTFSPackage:
         gtfs_package = GTFSPackage.from_url(url)
 
         # Assert
-        get_mock.assert_called_once_with(url, stream=True)
+        get_mock.assert_called_once_with(url, stream=True, timeout=600)
 
         self._assert_data_frame_content(
             data_frame=gtfs_package.stops,

@@ -6,20 +6,9 @@ from typing import ClassVar, Self
 
 from pydantic import BaseModel, ValidationError
 
+from city_configuration.models import CustomTramStopPairMapping, TramStopPairCheck
+
 logger = logging.getLogger(__name__)
-
-
-class CustomTramStopPairMapping(BaseModel):
-    source_gtfs_stop_id: str
-    source_osm_node_id: int
-    destination_gtfs_stop_id: str
-    destination_osm_node_id: int
-
-
-class TramStopPairCheck(BaseModel):
-    source: int
-    destination: int
-    ratio: float
 
 
 class CityConfiguration(BaseModel):

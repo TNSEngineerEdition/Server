@@ -9,8 +9,9 @@ import networkx as nx
 import overpy
 import pytest
 
-from city_data_builder import CityConfiguration, ResponseCityData
-from tram_stop_mapper import GTFSPackage
+from city_configuration import CityConfiguration
+from city_data_builder import ResponseCityData
+from gtfs import GTFSPackage
 from tram_track_graph_transformer import Node
 
 

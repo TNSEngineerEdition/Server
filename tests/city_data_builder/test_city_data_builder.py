@@ -6,8 +6,10 @@ import pandas as pd
 import pytest
 from freezegun import freeze_time
 
-from city_data_builder import CityConfiguration, CityDataBuilder, ResponseGraphTramStop
-from tram_stop_mapper import GTFSPackage, TramStopNotFound, Weekday
+from city_configuration import CityConfiguration
+from city_data_builder import CityDataBuilder, ResponseGraphTramStop
+from gtfs import GTFSPackage, Weekday
+from tram_stop_mapper import TramStopNotFound
 
 
 class TestCityDataBuilder:
@@ -76,7 +78,7 @@ class TestCityDataBuilder:
             pytest.param(Weekday.SUNDAY, 23, 2375, 62988, id=Weekday.SUNDAY),
         ],
     )
-    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("gtfs.gtfs_package.GTFSPackage.from_url")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     def test_city_data_builder(
@@ -131,7 +133,7 @@ class TestCityDataBuilder:
         )
 
     @freeze_time("2025-05-01")
-    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("gtfs.gtfs_package.GTFSPackage.from_url")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     def test_city_data_builder_today(
@@ -199,7 +201,7 @@ class TestCityDataBuilder:
             pytest.param(Weekday.SUNDAY, 22, 2198, 57536, id=Weekday.SUNDAY),
         ],
     )
-    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("gtfs.gtfs_package.GTFSPackage.from_url")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     def test_city_data_builder_with_custom_schedule(
@@ -257,7 +259,7 @@ class TestCityDataBuilder:
             krakow_city_configuration.gtfs_url
         )
 
-    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("gtfs.gtfs_package.GTFSPackage.from_url")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     def test_tram_routes_data_with_custom_schedule_stop_not_found_in_mapping(

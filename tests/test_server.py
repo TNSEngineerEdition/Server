@@ -12,19 +12,17 @@ from fastapi.testclient import TestClient
 from freezegun import freeze_time
 from pydantic import ValidationError
 
-from city_data_builder import CityConfiguration, ResponseCityData
+from city_configuration import CityConfiguration
+from city_data_builder import ResponseCityData
+from gtfs import GTFSPackage
 from server import app
-from tram_stop_mapper import (
-    GTFSPackage,
-    TramStopMappingBuildError,
-    TramStopMappingErrors,
-)
+from tram_stop_mapper import TramStopMappingBuildError, TramStopMappingErrors
 
 
 class TestServer:
     client = TestClient(app)
 
-    @patch("city_data_builder.city_configuration.CityConfiguration.get_all")
+    @patch("city_configuration.city_configuration.CityConfiguration.get_all")
     def test_cities(
         self, get_all_mock: MagicMock, krakow_city_configuration: CityConfiguration
     ) -> None:
@@ -84,7 +82,7 @@ class TestServer:
 
         assert any(configuration["osm_area_name"] == "Kraków" for _ in cities.values())
 
-    @patch("city_data_builder.city_configuration.CityConfiguration.get_all")
+    @patch("city_configuration.city_configuration.CityConfiguration.get_all")
     def test_cities_validation_error(self, get_all_mock: MagicMock) -> None:
         # Arrange
         get_all_mock.side_effect = ValidationError.from_exception_data("", [])
@@ -192,8 +190,8 @@ class TestServer:
                     assert isinstance(stop_time, int)
 
     @freeze_time("2025-01-01")
-    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
-    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("city_configuration.city_configuration.CityConfiguration.get_by_city_id")
+    @patch("gtfs.gtfs_package.GTFSPackage.from_url")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     @patch("city_data_cache.CityDataCache.get", return_value=None)
@@ -236,8 +234,8 @@ class TestServer:
         )
 
     @freeze_time("2025-01-01")
-    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
-    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("city_configuration.city_configuration.CityConfiguration.get_by_city_id")
+    @patch("gtfs.gtfs_package.GTFSPackage.from_url")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     @patch("city_data_cache.CityDataCache.get", return_value=None)
@@ -278,7 +276,7 @@ class TestServer:
         cache_store_mock.assert_not_called()
 
     @freeze_time("2025-01-01")
-    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
+    @patch("city_configuration.city_configuration.CityConfiguration.get_by_city_id")
     @patch("city_data_builder.city_data_builder.CityDataBuilder.__init__")
     @patch("city_data_cache.CityDataCache.get", return_value=None)
     def test_get_city_data_tram_stop_mapping_error(
@@ -306,8 +304,8 @@ class TestServer:
 
         cache_get_mock.assert_called_once_with("krakow", datetime.date.today())
 
-    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
-    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("city_configuration.city_configuration.CityConfiguration.get_by_city_id")
+    @patch("gtfs.gtfs_package.GTFSPackage.from_url")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     @patch("city_data_cache.CityDataCache.get")
@@ -451,7 +449,7 @@ class TestServer:
         assert response.json()["detail"] == expected_response_detail
 
     @freeze_time("2025-01-01")
-    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
+    @patch("city_configuration.city_configuration.CityConfiguration.get_by_city_id")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     @patch("city_data_cache.CityDataCache.get")
     def test_get_city_data_exception_during_data_build_empty_cache(
@@ -488,9 +486,9 @@ class TestServer:
         get_by_city_id_mock.assert_called_once_with("krakow")
 
     @freeze_time("2025-01-01")
-    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
-    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
-    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.get_trips_for_service_ids")
+    @patch("city_configuration.city_configuration.CityConfiguration.get_by_city_id")
+    @patch("gtfs.gtfs_package.GTFSPackage.from_url")
+    @patch("gtfs.gtfs_package.GTFSPackage.get_trips_for_service_ids")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     @patch("city_data_cache.CityDataCache.get", return_value=None)
@@ -552,7 +550,7 @@ class TestServer:
         )
 
     @freeze_time("2025-01-01")
-    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
+    @patch("city_configuration.city_configuration.CityConfiguration.get_by_city_id")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     @patch("city_data_cache.CityDataCache.get")
     def test_get_city_data_overpass_gateway_timeout_empty_cache(
@@ -587,8 +585,8 @@ class TestServer:
         get_by_city_id_mock.assert_called_once_with("krakow")
 
     @freeze_time("2025-01-01")
-    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
-    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("city_configuration.city_configuration.CityConfiguration.get_by_city_id")
+    @patch("gtfs.gtfs_package.GTFSPackage.from_url")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     def test_get_city_data_with_custom_schedule(
@@ -718,8 +716,8 @@ class TestServer:
         }
 
     @freeze_time("2025-01-01")
-    @patch("city_data_builder.city_configuration.CityConfiguration.get_by_city_id")
-    @patch("tram_stop_mapper.gtfs_package.GTFSPackage.from_url")
+    @patch("city_configuration.city_configuration.CityConfiguration.get_by_city_id")
+    @patch("gtfs.gtfs_package.GTFSPackage.from_url")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     def test_get_city_data_with_custom_schedule_unknown_stop(

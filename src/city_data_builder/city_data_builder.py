@@ -2,7 +2,7 @@ import datetime
 
 import networkx as nx
 
-from city_data_builder.city_configuration import CityConfiguration
+from city_configuration import CityConfiguration
 from city_data_builder.model import (
     ResponseCityData,
     ResponseGraphEdge,
@@ -12,8 +12,9 @@ from city_data_builder.model import (
     ResponseTramTrip,
     ResponseTramTripStop,
 )
+from gtfs import GTFSPackage, Weekday
 from overpass_client import OverpassClient
-from tram_stop_mapper import GTFSPackage, StopIDAndTime, TramStopMapper, Weekday
+from tram_stop_mapper import StopIDAndTime, TramStopMapper
 from tram_track_graph_transformer import (
     Node,
     NodeType,

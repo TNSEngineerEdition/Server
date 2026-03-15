@@ -5,9 +5,9 @@ from zipfile import ZipFile
 import overpy
 import pytest
 
-from city_data_builder import CityConfiguration, CustomTramStopPairMapping
+from city_configuration import CityConfiguration, CustomTramStopPairMapping
+from gtfs import GTFSPackage
 from tram_stop_mapper.exceptions import InvalidRelationTag, TramStopMappingBuildError
-from tram_stop_mapper.gtfs_package import GTFSPackage
 from tram_stop_mapper.tram_stop_mapper import TramStopMapper
 
 

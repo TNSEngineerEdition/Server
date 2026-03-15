@@ -4,21 +4,19 @@ import re
 import string
 from collections import defaultdict
 from functools import cached_property
-from typing import Hashable, TYPE_CHECKING
+from typing import Hashable
 
 import overpy
 from pydantic import BaseModel
 
+from city_configuration import CityConfiguration
+from gtfs import GTFSPackage
 from tram_stop_mapper.exceptions import (
     InvalidRelationTag,
     TramStopMappingBuildError,
     TramStopNotFound,
 )
-from tram_stop_mapper.gtfs_package import GTFSPackage
 from tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
-
-if TYPE_CHECKING:  # pragma: no cover
-    from city_data_builder import CityConfiguration
 
 
 class StopIDAndTime(BaseModel):
@@ -541,7 +539,7 @@ class TramStopMapper:
                     InvalidRelationTag(
                         relation=relation,
                         tag_name="name",
-                        message=f"String '{relation.tags.get("name", "")}' doesn't match regular expression",
+                        message=f"String '{relation.tags.get('name', '')}' doesn't match regular expression",
                     )
                 )
                 continue

@@ -8,7 +8,7 @@ import pytest
 from pydantic import ValidationError
 from pytest import LogCaptureFixture
 
-from city_data_builder.city_configuration import CityConfiguration
+from city_configuration.city_configuration import CityConfiguration
 
 
 class TestCityConfiguration:

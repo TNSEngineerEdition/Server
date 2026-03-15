@@ -10,8 +10,8 @@ import pandas as pd
 import requests
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from tram_stop_mapper.exceptions import InvalidGTFSPackage
-from tram_stop_mapper.weekday import Weekday
+from gtfs.exceptions import InvalidGTFSPackage
+from gtfs.weekday import Weekday
 
 
 class GTFSPackage(BaseModel):
@@ -185,9 +185,21 @@ class GTFSPackage(BaseModel):
 
     @classmethod
     def from_url(cls, url: str) -> "GTFSPackage":
-        response = requests.get(url, stream=True)
-        zip_file = ZipFile(BytesIO(response.content))
-        return cls.from_zip_file(zip_file)
+        response = requests.get(url, stream=True, timeout=600)
+
+        with ZipFile(BytesIO(response.content)) as zip_file:
+            return cls.from_zip_file(zip_file)
+
+    def replace_file(self, target_file_path: Path) -> None:
+        new_file_path = target_file_path.with_suffix(".new")
+
+        try:
+            with new_file_path.open("wb") as file:
+                self.to_zip_file(file)
+
+            new_file_path.replace(target_file_path)
+        finally:
+            new_file_path.unlink(missing_ok=True)
 
     @cached_property
     def _stop_times_as_dict(self) -> dict[str, dict[tuple[str, int], Any]]:
