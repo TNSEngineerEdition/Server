@@ -46,9 +46,17 @@ class TestServer:
             configuration = payload["city_configuration"]
             available_dates = payload["available_dates"]
 
-            osm_area_name = configuration["osm_area_name"]
-            assert osm_area_name
-            assert isinstance(osm_area_name, str)
+            osm_relations_area_name = configuration["osm_relations_area_name"]
+            assert osm_relations_area_name
+            assert isinstance(osm_relations_area_name, str)
+
+            osm_stops_area_name = configuration["osm_stops_area_name"]
+            assert osm_stops_area_name
+            assert isinstance(osm_stops_area_name, str)
+
+            osm_network = configuration["osm_network"]
+            assert osm_network
+            assert isinstance(osm_network, str)
 
             gtfs_configurations = configuration["gtfs_configurations"]
             assert gtfs_configurations
@@ -86,7 +94,10 @@ class TestServer:
             assert all(isinstance(d, datetime.date) for d in parsed_dates)
             assert parsed_dates == sorted(parsed_dates, reverse=True)
 
-        assert any(configuration["osm_area_name"] == "Kraków" for _ in cities.values())
+        assert any(
+            configuration["osm_relations_area_name"] == "Kraków"
+            for _ in cities.values()
+        )
 
     @patch("city_configuration.city_configuration.CityConfiguration.get_all")
     def test_cities_validation_error(self, get_all_mock: MagicMock) -> None:
@@ -197,7 +208,7 @@ class TestServer:
 
     @freeze_time("2025-01-01")
     @patch("city_configuration.city_configuration.CityConfiguration.get_by_city_id")
-    @patch("gtfs.gtfs_package.GTFSPackage.from_url")
+    @patch("gtfs.gtfs_package_store.GTFSPackageStore.load_gtfs_package")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     @patch("city_data_cache.CityDataCache.get", return_value=None)
@@ -208,7 +219,7 @@ class TestServer:
         cache_get_mock: MagicMock,
         get_relations_and_stops_mock: MagicMock,
         get_tram_stops_and_tracks_mock: MagicMock,
-        gtfs_package_from_url_mock: MagicMock,
+        load_gtfs_package_mock: MagicMock,
         get_by_city_id_mock: MagicMock,
         relations_and_stops_overpass_query_result: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
@@ -222,7 +233,7 @@ class TestServer:
         get_tram_stops_and_tracks_mock.return_value = (
             tram_stops_and_tracks_overpass_query_result
         )
-        gtfs_package_from_url_mock.return_value = gtfs_package
+        load_gtfs_package_mock.return_value = gtfs_package
         get_by_city_id_mock.return_value = krakow_city_configuration
 
         # Act
@@ -241,7 +252,7 @@ class TestServer:
 
     @freeze_time("2025-01-01")
     @patch("city_configuration.city_configuration.CityConfiguration.get_by_city_id")
-    @patch("gtfs.gtfs_package.GTFSPackage.from_url")
+    @patch("gtfs.gtfs_package_store.GTFSPackageStore.load_gtfs_package")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     @patch("city_data_cache.CityDataCache.get", return_value=None)
@@ -252,7 +263,7 @@ class TestServer:
         cache_get_mock: MagicMock,
         get_relations_and_stops_mock: MagicMock,
         get_tram_stops_and_tracks_mock: MagicMock,
-        gtfs_package_from_url_mock: MagicMock,
+        load_gtfs_package_mock: MagicMock,
         get_by_city_id_mock: MagicMock,
         relations_and_stops_overpass_query_result: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
@@ -267,7 +278,7 @@ class TestServer:
         get_tram_stops_and_tracks_mock.return_value = (
             tram_stops_and_tracks_overpass_query_result
         )
-        gtfs_package_from_url_mock.return_value = gtfs_package
+        load_gtfs_package_mock.return_value = gtfs_package
         get_by_city_id_mock.return_value = krakow_city_configuration
         cache_get_mock.return_value = krakow_response_city_data
 
@@ -346,15 +357,18 @@ class TestServer:
 
         get_by_city_id_mock.assert_called_once_with("krakow")
         get_relations_and_stops_mock.assert_called_once_with(
-            "Kraków",
-            [
+            krakow_city_configuration.gtfs_configurations[0].transit_type,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
+            krakow_city_configuration.osm_stops_area_name,
+            (
                 1770194211,
                 2163355814,
                 10020926691,
                 2163355821,
                 2375524420,
                 629106153,
-            ],
+            ),
         )
         get_tram_stops_and_tracks_mock.assert_called_once_with("Kraków")
         load_gtfs_package_mock.assert_called_once_with(
@@ -486,8 +500,18 @@ class TestServer:
 
         cache_get_mock.assert_called_once_with("krakow", datetime.date.today())
         get_relations_and_stops_mock.assert_called_once_with(
-            "Kraków",
-            [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
+            krakow_city_configuration.gtfs_configurations[0].transit_type,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
+            krakow_city_configuration.osm_stops_area_name,
+            (
+                1770194211,
+                2163355814,
+                10020926691,
+                2163355821,
+                2375524420,
+                629106153,
+            ),
         )
         get_by_city_id_mock.assert_called_once_with("krakow")
 
@@ -540,15 +564,18 @@ class TestServer:
         cache_get_mock.assert_called_once_with("krakow", datetime.date.today())
         get_by_city_id_mock.assert_called_once_with("krakow")
         get_relations_and_stops_mock.assert_called_once_with(
-            "Kraków",
-            [
+            krakow_city_configuration.gtfs_configurations[0].transit_type,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
+            krakow_city_configuration.osm_stops_area_name,
+            (
                 1770194211,
                 2163355814,
                 10020926691,
                 2163355821,
                 2375524420,
                 629106153,
-            ],
+            ),
         )
         get_tram_stops_and_tracks_mock.assert_called_once_with("Kraków")
         load_gtfs_package_mock.assert_called_once_with(
@@ -585,21 +612,31 @@ class TestServer:
 
         cache_get_mock.assert_called_once_with("krakow", datetime.date.today())
         get_relations_and_stops_mock.assert_called_once_with(
-            "Kraków",
-            [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
+            krakow_city_configuration.gtfs_configurations[0].transit_type,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
+            krakow_city_configuration.osm_stops_area_name,
+            (
+                1770194211,
+                2163355814,
+                10020926691,
+                2163355821,
+                2375524420,
+                629106153,
+            ),
         )
         get_by_city_id_mock.assert_called_once_with("krakow")
 
     @freeze_time("2025-01-01")
     @patch("city_configuration.city_configuration.CityConfiguration.get_by_city_id")
-    @patch("gtfs.gtfs_package.GTFSPackage.from_url")
+    @patch("gtfs.gtfs_package_store.GTFSPackageStore.load_gtfs_package")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     def test_get_city_data_with_custom_schedule(
         self,
         get_relations_and_stops_mock: MagicMock,
         get_tram_stops_and_tracks_mock: MagicMock,
-        gtfs_package_from_url_mock: MagicMock,
+        load_gtfs_package_mock: MagicMock,
         get_by_city_id_mock: MagicMock,
         relations_and_stops_overpass_query_result: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
@@ -614,7 +651,7 @@ class TestServer:
         get_tram_stops_and_tracks_mock.return_value = (
             tram_stops_and_tracks_overpass_query_result
         )
-        gtfs_package_from_url_mock.return_value = gtfs_package
+        load_gtfs_package_mock.return_value = gtfs_package
         get_by_city_id_mock.return_value = krakow_city_configuration
 
         # Act
@@ -723,14 +760,14 @@ class TestServer:
 
     @freeze_time("2025-01-01")
     @patch("city_configuration.city_configuration.CityConfiguration.get_by_city_id")
-    @patch("gtfs.gtfs_package.GTFSPackage.from_url")
+    @patch("gtfs.gtfs_package_store.GTFSPackageStore.load_gtfs_package")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     def test_get_city_data_with_custom_schedule_unknown_stop(
         self,
         get_relations_and_stops_mock: MagicMock,
         get_tram_stops_and_tracks_mock: MagicMock,
-        gtfs_package_from_url_mock: MagicMock,
+        load_gtfs_package_mock: MagicMock,
         get_by_city_id_mock: MagicMock,
         relations_and_stops_overpass_query_result: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
@@ -745,7 +782,7 @@ class TestServer:
         get_tram_stops_and_tracks_mock.return_value = (
             tram_stops_and_tracks_overpass_query_result
         )
-        gtfs_package_from_url_mock.return_value = gtfs_package
+        load_gtfs_package_mock.return_value = gtfs_package
         get_by_city_id_mock.return_value = krakow_city_configuration
 
         custom_gtfs_package.stop_times = pd.concat(

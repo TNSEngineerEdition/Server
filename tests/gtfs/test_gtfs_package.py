@@ -9,6 +9,7 @@ from zipfile import ZipFile
 import pandas as pd
 import pytest
 
+from city_configuration import CityConfiguration
 from gtfs import GTFSPackage, Weekday
 
 
@@ -56,7 +57,7 @@ class TestGTFSPackage:
     ) -> None:
         assert isinstance(data_frame, pd.DataFrame)
         assert data_frame.index.name == index_name
-        assert list(data_frame.columns) == columns
+        assert set(data_frame.columns).issuperset(columns)
         assert len(data_frame) == row_count
 
     def test_from_zip_file(self) -> None:
@@ -324,3 +325,25 @@ class TestGTFSPackage:
 
         # Assert
         assert service_ids == expected_service_ids
+
+    def test_stop_group_name_by_gtfs_stop_id(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        expected_stop_groups: dict[str, str],
+    ) -> None:
+        # Arrange
+        gtfs_package = GTFSPackage.from_file(self.GTFS_FILE_PATH)
+        group_name_pattern = krakow_city_configuration.gtfs_configurations[
+            0
+        ].stop_group_name_pattern
+
+        # Act
+        stop_group_name_by_gtfs_stop_id = {
+            stop_id: gtfs_package.get_stop_group_name_by_stop_ids(
+                group_name_pattern, [stop_id]
+            )
+            for stop_id in expected_stop_groups
+        }
+
+        # Assert
+        assert stop_group_name_by_gtfs_stop_id == expected_stop_groups

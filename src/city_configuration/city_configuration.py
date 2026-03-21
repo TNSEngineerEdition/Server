@@ -22,7 +22,9 @@ class CityConfiguration(BaseModel):
     city: str
     country: str
     image: str
-    osm_area_name: str
+    osm_relations_area_name: str
+    osm_stops_area_name: str
+    osm_network: str
     gtfs_configurations: list[GTFSConfiguration]
     ignored_osm_relations: list[int]
     max_distance_ratio: float

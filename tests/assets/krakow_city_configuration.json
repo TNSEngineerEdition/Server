@@ -2,9 +2,12 @@
   "city": "Krak\u00f3w",
   "country": "Poland",
   "image": "https://some.image/tram.png",
-  "osm_area_name": "Krak\u00f3w",
+  "osm_relations_area_name": "Krak\u00f3w",
+  "osm_stops_area_name": "wojew\u00f3dztwo ma\u0142opolskie",
+  "osm_network": "KMK",
   "gtfs_configurations": [
     {
+      "transit_type": "tram",
       "file_url": "https://gtfs.ztp.krakow.pl/GTFS_KRK_T.zip",
       "ignored_route_names": [],
       "custom_stop_mapping": {
@@ -31,7 +34,8 @@
           "destination_gtfs_stop_id": "stop_272_46429",
           "destination_osm_node_id": 1369031767
         }
-      ]
+      ],
+      "stop_group_name_regex": "^(.*)$"
     }
   ],
   "ignored_osm_relations": [

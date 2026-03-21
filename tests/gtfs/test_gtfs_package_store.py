@@ -10,13 +10,18 @@ import requests
 from freezegun import freeze_time
 
 from city_configuration import GTFSConfiguration
+from city_configuration.enums import TransitType
 from gtfs.exceptions import MissingGTFSPackage
 from gtfs.gtfs_package import GTFSPackage
 from gtfs.gtfs_package_store import GTFSPackageStore
 
 
 class TestGTFSPackageStore:
-    EXAMPLE_CONFIG = GTFSConfiguration(file_url="https://gtfs.example.com/GTFS.zip")
+    EXAMPLE_CONFIG = GTFSConfiguration(
+        transit_type=TransitType.BUS,
+        file_url="https://gtfs.example.com/GTFS.zip",
+        stop_group_name_regex="",
+    )
     EXAMPLE_CONFIG_FILE_URL_HASH = "2e997655433a4916518a9c1a065bf377"
 
     @pytest.fixture

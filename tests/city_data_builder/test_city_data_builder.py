@@ -7,6 +7,7 @@ import pytest
 from freezegun import freeze_time
 
 from city_configuration import CityConfiguration
+from city_configuration.enums import TransitType
 from city_data_builder import CityDataBuilder, ResponseGraphTramStop
 from gtfs import GTFSPackage, GTFSPackageStore, Weekday
 from tram_stop_mapper import TramStopNotFound
@@ -128,11 +129,14 @@ class TestCityDataBuilder:
         )
 
         get_relations_and_stops_mock.assert_called_once_with(
-            krakow_city_configuration.osm_area_name,
-            [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
+            TransitType.TRAM,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
+            krakow_city_configuration.osm_stops_area_name,
+            (1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153),
         )
         get_tram_stops_and_tracks_mock.assert_called_once_with(
-            krakow_city_configuration.osm_area_name
+            krakow_city_configuration.osm_relations_area_name
         )
         gtfs_package_store_mock.load_gtfs_package.assert_called_once_with(
             krakow_city_configuration.gtfs_configurations[0]
@@ -180,11 +184,14 @@ class TestCityDataBuilder:
         )
 
         get_relations_and_stops_mock.assert_called_once_with(
-            krakow_city_configuration.osm_area_name,
-            [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
+            TransitType.TRAM,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
+            krakow_city_configuration.osm_stops_area_name,
+            (1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153),
         )
         get_tram_stops_and_tracks_mock.assert_called_once_with(
-            krakow_city_configuration.osm_area_name
+            krakow_city_configuration.osm_relations_area_name
         )
         gtfs_package_store_mock.load_gtfs_package.assert_called_once_with(
             krakow_city_configuration.gtfs_configurations[0]
@@ -217,7 +224,6 @@ class TestCityDataBuilder:
         krakow_city_configuration: CityConfiguration,
         relations_and_stops_overpass_query_result: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
-        gtfs_package: GTFSPackage,
         custom_gtfs_package: GTFSPackage,
         weekday: Weekday,
         expected_route_count: int,
@@ -254,11 +260,14 @@ class TestCityDataBuilder:
         )
 
         get_relations_and_stops_mock.assert_called_once_with(
-            krakow_city_configuration.osm_area_name,
-            [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
+            TransitType.TRAM,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
+            krakow_city_configuration.osm_stops_area_name,
+            (1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153),
         )
         get_tram_stops_and_tracks_mock.assert_called_once_with(
-            krakow_city_configuration.osm_area_name
+            krakow_city_configuration.osm_relations_area_name
         )
         gtfs_package_store_mock.load_gtfs_package.assert_called_once_with(
             krakow_city_configuration.gtfs_configurations[0]
@@ -274,7 +283,6 @@ class TestCityDataBuilder:
         krakow_city_configuration: CityConfiguration,
         relations_and_stops_overpass_query_result: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
-        gtfs_package: GTFSPackage,
         custom_gtfs_package: GTFSPackage,
     ) -> None:
         # Arrange
@@ -324,11 +332,14 @@ class TestCityDataBuilder:
 
         # Assert
         get_relations_and_stops_mock.assert_called_once_with(
-            krakow_city_configuration.osm_area_name,
-            [1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153],
+            TransitType.TRAM,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
+            krakow_city_configuration.osm_stops_area_name,
+            (1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153),
         )
         get_tram_stops_and_tracks_mock.assert_called_once_with(
-            krakow_city_configuration.osm_area_name
+            krakow_city_configuration.osm_relations_area_name
         )
         gtfs_package_store_mock.load_gtfs_package.assert_called_once_with(
             krakow_city_configuration.gtfs_configurations[0]

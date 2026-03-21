@@ -1,7 +1,5 @@
 import difflib
-import os
 import re
-import string
 from collections import defaultdict
 from functools import cached_property
 from typing import Hashable
@@ -10,6 +8,7 @@ import overpy
 from pydantic import BaseModel
 
 from city_configuration import GTFSConfiguration
+from city_configuration.enums import TransitType
 from gtfs import GTFSPackage
 from tram_stop_mapper.exceptions import (
     InvalidRelationTag,
@@ -136,52 +135,24 @@ class TramStopMapper:
 
         return (
             stop_name.lower()
-            .rstrip(string.digits)
-            .replace(".", "")
-            .replace(" ", "")
+            .replace("0", "")
+            .replace("1", "")
+            .replace("2", "")
+            .replace("3", "")
+            .replace("4", "")
+            .replace("5", "")
+            .replace("6", "")
+            .replace("7", "")
+            .replace("8", "")
+            .replace("9", "")
             .replace("(nż)", "")
+            .replace("(dla wysiadających)", "")
+            .replace(".", "")
+            .replace("-", "")
+            .replace("”", "")
+            .replace('"', "")
+            .replace(" ", "")
         )
-
-    @cached_property
-    def _stop_group_name_by_gtfs_stop_id(self) -> dict[str, str]:
-        stop_ids_by_universal_stop_name: defaultdict[str, set[str]] = defaultdict(set)
-
-        for stop_id, stop_row in self.gtfs_package.stops.iterrows():
-            universal_stop_name = self._to_universal_stop_name(
-                str(stop_row["stop_name"])
-            )
-
-            stop_ids_by_universal_stop_name[universal_stop_name].add(stop_id)
-
-        stop_group_name_by_stop_id: dict[str, str] = {}
-        for stop_ids in stop_ids_by_universal_stop_name.values():
-            stops_series = self.gtfs_package.stops.loc[list(stop_ids), "stop_name"]
-            stop_names = list(map(str, stops_series))
-            stop_group_name = (
-                os.path.commonprefix(stop_names).rstrip(string.digits).strip()
-            )
-
-            for stop_id in stop_ids:
-                stop_group_name_by_stop_id[stop_id] = stop_group_name
-
-        return stop_group_name_by_stop_id
-
-    def get_stop_group_name_by_gtfs_stop_ids(self, stop_ids: list[str]) -> str | None:
-        group_names = {
-            self._stop_group_name_by_gtfs_stop_id[stop_id]
-            for stop_id in stop_ids
-            if stop_id in self._stop_group_name_by_gtfs_stop_id
-        }
-
-        match len(group_names):
-            case 0:
-                return None
-            case 1:
-                return next(iter(group_names))
-            case _:  # pragma: no cover
-                raise ValueError(
-                    f"Duplicate group names {group_names} found for stop IDs {stop_ids}"
-                )
 
     @cached_property
     def _universal_stop_names_by_osm_relation(self) -> dict[overpy.Relation, list[str]]:
@@ -256,6 +227,9 @@ class TramStopMapper:
             ):
                 longest_match, longest_relation = match_result, relation
 
+        if longest_match.size != len(gtfs_trip_stop_names):
+            pass
+
         return longest_match, longest_relation
 
     def _add_trip_to_mapping(
@@ -275,7 +249,7 @@ class TramStopMapper:
 
         matched_gtfs_trip_stops = gtfs_trip_stop_data.iloc[
             longest_match.a : longest_match.a + longest_match.size
-        ].index
+        ].index.astype(str)
 
         matched_osm_relation_stops = self._stops_by_osm_relation[longest_relation][
             longest_match.b : longest_match.b + longest_match.size
@@ -316,7 +290,7 @@ class TramStopMapper:
         gtfs_route_id: Hashable,
     ) -> None:
         gtfs_trips_for_route = self._gtfs_package.trips[
-            self._gtfs_package.trips["route_id"] == gtfs_route_id
+            self._gtfs_package.trips["route_id"].astype(str) == gtfs_route_id
         ]
 
         route_relations = self._get_route_relations(route_name)
@@ -355,7 +329,7 @@ class TramStopMapper:
                     self._mapping_errors.stops_without_mapping.add(gtfs_stop_id)
                 case 1:
                     pass
-                case _:
+                case _ if gtfs_stop_id not in self._gtfs_config.ignored_node_conflicts:
                     self._mapping_errors.nodes_with_conflict[gtfs_stop_id] = [
                         (self._osm_node_by_id[node_id].tags.get("name"), node_id)
                         for node_id in osm_node_ids
@@ -367,12 +341,24 @@ class TramStopMapper:
             - set(self._last_stop_mapping.keys())
         )
 
+        stops_by_osm_relation = self._stops_by_osm_relation
+        if self._gtfs_config.transit_type == TransitType.BUS:
+            available_route_names = {
+                route_name
+                for route_name, _ in self._gtfs_package.get_route_names_and_ids(
+                    ignored_route_names=set(self._gtfs_config.ignored_route_names)
+                )
+            }
+
+            stops_by_osm_relation = {
+                relation: stops
+                for relation, stops in stops_by_osm_relation.items()
+                if relation.tags.get("ref", "") in available_route_names
+            }
+
         self._mapping_errors.underutilized_relations = {
-            relation: [
-                item.tags.get("name", "Unknown stop")
-                for item in self._stops_by_osm_relation[relation]
-            ]
-            for relation, stops in self._stops_by_osm_relation.items()
+            relation: [stop.tags.get("name", "Unknown stop") for stop in stops]
+            for relation, stops in stops_by_osm_relation.items()
             if self._longest_match_size_by_osm_relation[relation] < len(stops)
         }
 

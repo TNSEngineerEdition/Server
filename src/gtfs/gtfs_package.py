@@ -1,4 +1,5 @@
 import datetime
+import re
 from collections import defaultdict
 from functools import cached_property
 from io import BytesIO
@@ -23,30 +24,11 @@ class GTFSPackage(BaseModel):
         "calendar.txt",
     ]
 
-    STOPS_COLUMNS: ClassVar[list[str]] = [
-        "stop_id",
-        "stop_code",
-        "stop_name",
-        "stop_desc",
-        "stop_lat",
-        "stop_lon",
-        "zone_id",
-        "stop_url",
-        "location_type",
-        "parent_station",
-        "stop_timezone",
-        "wheelchair_boarding",
-        "platform_code",
-    ]
+    STOPS_COLUMNS: ClassVar[list[str]] = ["stop_id", "stop_name"]
 
     ROUTES_COLUMNS: ClassVar[list[str]] = [
         "route_id",
-        "agency_id",
         "route_short_name",
-        "route_long_name",
-        "route_desc",
-        "route_type",
-        "route_url",
         "route_color",
         "route_text_color",
     ]
@@ -56,11 +38,6 @@ class GTFSPackage(BaseModel):
         "route_id",
         "service_id",
         "trip_headsign",
-        "trip_short_name",
-        "direction_id",
-        "block_id",
-        "shape_id",
-        "wheelchair_accessible",
     ]
 
     STOP_TIMES_COLUMNS: ClassVar[list[str]] = [
@@ -69,11 +46,6 @@ class GTFSPackage(BaseModel):
         "departure_time",
         "stop_id",
         "stop_sequence",
-        "stop_headsign",
-        "pickup_type",
-        "drop_off_type",
-        "shape_dist_traveled",
-        "timepoint",
     ]
 
     CALENDAR_COLUMNS: ClassVar[list[str]] = [
@@ -110,7 +82,7 @@ class GTFSPackage(BaseModel):
         data_frame: pd.DataFrame,
         expected_columns: list[str],
     ) -> pd.DataFrame:
-        if (columns := list(data_frame.columns)) != expected_columns:
+        if not (columns := set(data_frame.columns)).issuperset(expected_columns):
             raise InvalidGTFSPackage(
                 f"File {file_name} should contain columns: {expected_columns}, instead got: {columns}"
             )
@@ -152,13 +124,19 @@ class GTFSPackage(BaseModel):
     @classmethod
     def from_zip_file(cls, zip_file: ZipFile) -> "GTFSPackage":
         with zip_file.open("stops.txt") as file:
-            stops = pd.read_csv(file).set_index("stop_id")
+            stops = pd.read_csv(file)
+            stops["stop_id"] = stops["stop_id"].astype(str)
+            stops = stops.set_index("stop_id")
 
         with zip_file.open("routes.txt") as file:
-            routes = pd.read_csv(file).set_index("route_id")
+            routes = pd.read_csv(file)
+            routes["route_id"] = routes["route_id"].astype(str)
+            routes = routes.set_index("route_id")
 
         with zip_file.open("trips.txt") as file:
-            trips = pd.read_csv(file).set_index("trip_id")
+            trips = pd.read_csv(file)
+            trips["trip_id"] = trips["trip_id"].astype(str)
+            trips = trips.set_index("trip_id")
 
         with zip_file.open("stop_times.txt") as file:
             stop_times = pd.read_csv(file)
@@ -255,7 +233,7 @@ class GTFSPackage(BaseModel):
 
         result: defaultdict[str, list[str]] = defaultdict(list)
         for trip_id, stop_sequence in sorted(stop_ids.keys()):
-            result[trip_id].append(stop_ids[trip_id, stop_sequence])
+            result[trip_id].append(str(stop_ids[trip_id, stop_sequence]))
 
         return dict(result)
 
@@ -334,3 +312,28 @@ class GTFSPackage(BaseModel):
         service_ids = service_ids.difference(map(str, service_ids_to_remove))
 
         return service_ids
+
+    def get_stop_group_name_by_stop_ids(
+        self, group_name_pattern: re.Pattern[str], stop_ids: list[str]
+    ) -> str | None:
+        group_names = [
+            group_name_pattern.match(str(self.stops.loc[stop_id]["stop_name"]))
+            for stop_id in stop_ids
+        ]
+
+        names: set[str] = set()
+        for item in group_names:
+            if item is None:
+                return None
+
+            names.add(str(item.group(1)))
+
+        match len(names):
+            case 0:
+                return None
+            case 1:
+                return next(iter(names))
+            case _:  # pragma: no cover
+                raise ValueError(
+                    f"Duplicate group names {names} found for stop IDs {stop_ids}"
+                )

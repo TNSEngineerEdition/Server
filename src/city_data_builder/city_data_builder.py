@@ -32,7 +32,7 @@ class CityDataBuilder:
         is_today: bool,
         custom_gtfs_package: GTFSPackage | None = None,
         max_distance_between_nodes: float = 5.0,
-    ):
+    ) -> None:
         self._city_configuration = city_configuration
         self._weekday = weekday
         self._gtfs_package_store = gtfs_package_store
@@ -66,8 +66,11 @@ class CityDataBuilder:
                     )
 
             relations_and_stops = OverpassClient.get_relations_and_stops(
-                self._city_configuration.osm_area_name,
-                custom_node_ids,
+                gtfs_config.transit_type,
+                self._city_configuration.osm_network,
+                self._city_configuration.osm_relations_area_name,
+                self._city_configuration.osm_stops_area_name,
+                tuple(custom_node_ids),
             )
 
             gtfs_package = self._gtfs_package_store.load_gtfs_package(gtfs_config)
@@ -85,7 +88,7 @@ class CityDataBuilder:
 
     def _get_tram_track_graph(self) -> "nx.DiGraph[Node]":
         tram_stops_and_tracks = OverpassClient.get_tram_stops_and_tracks(
-            self._city_configuration.osm_area_name
+            self._city_configuration.osm_relations_area_name
         )
 
         tram_track_graph_transformer = TramTrackGraphTransformer(
@@ -97,7 +100,6 @@ class CityDataBuilder:
             self._max_distance_between_nodes
         )
 
-        # TODO: Replace with path calculation
         tram_track_graph_inspector = TramTrackGraphInspector(tram_track_graph)
         for tram_stop_mapper in self._tram_stop_mappers.values():
             for (
@@ -132,8 +134,8 @@ class CityDataBuilder:
             stop_row = tram_stop_mapper.gtfs_package.stops.loc[gtfs_stop_ids[0]]
             stop_name = str(stop_row["stop_name"])
 
-        stop_group_name = tram_stop_mapper.get_stop_group_name_by_gtfs_stop_ids(
-            gtfs_stop_ids
+        stop_group_name = tram_stop_mapper.gtfs_package.get_stop_group_name_by_stop_ids(
+            tram_stop_mapper._gtfs_config.stop_group_name_pattern, gtfs_stop_ids
         )
 
         return ResponseGraphTramStop(
