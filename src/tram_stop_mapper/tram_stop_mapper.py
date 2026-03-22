@@ -7,8 +7,7 @@ from typing import Hashable
 import overpy
 from pydantic import BaseModel
 
-from city_configuration import GTFSConfiguration
-from city_configuration.enums import TransitType
+from city_configuration import GTFSConfiguration, TransitType
 from gtfs import GTFSPackage
 from tram_stop_mapper.exceptions import (
     InvalidRelationTag,
@@ -45,6 +44,7 @@ class TramStopMapper:
     """
 
     RELATION_NAME_REGEX = re.compile(r"^Tram [a-zA-Z0-9\(\) ]+: (.+)")
+    UNIVERSAL_STOP_NAME_IGNORED_CHARS_REGEX = re.compile(r"[0-9\.\-”\"\s]")
 
     def __init__(
         self,
@@ -123,8 +123,8 @@ class TramStopMapper:
             if relation.id not in self._ignored_osm_relations
         }
 
-    @staticmethod
-    def _to_universal_stop_name(stop_name: str) -> str:
+    @classmethod
+    def _to_universal_stop_name(cls, stop_name: str) -> str:
         """
         Due to differences in stop names between GTFS and OSM, for example
         the 'Meksyk (nż)' stop in GTFS is equivalent to 'Meksyk 01' on OSM,
@@ -134,24 +134,9 @@ class TramStopMapper:
         """
 
         return (
-            stop_name.lower()
-            .replace("0", "")
-            .replace("1", "")
-            .replace("2", "")
-            .replace("3", "")
-            .replace("4", "")
-            .replace("5", "")
-            .replace("6", "")
-            .replace("7", "")
-            .replace("8", "")
-            .replace("9", "")
+            cls.UNIVERSAL_STOP_NAME_IGNORED_CHARS_REGEX.sub("", stop_name.lower())
             .replace("(nż)", "")
             .replace("(dla wysiadających)", "")
-            .replace(".", "")
-            .replace("-", "")
-            .replace("”", "")
-            .replace('"', "")
-            .replace(" ", "")
         )
 
     @cached_property

@@ -6,8 +6,7 @@ import pandas as pd
 import pytest
 from freezegun import freeze_time
 
-from city_configuration import CityConfiguration
-from city_configuration.enums import TransitType
+from city_configuration import CityConfiguration, TransitType
 from city_data_builder import CityDataBuilder, ResponseGraphTramStop
 from gtfs import GTFSPackage, GTFSPackageStore, Weekday
 from tram_stop_mapper import TramStopNotFound
