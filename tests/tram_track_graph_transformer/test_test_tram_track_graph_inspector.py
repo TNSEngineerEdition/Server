@@ -2,7 +2,7 @@ import networkx as nx
 import pytest
 from pyproj import Geod
 
-from city_data_builder import CityConfiguration
+from city_configuration import CityConfiguration
 from tram_track_graph_transformer.exceptions import (
     NodeNotFoundError,
     NoPathFoundError,

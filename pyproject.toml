@@ -23,7 +23,9 @@ dependencies = [
     "uvicorn>=0.34.0",
     "types-requests>=2.32.4",
     "types-networkx>=3.5.0",
-    "python-multipart>=0.0.20"
+    "types-cachetools>=6.2.0",
+    "python-multipart>=0.0.20",
+    "cachetools>=7.0.5",
 ]
 
 [project.optional-dependencies]
@@ -63,6 +65,5 @@ strict = true
 exclude_lines = [
     "pragma: no cover",
     "if __name__ == .__main__.:",
-    "if TYPE_CHECKING:",
     "with pytest.raises",
 ]

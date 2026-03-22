@@ -2,7 +2,7 @@ import datetime
 
 from pydantic import BaseModel
 
-from city_data_builder.city_configuration import CityConfiguration
+from city_configuration import CityConfiguration
 
 
 class CachedCityDates(BaseModel):

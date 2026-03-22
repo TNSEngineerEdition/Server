@@ -1,18 +1,16 @@
 import math
 from itertools import chain
-from typing import cast, TYPE_CHECKING
+from typing import cast
 
 import networkx as nx
 import overpy
 from pyproj import Geod, Transformer
 from shapely.geometry import LineString
 
+from city_configuration import CityConfiguration
 from tram_track_graph_transformer.exceptions import TrackDirectionChangeError
 from tram_track_graph_transformer.node import Node
 from tram_track_graph_transformer.node_type import NodeType
-
-if TYPE_CHECKING:  # pragma: no cover
-    from city_data_builder import CityConfiguration
 
 
 class TramTrackGraphTransformer:
@@ -101,11 +99,12 @@ class TramTrackGraphTransformer:
         each node can potentially act as a tram stop, even when it has a different type
         assigned to it by OSM.
         """
-        return (
-            NodeType.TRAM_STOP
-            if node.id in self._city_configuration.custom_stop_mapping.values()
-            else NodeType.get_by_value_safe(node.tags.get("railway"))
-        )
+
+        for gtfs_config in self._city_configuration.gtfs_configurations:
+            if node.id in gtfs_config.custom_stop_mapping.values():
+                return NodeType.TRAM_STOP
+
+        return NodeType.get_by_value_safe(node.tags.get("railway"))
 
     def _get_tram_stop_node_ids_in_graph(self) -> set[Node]:
         """

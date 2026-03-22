@@ -11,8 +11,8 @@ from city_data_builder import ResponseCityData
 
 
 class CityDataCache:
-    DEFAULT_CACHE_DIRECTORY = Path(
-        os.environ.get("CITY_DATA_CACHE_DIRECTORY", "./cache/cities")
+    DEFAULT_CACHE_DIRECTORY = (
+        Path(os.environ.get("CACHE_DIRECTORY", "./cache")) / "cities"
     )
     DEFAULT_MAX_FILE_COUNT = int(os.environ.get("CITY_DATA_CACHE_MAX_FILE_COUNT", "10"))
 

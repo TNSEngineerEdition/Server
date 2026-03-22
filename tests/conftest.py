@@ -9,14 +9,25 @@ import networkx as nx
 import overpy
 import pytest
 
-from city_data_builder import CityConfiguration, ResponseCityData
-from tram_stop_mapper import GTFSPackage
+from city_configuration import CityConfiguration
+from city_data_builder import ResponseCityData
+from gtfs import GTFSPackage
 from tram_track_graph_transformer import Node
 
 
 @pytest.fixture
 def gtfs_package() -> GTFSPackage:
     return GTFSPackage.from_file("tests/assets/gtfs_schedule.zip")
+
+
+@pytest.fixture
+def gtfs_package_byte_buffer(
+    gtfs_package: GTFSPackage,
+) -> Generator[IO[bytes], None, None]:
+    with io.BytesIO() as buffer:
+        gtfs_package.to_zip_file(buffer)
+        buffer.seek(0)
+        yield buffer
 
 
 @pytest.fixture
