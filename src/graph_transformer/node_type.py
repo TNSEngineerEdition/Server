@@ -15,6 +15,9 @@ class NodeType(Enum):
     BUFFER_STOP = "buffer_stop"
     INTERPOLATED = "interpolated"
 
+    BUS_STOP = "stop_position"
+    TRAFFIC_SIGNALS = "traffic_signals"
+
     @classmethod
     def get_by_value_safe(cls, value: Any) -> "NodeType":
         try:

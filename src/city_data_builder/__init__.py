@@ -4,7 +4,7 @@ from .model import (
     ResponseCityData,
     ResponseGraphEdge,
     ResponseGraphNode,
-    ResponseGraphTramStop,
+    ResponseGraphStop,
     ResponseTramRoute,
     ResponseTramTrip,
 )
@@ -14,7 +14,7 @@ __all__ = [
     "CustomTramStopPairMapping",
     "CityDataBuilder",
     "ResponseGraphNode",
-    "ResponseGraphTramStop",
+    "ResponseGraphStop",
     "ResponseTramTrip",
     "ResponseTramRoute",
     "ResponseGraphEdge",

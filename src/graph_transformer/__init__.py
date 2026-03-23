@@ -4,13 +4,13 @@ from .exceptions import (
     PathTooLongError,
     TrackDirectionChangeError,
 )
+from .graph_transformer import GraphTransformer
 from .node import Node
 from .node_type import NodeType
 from .tram_track_graph_inspector import TramTrackGraphInspector
-from .tram_track_graph_transformer import TramTrackGraphTransformer
 
 __all__ = [
-    "TramTrackGraphTransformer",
+    "GraphTransformer",
     "Node",
     "NodeType",
     "TramTrackGraphInspector",

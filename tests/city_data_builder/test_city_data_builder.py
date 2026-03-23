@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 from freezegun import freeze_time
 
-from city_data_builder import CityConfiguration, CityDataBuilder, ResponseGraphTramStop
+from city_data_builder import CityConfiguration, CityDataBuilder, ResponseGraphStop
 from tram_stop_mapper import GTFSPackage, TramStopNotFound, Weekday
 
 
@@ -53,7 +53,7 @@ class TestCityDataBuilder:
         }
 
         assert all(
-            isinstance(nodes_by_id[trip_stop.id], ResponseGraphTramStop)
+            isinstance(nodes_by_id[trip_stop.id], ResponseGraphStop)
             for route in city_data_builder.tram_routes_data
             for trip in route.trips
             for trip_stop in trip.stops
