@@ -22,4 +22,4 @@ class ResponseCityData(BaseModel):
             ResponseGraphNode | ResponseGraphStop,
             Field(discriminator="node_type"),
         ]
-    ]
+    ] = Field(default_factory=list)

@@ -332,7 +332,7 @@ class GraphTransformer:
         )
 
     def densify_graph_by_max_distance(
-        self, max_distance_in_meters: float, error_enable: bool = False
+        self, max_distance_in_meters: float, error_enable: bool = True
     ) -> "nx.DiGraph[Node]":
         """
         Builds a directed graph by splitting edges between permanent nodes

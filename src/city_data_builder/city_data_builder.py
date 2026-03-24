@@ -80,7 +80,7 @@ class CityDataBuilder:
         )
 
         tram_track_graph = tram_track_graph_transformer.densify_graph_by_max_distance(
-            self._max_distance_between_nodes, error_enable=True
+            self._max_distance_between_nodes
         )
 
         tram_track_graph_inspector = TramTrackGraphInspector(tram_track_graph)
@@ -105,7 +105,7 @@ class CityDataBuilder:
         )
 
         bus_road_graph = bus_road_graph_transformer.densify_graph_by_max_distance(
-            self._max_distance_between_nodes
+            self._max_distance_between_nodes, error_enable=False
         )
 
         return bus_road_graph
