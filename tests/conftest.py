@@ -110,6 +110,15 @@ def tram_stops_and_tracks_overpass_query_result() -> overpy.Result:
 
 
 @pytest.fixture
+def bus_roads_overpass_query_result() -> overpy.Result:
+    with zipfile.ZipFile(
+        "tests/assets/bus_roads_overpass_query_result.zip"
+    ) as zip_file:
+        with zip_file.open("osm_bus_roads.pickle") as file:
+            return pickle.load(file)
+
+
+@pytest.fixture
 def krakow_tram_network_graph() -> "nx.DiGraph[Node]":
     with zipfile.ZipFile("tests/assets/krakow_tram_network_graph.zip") as zip_file:
         with zip_file.open("krakow_tram_network_graph.pickle") as file:

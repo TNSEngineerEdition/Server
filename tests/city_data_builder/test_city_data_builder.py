@@ -84,16 +84,19 @@ class TestCityDataBuilder:
             pytest.param(Weekday.SUNDAY, 23, 2375, 62988, id=Weekday.SUNDAY),
         ],
     )
+    @patch("overpass_client.OverpassClient.get_bus_roads")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     def test_city_data_builder(
         self,
         get_relations_and_stops_mock: MagicMock,
         get_tram_stops_and_tracks_mock: MagicMock,
+        get_bus_roads_mock: MagicMock,
         gtfs_package_store_mock: MagicMock,
         krakow_city_configuration: CityConfiguration,
         relations_and_stops_overpass_query_result: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
+        bus_roads_overpass_query_result: overpy.Result,
         weekday: Weekday,
         expected_route_count: int,
         expected_trip_count: int,
@@ -106,6 +109,7 @@ class TestCityDataBuilder:
         get_tram_stops_and_tracks_mock.return_value = (
             tram_stops_and_tracks_overpass_query_result
         )
+        get_bus_roads_mock.return_value = bus_roads_overpass_query_result
 
         expected_node_count, expected_edge_count = 43321, 46047
 
@@ -142,16 +146,19 @@ class TestCityDataBuilder:
         )
 
     @freeze_time("2025-05-01")
+    @patch("overpass_client.OverpassClient.get_bus_roads")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     def test_city_data_builder_today(
         self,
         get_relations_and_stops_mock: MagicMock,
         get_tram_stops_and_tracks_mock: MagicMock,
+        get_bus_roads_mock: MagicMock,
         gtfs_package_store_mock: MagicMock,
         krakow_city_configuration: CityConfiguration,
         relations_and_stops_overpass_query_result: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
+        bus_roads_overpass_query_result: overpy.Result,
     ) -> None:
         # Arrange
         get_relations_and_stops_mock.return_value = (
@@ -160,6 +167,8 @@ class TestCityDataBuilder:
         get_tram_stops_and_tracks_mock.return_value = (
             tram_stops_and_tracks_overpass_query_result
         )
+
+        get_bus_roads_mock.return_value = bus_roads_overpass_query_result
 
         expected_node_count, expected_edge_count = 43321, 46047
 
@@ -213,16 +222,19 @@ class TestCityDataBuilder:
             pytest.param(Weekday.SUNDAY, 22, 2198, 57536, id=Weekday.SUNDAY),
         ],
     )
+    @patch("overpass_client.OverpassClient.get_bus_roads")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     def test_city_data_builder_with_custom_schedule(
         self,
         get_relations_and_stops_mock: MagicMock,
         get_tram_stops_and_tracks_mock: MagicMock,
+        get_bus_roads_mock: MagicMock,
         gtfs_package_store_mock: MagicMock,
         krakow_city_configuration: CityConfiguration,
         relations_and_stops_overpass_query_result: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
+        bus_roads_overpass_query_result: overpy.Result,
         custom_gtfs_package: GTFSPackage,
         weekday: Weekday,
         expected_route_count: int,
@@ -236,6 +248,7 @@ class TestCityDataBuilder:
         get_tram_stops_and_tracks_mock.return_value = (
             tram_stops_and_tracks_overpass_query_result
         )
+        get_bus_roads_mock.return_value = bus_roads_overpass_query_result
 
         expected_node_count, expected_edge_count = 43321, 46047
 
@@ -272,16 +285,19 @@ class TestCityDataBuilder:
             krakow_city_configuration.gtfs_configurations[0]
         )
 
+    @patch("overpass_client.OverpassClient.get_bus_roads")
     @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
     @patch("overpass_client.OverpassClient.get_relations_and_stops")
     def test_tram_routes_data_with_custom_schedule_stop_not_found_in_mapping(
         self,
         get_relations_and_stops_mock: MagicMock,
         get_tram_stops_and_tracks_mock: MagicMock,
+        get_bus_roads_mock: MagicMock,
         gtfs_package_store_mock: MagicMock,
         krakow_city_configuration: CityConfiguration,
         relations_and_stops_overpass_query_result: overpy.Result,
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
+        bus_roads_overpass_query_result: overpy.Result,
         custom_gtfs_package: GTFSPackage,
     ) -> None:
         # Arrange
@@ -291,6 +307,7 @@ class TestCityDataBuilder:
         get_tram_stops_and_tracks_mock.return_value = (
             tram_stops_and_tracks_overpass_query_result
         )
+        get_bus_roads_mock.return_value = bus_roads_overpass_query_result
 
         custom_gtfs_package.stop_times = pd.concat(
             [
@@ -342,4 +359,7 @@ class TestCityDataBuilder:
         )
         gtfs_package_store_mock.load_gtfs_package.assert_called_once_with(
             krakow_city_configuration.gtfs_configurations[0]
+        )
+        get_bus_roads_mock.assert_called_once_with(
+            krakow_city_configuration.osm_relations_area_name
         )
