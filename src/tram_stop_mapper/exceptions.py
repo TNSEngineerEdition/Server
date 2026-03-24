@@ -34,20 +34,6 @@ class TramStopNotFound(ValueError):
         return f"Stop {self.missing_stop_id} not found in any mapping."
 
 
-class InvalidGTFSPackage(ValueError):
-    """
-    Provided GTFS package contains invalid data.
-    """
-
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-
-        self.message = message
-
-    def __str__(self) -> str:
-        return f"Invalid GTFS data: {self.message}"
-
-
 class InvalidRelationTag(ValueError):
     """
     Provided tag of the provided relation is invalid.

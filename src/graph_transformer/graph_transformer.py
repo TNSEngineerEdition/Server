@@ -1,18 +1,16 @@
 import math
 from itertools import chain
-from typing import cast, TYPE_CHECKING
+from typing import cast
 
 import networkx as nx
 import overpy
 from pyproj import Geod, Transformer
 from shapely.geometry import LineString
 
+from city_configuration import CityConfiguration
 from graph_transformer.exceptions import TrackDirectionChangeError
 from graph_transformer.node import Node
 from graph_transformer.node_type import NodeType
-
-if TYPE_CHECKING:  # pragma: no cover
-    from city_data_builder import CityConfiguration
 
 
 class GraphTransformer:
@@ -127,14 +125,15 @@ class GraphTransformer:
         public_transport = tags.get("public_transport")
         railway = tags.get("railway")
 
-        if node.id in self._city_configuration.custom_stop_mapping.values():
-            return NodeType.TRAM_STOP
+        for gtfs_config in self._city_configuration.gtfs_configurations:
+            if node.id in gtfs_config.custom_stop_mapping.values():
+                return NodeType.TRAM_STOP
 
-        if public_transport == "stop_position" or highway == "bus_stop":
-            return NodeType.BUS_STOP
+            if public_transport == "stop_position" or highway == "bus_stop":
+                return NodeType.BUS_STOP
 
-        if highway == "traffic_signals":
-            return NodeType.TRAFFIC_SIGNALS
+            if highway == "traffic_signals":
+                return NodeType.TRAFFIC_SIGNALS
 
         return NodeType.get_by_value_safe(railway)
 

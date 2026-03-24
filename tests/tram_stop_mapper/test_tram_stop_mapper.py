@@ -5,9 +5,9 @@ from zipfile import ZipFile
 import overpy
 import pytest
 
-from city_data_builder import CityConfiguration, CustomTramStopPairMapping
+from city_configuration import CityConfiguration, CustomTramStopPairMapping
+from gtfs import GTFSPackage
 from tram_stop_mapper.exceptions import InvalidRelationTag, TramStopMappingBuildError
-from tram_stop_mapper.gtfs_package import GTFSPackage
 from tram_stop_mapper.tram_stop_mapper import TramStopMapper
 
 
@@ -44,16 +44,19 @@ class TestTramStopMapper:
         ],
     ) -> None:
         # Arrange
-        krakow_city_configuration.ignored_gtfs_lines.append("17")
+        krakow_city_configuration.gtfs_configurations[0].ignored_route_names.append(
+            "17"
+        )
 
         del relations_and_stops_overpass_query_result._relations[172973]
         del relations_and_stops_overpass_query_result._relations[3147263]
 
         # Act
         tram_stop_mapper = TramStopMapper(
-            krakow_city_configuration,
+            krakow_city_configuration.gtfs_configurations[0],
             gtfs_package,
             relations_and_stops_overpass_query_result,
+            krakow_city_configuration.ignored_osm_relations,
         )
 
         # Assert
@@ -80,9 +83,10 @@ class TestTramStopMapper:
     ) -> None:
         # Act
         tram_stop_mapper = TramStopMapper(
-            krakow_city_configuration,
+            krakow_city_configuration.gtfs_configurations[0],
             gtfs_package,
             relations_and_stops_overpass_query_result,
+            krakow_city_configuration.ignored_osm_relations,
         )
 
         # Assert
@@ -134,9 +138,10 @@ class TestTramStopMapper:
         # Act
         with pytest.raises(TramStopMappingBuildError) as exc_info:
             TramStopMapper(
-                krakow_city_configuration,
+                krakow_city_configuration.gtfs_configurations[0],
                 gtfs_package,
                 relations_and_stops_overpass_query_result,
+                krakow_city_configuration.ignored_osm_relations,
             )
 
         # Assert
@@ -149,7 +154,9 @@ class TestTramStopMapper:
         relations_and_stops_overpass_query_result: overpy.Result,
     ) -> None:
         # Arrange
-        krakow_city_configuration.custom_stop_mapping["stop_386_285919"] = 2419732952
+        krakow_city_configuration.gtfs_configurations[0].custom_stop_mapping[
+            "stop_386_285919"
+        ] = 2419732952
 
         expected_exception_message = (
             "Unable to build correct mapping of GTFS stops to OSM nodes.\n"
@@ -160,9 +167,10 @@ class TestTramStopMapper:
         # Act
         with pytest.raises(TramStopMappingBuildError) as exc_info:
             TramStopMapper(
-                krakow_city_configuration,
+                krakow_city_configuration.gtfs_configurations[0],
                 gtfs_package,
                 relations_and_stops_overpass_query_result,
+                krakow_city_configuration.ignored_osm_relations,
             )
 
         # Assert
@@ -198,9 +206,10 @@ class TestTramStopMapper:
         # Act
         with pytest.raises(TramStopMappingBuildError) as exc_info:
             TramStopMapper(
-                krakow_city_configuration,
+                krakow_city_configuration.gtfs_configurations[0],
                 gtfs_package,
                 relations_and_stops_overpass_query_result,
+                krakow_city_configuration.ignored_osm_relations,
             )
 
         # Assert
@@ -223,9 +232,10 @@ class TestTramStopMapper:
         # Act
         with pytest.raises(TramStopMappingBuildError) as exc_info:
             TramStopMapper(
-                krakow_city_configuration,
+                krakow_city_configuration.gtfs_configurations[0],
                 gtfs_package,
                 relations_and_stops_overpass_query_result,
+                krakow_city_configuration.ignored_osm_relations,
             )
 
         # Assert
@@ -242,7 +252,9 @@ class TestTramStopMapper:
         relations_and_stops_overpass_query_result: overpy.Result,
     ) -> None:
         # Arrange
-        krakow_city_configuration.custom_stop_mapping["stop_386_285919"] = 2419732952
+        krakow_city_configuration.gtfs_configurations[0].custom_stop_mapping[
+            "stop_386_285919"
+        ] = 2419732952
 
         gtfs_package.routes.loc["route_12345"] = [
             "agency_1",
@@ -289,9 +301,10 @@ class TestTramStopMapper:
         # Act
         with pytest.raises(TramStopMappingBuildError) as exc_info:
             TramStopMapper(
-                krakow_city_configuration,
+                krakow_city_configuration.gtfs_configurations[0],
                 gtfs_package,
                 relations_and_stops_overpass_query_result,
+                krakow_city_configuration.ignored_osm_relations,
             )
 
         # Assert
@@ -323,9 +336,10 @@ class TestTramStopMapper:
         )
 
         tram_stop_mapper = TramStopMapper(
-            krakow_city_configuration,
+            krakow_city_configuration.gtfs_configurations[0],
             gtfs_package,
             relations_and_stops_overpass_query_result,
+            krakow_city_configuration.ignored_osm_relations,
         )
 
         # Act
@@ -360,9 +374,9 @@ class TestTramStopMapper:
         custom_stop_mapping: tuple[int | None, int | None, int | None],
     ) -> None:
         # Arrange
-        krakow_city_configuration.custom_stop_mapping[gtfs_stop_id] = (
-            custom_stop_mapping
-        )
+        krakow_city_configuration.gtfs_configurations[0].custom_stop_mapping[
+            gtfs_stop_id
+        ] = custom_stop_mapping
 
         expected_trip_stop_count = gtfs_package.stop_times.value_counts("trip_id")
 
@@ -371,9 +385,10 @@ class TestTramStopMapper:
         )
 
         tram_stop_mapper = TramStopMapper(
-            krakow_city_configuration,
+            krakow_city_configuration.gtfs_configurations[0],
             gtfs_package,
             relations_and_stops_overpass_query_result,
+            krakow_city_configuration.ignored_osm_relations,
         )
 
         # Act
@@ -405,7 +420,9 @@ class TestTramStopMapper:
             gtfs_package.stop_id_sequence_by_trip_id.values()
         )
 
-        krakow_city_configuration.custom_stop_pair_mapping.append(
+        krakow_city_configuration.gtfs_configurations[
+            0
+        ].custom_stop_pair_mapping.append(
             CustomTramStopPairMapping(
                 source_gtfs_stop_id="stop_331_254819",
                 source_osm_node_id=10757365408,
@@ -415,9 +432,10 @@ class TestTramStopMapper:
         )
 
         tram_stop_mapper = TramStopMapper(
-            krakow_city_configuration,
+            krakow_city_configuration.gtfs_configurations[0],
             gtfs_package,
             relations_and_stops_overpass_query_result,
+            krakow_city_configuration.ignored_osm_relations,
         )
 
         # Act
@@ -444,9 +462,10 @@ class TestTramStopMapper:
     ) -> None:
         # Arrange
         tram_stop_mapper = TramStopMapper(
-            krakow_city_configuration,
+            krakow_city_configuration.gtfs_configurations[0],
             gtfs_package,
             relations_and_stops_overpass_query_result,
+            krakow_city_configuration.ignored_osm_relations,
         )
 
         # Act
@@ -489,9 +508,10 @@ class TestTramStopMapper:
         expected_trip_stop_count = gtfs_package.stop_times.value_counts("trip_id")
 
         tram_stop_mapper = TramStopMapper(
-            krakow_city_configuration,
+            krakow_city_configuration.gtfs_configurations[0],
             gtfs_package,
             relations_and_stops_overpass_query_result,
+            krakow_city_configuration.ignored_osm_relations,
         )
 
         # Act
@@ -512,9 +532,10 @@ class TestTramStopMapper:
     ) -> None:
         # Arrange
         tram_stop_mapper = TramStopMapper(
-            krakow_city_configuration,
+            krakow_city_configuration.gtfs_configurations[0],
             gtfs_package,
             relations_and_stops_overpass_query_result,
+            krakow_city_configuration.ignored_osm_relations,
         )
 
         # Act
@@ -535,9 +556,10 @@ class TestTramStopMapper:
     ) -> None:
         # Arrange
         tram_stop_mapper = TramStopMapper(
-            krakow_city_configuration,
+            krakow_city_configuration.gtfs_configurations[0],
             gtfs_package,
             relations_and_stops_overpass_query_result,
+            krakow_city_configuration.ignored_osm_relations,
         )
 
         expected_routes = list(map(str, custom_gtfs_package.routes["route_short_name"]))
@@ -563,9 +585,10 @@ class TestTramStopMapper:
         relation.tags["name"] = "Incorrect tram name"
 
         tram_stop_mapper = TramStopMapper(
-            krakow_city_configuration,
+            krakow_city_configuration.gtfs_configurations[0],
             gtfs_package,
             relations_and_stops_overpass_query_result,
+            krakow_city_configuration.ignored_osm_relations,
         )
 
         # Act
@@ -579,26 +602,3 @@ class TestTramStopMapper:
             "Relation 172969 has invalid tag name: "
             "String 'Incorrect tram name' doesn't match regular expression"
         )
-
-    def test_stop_group_name_by_gtfs_stop_id(
-        self,
-        krakow_city_configuration: CityConfiguration,
-        gtfs_package: GTFSPackage,
-        relations_and_stops_overpass_query_result: overpy.Result,
-        expected_stop_groups: dict[str, str],
-    ) -> None:
-        # Arrange
-        tram_stop_mapper = TramStopMapper(
-            krakow_city_configuration,
-            gtfs_package,
-            relations_and_stops_overpass_query_result,
-        )
-
-        # Act
-        stop_group_name_by_gtfs_stop_id = {
-            stop_id: tram_stop_mapper.get_stop_group_name_by_gtfs_stop_ids([stop_id])
-            for stop_id in expected_stop_groups
-        }
-
-        # Assert
-        assert stop_group_name_by_gtfs_stop_id == expected_stop_groups
