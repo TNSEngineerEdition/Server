@@ -564,6 +564,7 @@ class TestServer:
         get_tram_stops_and_tracks_mock.return_value = (
             tram_stops_and_tracks_overpass_query_result
         )
+        get_bus_roads_mock.return_value = bus_roads_overpass_query_result
         gtfs_package_get_trips_for_service_ids_mock.side_effect = Exception("Error")
         load_gtfs_package_mock.return_value = gtfs_package
         get_by_city_id_mock.return_value = krakow_city_configuration
@@ -671,6 +672,7 @@ class TestServer:
         get_tram_stops_and_tracks_mock.return_value = (
             tram_stops_and_tracks_overpass_query_result
         )
+        get_bus_roads_mock.return_value = bus_roads_overpass_query_result
         load_gtfs_package_mock.return_value = gtfs_package
         get_by_city_id_mock.return_value = krakow_city_configuration
 
@@ -805,6 +807,7 @@ class TestServer:
         get_tram_stops_and_tracks_mock.return_value = (
             tram_stops_and_tracks_overpass_query_result
         )
+        get_bus_roads_mock.return_value = bus_roads_overpass_query_result
         load_gtfs_package_mock.return_value = gtfs_package
         get_by_city_id_mock.return_value = krakow_city_configuration
 
