@@ -3,13 +3,13 @@ import pytest
 from pyproj import Geod
 
 from city_configuration import CityConfiguration
-from tram_track_graph_transformer.exceptions import (
+from graph_transformer.exceptions import (
     NodeNotFoundError,
     NoPathFoundError,
     PathTooLongError,
 )
-from tram_track_graph_transformer.node import Node
-from tram_track_graph_transformer.tram_track_graph_inspector import (
+from graph_transformer.node import Node
+from graph_transformer.tram_track_graph_inspector import (
     TramTrackGraphInspector,
 )
 

@@ -11,8 +11,8 @@ import pytest
 
 from city_configuration import CityConfiguration
 from city_data_builder import ResponseCityData
+from graph_transformer import Node
 from gtfs import GTFSPackage
-from tram_track_graph_transformer import Node
 
 
 @pytest.fixture
@@ -106,6 +106,15 @@ def tram_stops_and_tracks_overpass_query_result() -> overpy.Result:
         "tests/assets/tram_stops_and_tracks_overpass_query_result.zip"
     ) as zip_file:
         with zip_file.open("osm_tram_stops_and_tracks.pickle") as file:
+            return pickle.load(file)
+
+
+@pytest.fixture
+def bus_roads_overpass_query_result() -> overpy.Result:
+    with zipfile.ZipFile(
+        "tests/assets/bus_roads_overpass_query_result.zip"
+    ) as zip_file:
+        with zip_file.open("osm_bus_roads.pickle") as file:
             return pickle.load(file)
 
 

@@ -7,14 +7,14 @@ import pytest
 from pyproj import Geod
 
 from city_configuration import CityConfiguration
-from tram_track_graph_transformer.exceptions import TrackDirectionChangeError
-from tram_track_graph_transformer.node import Node
-from tram_track_graph_transformer.tram_track_graph_transformer import (
-    TramTrackGraphTransformer,
+from graph_transformer.exceptions import TrackDirectionChangeError
+from graph_transformer.graph_transformer import (
+    GraphTransformer,
 )
+from graph_transformer.node import Node
 
 
-class TestTramTrackGraphTransformer:
+class TestGraphTransformer:
     CORRECT_MAX_DENSIFICATION_DISTANCES = [10.0, 25.0]
     INCORRECT_MAX_DENSIFICATION_DISTANCES = [-5.0, 0.0]
     _geod = Geod(ellps="WGS84")
@@ -79,7 +79,7 @@ class TestTramTrackGraphTransformer:
         krakow_city_configuration: CityConfiguration,
     ) -> None:
         # Arrange
-        transformer = TramTrackGraphTransformer(
+        transformer = GraphTransformer(
             tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
         )
 
@@ -97,7 +97,7 @@ class TestTramTrackGraphTransformer:
         krakow_city_configuration: CityConfiguration,
     ) -> None:
         # Arrange
-        transformer = TramTrackGraphTransformer(
+        transformer = GraphTransformer(
             tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
         )
 
@@ -117,7 +117,7 @@ class TestTramTrackGraphTransformer:
         krakow_city_configuration: CityConfiguration,
     ) -> None:
         # Arrange
-        transformer = TramTrackGraphTransformer(
+        transformer = GraphTransformer(
             tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
         )
 
@@ -138,7 +138,7 @@ class TestTramTrackGraphTransformer:
         krakow_city_configuration: CityConfiguration,
     ) -> None:
         # Arrange
-        transformer = TramTrackGraphTransformer(
+        transformer = GraphTransformer(
             tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
         )
         perm_nodes = transformer.permament_nodes
@@ -164,7 +164,7 @@ class TestTramTrackGraphTransformer:
     ) -> None:
         # Arrange
         m = 0.05
-        transformer = TramTrackGraphTransformer(
+        transformer = GraphTransformer(
             tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
         )
         perm_nodes = transformer.permament_nodes
@@ -196,7 +196,7 @@ class TestTramTrackGraphTransformer:
         tram_stops_and_tracks_overpass_query_result: overpy.Result,
     ) -> None:
         # Arrange
-        transformer = TramTrackGraphTransformer(
+        transformer = GraphTransformer(
             tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
         )
 
@@ -224,7 +224,7 @@ class TestTramTrackGraphTransformer:
             "at non-permanent node 3161187695."
         )
 
-        transformer = TramTrackGraphTransformer(
+        transformer = GraphTransformer(
             tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
         )
 

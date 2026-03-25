@@ -8,18 +8,18 @@ from city_data_builder.model import (
     ResponseCityData,
     ResponseGraphEdge,
     ResponseGraphNode,
-    ResponseGraphTramStop,
+    ResponseGraphStop,
     ResponseTramRoute,
     ResponseTramTrip,
     ResponseTramTripStop,
 )
+from graph_transformer import GraphTransformer, Node, NodeType
+from graph_transformer.tram_track_graph_inspector import (
+    TramTrackGraphInspector,
+)
 from gtfs import GTFSPackage, GTFSPackageStore, Weekday
 from overpass_client import OverpassClient
 from tram_stop_mapper import StopIDAndTime, TramStopMapper
-from tram_track_graph_transformer import Node, NodeType, TramTrackGraphTransformer
-from tram_track_graph_transformer.tram_track_graph_inspector import (
-    TramTrackGraphInspector,
-)
 
 
 class CityDataBuilder:
@@ -42,6 +42,7 @@ class CityDataBuilder:
 
         self._tram_stop_mappers = self._get_tram_stop_mappers()
         self._tram_track_graph = self._get_tram_track_graph()
+        self._bus_road_graph = self._get_bus_road_graph()
 
     def _get_gtfs_package_for_gtfs_config(
         self, gtfs_config: GTFSConfiguration
@@ -91,7 +92,7 @@ class CityDataBuilder:
             self._city_configuration.osm_relations_area_name
         )
 
-        tram_track_graph_transformer = TramTrackGraphTransformer(
+        tram_track_graph_transformer = GraphTransformer(
             tram_stops_and_tracks,
             self._city_configuration,
         )
@@ -114,10 +115,27 @@ class CityDataBuilder:
 
         return tram_track_graph
 
+    def _get_bus_road_graph(self) -> "nx.DiGraph[Node]":
+        bus_roads = OverpassClient.get_bus_roads(
+            self._city_configuration.osm_relations_area_name
+        )
+
+        bus_road_graph_transformer = GraphTransformer(
+            bus_roads,
+            self._city_configuration,
+        )
+
+        bus_road_graph = bus_road_graph_transformer.densify_graph_by_max_distance(
+            self._max_distance_between_nodes, error_enable=False
+        )
+
+        return bus_road_graph
+
     def to_response_city_data(self) -> ResponseCityData:
         return ResponseCityData(
             tram_track_graph=self.tram_track_graph_data,
             tram_routes=self.tram_routes_data,
+            bus_road_graph=self.bus_road_graph_data,
         )
 
     def _get_tram_stop_node(
@@ -125,7 +143,7 @@ class CityDataBuilder:
         tram_stop_mapper: TramStopMapper,
         node: Node,
         neighbors: dict[int, ResponseGraphEdge],
-    ) -> ResponseGraphTramStop:
+    ) -> ResponseGraphStop:
         gtfs_stop_ids = sorted(tram_stop_mapper.gtfs_stop_ids_by_node_id[node.id])
 
         if node.type == NodeType.TRAM_STOP:
@@ -138,7 +156,7 @@ class CityDataBuilder:
             tram_stop_mapper._gtfs_config.stop_group_name_pattern, gtfs_stop_ids
         )
 
-        return ResponseGraphTramStop(
+        return ResponseGraphStop(
             id=node.id,
             lat=node.lat,
             lon=node.lon,
@@ -150,7 +168,7 @@ class CityDataBuilder:
 
     def _get_response_node(
         self, node: Node, neighbors: dict[int, ResponseGraphEdge]
-    ) -> ResponseGraphNode | ResponseGraphTramStop:
+    ) -> ResponseGraphNode | ResponseGraphStop:
         for tram_stop_mapper in self._tram_stop_mappers.values():
             if not (
                 node.type == NodeType.TRAM_STOP
@@ -169,7 +187,7 @@ class CityDataBuilder:
         )
 
     @property
-    def tram_track_graph_data(self) -> list[ResponseGraphNode | ResponseGraphTramStop]:
+    def tram_track_graph_data(self) -> list[ResponseGraphNode | ResponseGraphStop]:
         response_data_edge_by_source: dict[Node, dict[int, ResponseGraphEdge]] = {
             node: {} for node in self._tram_track_graph.nodes
         }
@@ -184,6 +202,40 @@ class CityDataBuilder:
 
         return [
             self._get_response_node(node, neighbors)
+            for node, neighbors in response_data_edge_by_source.items()
+        ]
+
+    @property
+    def bus_road_graph_data(self) -> list[ResponseGraphNode | ResponseGraphStop]:
+        response_data_edge_by_source: dict[Node, dict[int, ResponseGraphEdge]] = {
+            node: {} for node in self._bus_road_graph.nodes
+        }
+
+        for source, dest, data in self._bus_road_graph.edges.data():
+            response_data_edge_by_source[source][dest.id] = ResponseGraphEdge(
+                id=dest.id,
+                distance=data["distance"],
+                azimuth=data["azimuth"],
+                max_speed=data["max_speed"],
+            )
+
+        return [
+            (
+                ResponseGraphNode(
+                    id=node.id,
+                    lat=node.lat,
+                    lon=node.lon,
+                    neighbors=neighbors,
+                )
+                if node.type != NodeType.BUS_STOP
+                else ResponseGraphStop(
+                    id=node.id,
+                    lat=node.lat,
+                    lon=node.lon,
+                    neighbors=neighbors,
+                    name=node.name or "",
+                )
+            )
             for node, neighbors in response_data_edge_by_source.items()
         ]
 

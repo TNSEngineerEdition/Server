@@ -2,8 +2,8 @@ from typing import Any
 
 import pytest
 
-from tram_track_graph_transformer.node import Node
-from tram_track_graph_transformer.node_type import NodeType
+from graph_transformer.node import Node
+from graph_transformer.node_type import NodeType
 
 
 class TestNode:

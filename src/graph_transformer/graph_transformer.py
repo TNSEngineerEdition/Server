@@ -8,20 +8,20 @@ from pyproj import Geod, Transformer
 from shapely.geometry import LineString
 
 from city_configuration import CityConfiguration
-from tram_track_graph_transformer.exceptions import TrackDirectionChangeError
-from tram_track_graph_transformer.node import Node
-from tram_track_graph_transformer.node_type import NodeType
+from graph_transformer.exceptions import TrackDirectionChangeError
+from graph_transformer.node import Node
+from graph_transformer.node_type import NodeType
 
 
-class TramTrackGraphTransformer:
+class GraphTransformer:
     """
-    TramTrackGraphTransformer processes OpenStreetMap (OSM) tram infrastructure data
+    GraphTransformer processes OpenStreetMap (OSM) tram infrastructure data
     and transforms it into a directed NetworkX graph, where nodes are represented by Node
-    instances. Under the hood it builds a directed graph using OSM tram track ways and
+    instances. Under the hood it builds a directed graph using OSM ways and
     includes the opposite direction where specified.
 
     In order to maintain the skeleton of the graph, nodes which are crucial to data
-    consistency, such as intersections or tram stops, are marked as permanent and
+    consistency, such as intersections or stops, are marked as permanent and
     have to appear in the resulting graphs on their predefined positions. The IDs of
     permanent nodes are available via the `permanent_nodes` property.
 
@@ -32,6 +32,23 @@ class TramTrackGraphTransformer:
     """
 
     _KPH_TO_MS = 3.6
+    _FALLBACK_SPEEDS_KPH = {
+        "motorway": 120.0,
+        "motorway_link": 60.0,
+        "trunk": 100.0,
+        "trunk_link": 60.0,
+        "primary": 70.0,
+        "primary_link": 50.0,
+        "secondary": 60.0,
+        "secondary_link": 50.0,
+        "tertiary": 50.0,
+        "tertiary_link": 40.0,
+        "unclassified": 50.0,
+        "residential": 40.0,
+        "service": 30.0,
+        "living_street": 20.0,
+        "busway": 50.0,
+    }
     _geod = Geod(ellps="WGS84")
     _transformer = Transformer.from_crs("EPSG:4326", "EPSG:2180", always_xy=True)
     _inverse_transformer = Transformer.from_crs(
@@ -40,11 +57,11 @@ class TramTrackGraphTransformer:
 
     def __init__(
         self,
-        tram_stops_and_tracks: overpy.Result,
+        overpy_result: overpy.Result,
         city_configuration: "CityConfiguration",
     ):
         self._city_configuration = city_configuration
-        self._ways = tram_stops_and_tracks.get_ways()
+        self._ways = overpy_result.get_ways()
         self._nodes_by_id = {
             node.id: Node(
                 id=node.id,
@@ -53,9 +70,11 @@ class TramTrackGraphTransformer:
                 type=self._get_node_type(node),
                 name=node.tags.get("name"),
             )
-            for node in tram_stops_and_tracks.get_nodes()
+            for node in overpy_result.get_nodes()
         }
-        self._tram_track_graph = self._build_tram_track_graph_from_osm_ways()
+        self._skeleton_graph: nx.DiGraph[Node] = (
+            self._build_skeleton_graph_from_osm_ways()
+        )
         self._permanent_nodes = self._find_permanent_nodes()
         self._max_node_id = max(node.id for node in self._permanent_nodes)
 
@@ -70,10 +89,12 @@ class TramTrackGraphTransformer:
         try:
             max_speed = float(way.tags.get("maxspeed"))
         except TypeError:
-            max_speed = default_speed_kph
+            max_speed = cls._FALLBACK_SPEEDS_KPH.get(
+                way.tags.get("highway"), default_speed_kph
+            )
         return max_speed / cls._KPH_TO_MS
 
-    def _build_tram_track_graph_from_osm_ways(self) -> "nx.DiGraph[Node]":
+    def _build_skeleton_graph_from_osm_ways(self) -> "nx.DiGraph[Node]":
         graph: "nx.DiGraph[Node]" = nx.DiGraph()
 
         for way in self._ways:
@@ -99,29 +120,40 @@ class TramTrackGraphTransformer:
         each node can potentially act as a tram stop, even when it has a different type
         assigned to it by OSM.
         """
+        tags = node.tags
+        highway = tags.get("highway")
+        public_transport = tags.get("public_transport")
+        railway = tags.get("railway")
 
         for gtfs_config in self._city_configuration.gtfs_configurations:
             if node.id in gtfs_config.custom_stop_mapping.values():
                 return NodeType.TRAM_STOP
 
-        return NodeType.get_by_value_safe(node.tags.get("railway"))
+            if public_transport == "stop_position" or highway == "bus_stop":
+                return NodeType.BUS_STOP
 
-    def _get_tram_stop_node_ids_in_graph(self) -> set[Node]:
+            if highway == "traffic_signals":
+                return NodeType.TRAFFIC_SIGNALS
+
+        return NodeType.get_by_value_safe(railway)
+
+    def _get_stop_node_ids_in_graph(self) -> set[Node]:
         """
-        Returns set of tram stop nodes which are on the tram tracks provided by OSM.
-        In case a track is out of service, the tram stops won't be used but
+        Returns set of stop nodes which are provided by OSM.
+        In case a way is out of service, the stops won't be used but
         will still be present in `self._stops`, so we want to exclude them.
         """
 
         return {
             node
             for node in self._nodes_by_id.values()
-            if node.type == NodeType.TRAM_STOP and node in self._tram_track_graph.nodes
+            if (node.type == NodeType.TRAM_STOP or node.type == NodeType.BUS_STOP)
+            and node in self._skeleton_graph.nodes
         }
 
-    def _get_track_crossing_and_endpoint_node_ids(self) -> set[Node]:
+    def _get_crossing_and_endpoint_node_ids(self) -> set[Node]:
         """
-        Returns set of nodes which serving the function of track crossings or endpoints.
+        Returns set of nodes which serving the function of crossings or endpoints.
         A node is a crossing if it has more than 2 distinct neighbors.
         A node is a track endpoint when it has exactly 1 distinct neighbor.
         In case a node doesn't have any neighbors (which shouldn't happen),
@@ -130,9 +162,9 @@ class TramTrackGraphTransformer:
         """
 
         result: set[Node] = set()
-        for node in self._tram_track_graph.nodes:
-            predecessors = set(self._tram_track_graph.predecessors(node))
-            successors = set(self._tram_track_graph.successors(node))
+        for node in self._skeleton_graph.nodes:
+            predecessors = set(self._skeleton_graph.predecessors(node))
+            successors = set(self._skeleton_graph.successors(node))
             if len(predecessors | successors) != 2:
                 result.add(node)
 
@@ -141,18 +173,18 @@ class TramTrackGraphTransformer:
     def _get_nodes_with_speed_changes(self) -> set[Node]:
         """
         Returns set of nodes at which the maximum allowed speed changes
-        between incident track segments. A node qualifies if among its
+        between incident segments. A node qualifies if among its
         incident edges (incoming or outgoing) there are at least two distinct
         non-null `max_speed` values.
         """
 
         result: set[Node] = set()
-        for node in self._tram_track_graph.nodes:
+        for node in self._skeleton_graph.nodes:
             speeds = {
                 data.get("max_speed")
                 for _, _, data in chain(
-                    self._tram_track_graph.in_edges(node, data=True),
-                    self._tram_track_graph.out_edges(node, data=True),
+                    self._skeleton_graph.in_edges(node, data=True),
+                    self._skeleton_graph.out_edges(node, data=True),
                 )
             }
             if len(speeds) > 1:
@@ -166,11 +198,11 @@ class TramTrackGraphTransformer:
         Between them, the graph will be densified.
         """
 
-        tram_stops = self._get_tram_stop_node_ids_in_graph()
-        crossings = self._get_track_crossing_and_endpoint_node_ids()
+        stops = self._get_stop_node_ids_in_graph()
+        crossings = self._get_crossing_and_endpoint_node_ids()
         speed_changes = self._get_nodes_with_speed_changes()
 
-        return tram_stops | crossings | speed_changes
+        return stops | crossings | speed_changes
 
     def _find_path_between_permanent_nodes(
         self, permanent_node: Node, successor: Node
@@ -189,7 +221,7 @@ class TramTrackGraphTransformer:
             next_candidate = next(
                 filter(
                     lambda x: x != previous_node,
-                    self._tram_track_graph.successors(current_node),
+                    self._skeleton_graph.successors(current_node),
                 ),
                 None,
             )
@@ -201,7 +233,7 @@ class TramTrackGraphTransformer:
 
         path_coordinates.append(current_node)
 
-        edge_attributes = self._tram_track_graph[permanent_node][path_coordinates[1]]
+        edge_attributes = self._skeleton_graph[permanent_node][path_coordinates[1]]
         max_speed = cast(float | None, edge_attributes.get("max_speed"))
 
         return path_coordinates, max_speed
@@ -299,7 +331,7 @@ class TramTrackGraphTransformer:
         )
 
     def densify_graph_by_max_distance(
-        self, max_distance_in_meters: float
+        self, max_distance_in_meters: float, error_enable: bool = True
     ) -> "nx.DiGraph[Node]":
         """
         Builds a directed graph by splitting edges between permanent nodes
@@ -316,7 +348,7 @@ class TramTrackGraphTransformer:
         errors: list[TrackDirectionChangeError] = []
 
         for permanent_node in self._permanent_nodes:
-            for successor in self._tram_track_graph.successors(permanent_node):
+            for successor in self._skeleton_graph.successors(permanent_node):
                 try:
                     path_nodes, max_speed = self._find_path_between_permanent_nodes(
                         permanent_node, successor
@@ -338,7 +370,7 @@ class TramTrackGraphTransformer:
                     max_speed,
                 )
 
-        if errors:
+        if errors and error_enable:
             raise ExceptionGroup("Track direction errors during densification", errors)
 
         return densified_graph
