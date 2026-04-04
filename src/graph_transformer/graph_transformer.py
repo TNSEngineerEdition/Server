@@ -99,7 +99,13 @@ class GraphTransformer:
 
         for way in self._ways:
             node_ids = [self._nodes_by_id[node.id] for node in way.get_nodes()]
-            is_oneway = way.tags.get("oneway") == "yes"
+
+            is_oneway = (
+                way.tags.get("oneway", "") == "yes"
+                and way.tags.get("oneway:psv", "") != "no"
+                and way.tags.get("oneway:bus", "") != "no"
+            )
+
             max_speed = self._get_max_speed_for_way(way)
 
             for i in range(len(node_ids) - 1):

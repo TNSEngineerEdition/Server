@@ -1,3 +1,4 @@
+import os
 from typing import Any
 
 import overpy
@@ -9,8 +10,13 @@ from city_configuration import TransitType
 class OverpassClient:
     _OVERPASS = overpy.Overpass()
 
-    _RELATIONS_AND_STOPS_CACHE: TTLCache[Any, overpy.Result] = TTLCache(128, 15 * 60)
-    _TRAM_STOPS_AND_TRACKS_CACHE: TTLCache[Any, overpy.Result] = TTLCache(128, 15 * 60)
+    _CACHE_TTL = int(os.environ.get("OVERPASS_CACHE_TTL", 60 * 60))
+
+    _RELATIONS_AND_STOPS_CACHE: TTLCache[Any, overpy.Result] = TTLCache(128, _CACHE_TTL)
+    _TRAM_STOPS_AND_TRACKS_CACHE: TTLCache[Any, overpy.Result] = TTLCache(
+        128, _CACHE_TTL
+    )
+    _BUS_ROADS_CACHE: TTLCache[Any, overpy.Result] = TTLCache(128, _CACHE_TTL)
 
     _TRAM_RELATIONS_STOPS_QUERY_TEMPLATE = """
     [out:json][timeout:600];
@@ -173,6 +179,7 @@ class OverpassClient:
         return cls._OVERPASS.query(query)
 
     @classmethod
+    @cached(_BUS_ROADS_CACHE)
     def get_bus_roads(cls, area_name: str) -> overpy.Result:
         query = cls._BUS_ROADS_TEMPLATE.format(area_name=area_name)
         return cls._OVERPASS.query(query)

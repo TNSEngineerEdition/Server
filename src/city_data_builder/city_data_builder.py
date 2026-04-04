@@ -1,9 +1,11 @@
 import datetime
+from collections import defaultdict
 from collections.abc import Generator
 
 import networkx as nx
+import overpy
 
-from city_configuration import CityConfiguration, GTFSConfiguration
+from city_configuration import CityConfiguration, GTFSConfiguration, TransitType
 from city_data_builder.model import (
     ResponseCityData,
     ResponseGraphEdge,
@@ -13,9 +15,12 @@ from city_data_builder.model import (
     ResponseTramTrip,
     ResponseTramTripStop,
 )
-from graph_transformer import GraphTransformer, Node, NodeType
-from graph_transformer.tram_track_graph_inspector import (
-    TramTrackGraphInspector,
+from graph_transformer import (
+    GraphInspector,
+    GraphTransformer,
+    Node,
+    NodeType,
+    PathTooLongError,
 )
 from gtfs import GTFSPackage, GTFSPackageStore, Weekday
 from overpass_client import OverpassClient
@@ -41,8 +46,11 @@ class CityDataBuilder:
         self._max_distance_between_nodes = max_distance_between_nodes
 
         self._tram_stop_mappers = self._get_tram_stop_mappers()
+
         self._tram_track_graph = self._get_tram_track_graph()
         self._bus_road_graph = self._get_bus_road_graph()
+
+        self._paths = self._get_paths()
 
     def _get_gtfs_package_for_gtfs_config(
         self, gtfs_config: GTFSConfiguration
@@ -87,55 +95,79 @@ class CityDataBuilder:
 
         return tram_stop_mappers
 
+    def _get_graph(
+        self, overpy_result: overpy.Result, error_enable: bool
+    ) -> "nx.DiGraph[Node]":
+        graph_transformer = GraphTransformer(
+            overpy_result,
+            self._city_configuration,
+        )
+
+        return graph_transformer.densify_graph_by_max_distance(
+            self._max_distance_between_nodes, error_enable
+        )
+
     def _get_tram_track_graph(self) -> "nx.DiGraph[Node]":
         tram_stops_and_tracks = OverpassClient.get_tram_stops_and_tracks(
             self._city_configuration.osm_relations_area_name
         )
 
-        tram_track_graph_transformer = GraphTransformer(
-            tram_stops_and_tracks,
-            self._city_configuration,
-        )
-
-        tram_track_graph = tram_track_graph_transformer.densify_graph_by_max_distance(
-            self._max_distance_between_nodes
-        )
-
-        tram_track_graph_inspector = TramTrackGraphInspector(tram_track_graph)
-        for tram_stop_mapper in self._tram_stop_mappers.values():
-            for (
-                start_stop_id,
-                end_stop_id,
-            ) in tram_track_graph_inspector.get_unique_tram_stop_pairs(
-                tram_stop_mapper.stop_nodes_by_gtfs_trip_id
-            ):
-                tram_track_graph_inspector.check_path_viability(
-                    start_stop_id, end_stop_id, self._max_distance_between_nodes
-                )
-
-        return tram_track_graph
+        return self._get_graph(tram_stops_and_tracks, True)
 
     def _get_bus_road_graph(self) -> "nx.DiGraph[Node]":
         bus_roads = OverpassClient.get_bus_roads(
             self._city_configuration.osm_relations_area_name
         )
 
-        bus_road_graph_transformer = GraphTransformer(
-            bus_roads,
-            self._city_configuration,
-        )
+        return self._get_graph(bus_roads, False)
 
-        bus_road_graph = bus_road_graph_transformer.densify_graph_by_max_distance(
-            self._max_distance_between_nodes, error_enable=False
-        )
+    def _get_paths(self) -> dict[int, dict[int, list[int]]]:
+        paths: defaultdict[int, dict[int, list[int]]] = defaultdict(dict)
 
-        return bus_road_graph
+        tram_track_graph_inspector = GraphInspector(self._tram_track_graph)
+        bus_road_graph_inspector = GraphInspector(self._bus_road_graph)
+
+        path_too_long_exceptions: list[PathTooLongError] = []
+        for tram_stop_mapper in self._tram_stop_mappers.values():
+            match tram_stop_mapper.gtfs_configuration.transit_type:
+                case TransitType.TRAM:
+                    graph_inspector = tram_track_graph_inspector
+                case TransitType.BUS:
+                    graph_inspector = bus_road_graph_inspector
+                case _ as transit_type:
+                    raise ValueError(f"Unexpected transit type: {transit_type}")
+
+            unique_stop_pairs = graph_inspector.get_unique_tram_stop_pairs(
+                tram_stop_mapper.stop_nodes_by_gtfs_trip_id
+            )
+
+            for start_stop_id, end_stop_id in unique_stop_pairs:
+                try:
+                    path = graph_inspector.get_viable_path(
+                        start_stop_id,
+                        end_stop_id,
+                        self._city_configuration.custom_tram_stop_pair_ratio_map.get(
+                            (start_stop_id, end_stop_id),
+                            self._city_configuration.max_distance_ratio,
+                        ),
+                    )
+                except PathTooLongError as exc:
+                    path_too_long_exceptions.append(exc)
+                    continue
+
+                paths[start_stop_id][end_stop_id] = [node.id for node in path]
+
+        if path_too_long_exceptions:
+            raise ExceptionGroup("Some paths are too long", path_too_long_exceptions)
+
+        return dict(paths)
 
     def to_response_city_data(self) -> ResponseCityData:
         return ResponseCityData(
             tram_track_graph=self.tram_track_graph_data,
             tram_routes=self.tram_routes_data,
             bus_road_graph=self.bus_road_graph_data,
+            paths=self._paths,
         )
 
     def _get_tram_stop_node(
