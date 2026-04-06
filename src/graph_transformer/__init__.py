@@ -1,21 +1,21 @@
 from .exceptions import (
+    DirectionChangeError,
     NodeNotFoundError,
     NoPathFoundError,
     PathTooLongError,
-    TrackDirectionChangeError,
 )
+from .graph_inspector import GraphInspector
 from .graph_transformer import GraphTransformer
 from .node import Node
 from .node_type import NodeType
-from .tram_track_graph_inspector import TramTrackGraphInspector
 
 __all__ = [
     "GraphTransformer",
     "Node",
     "NodeType",
-    "TramTrackGraphInspector",
+    "GraphInspector",
     "NodeNotFoundError",
     "NoPathFoundError",
     "PathTooLongError",
-    "TrackDirectionChangeError",
+    "DirectionChangeError",
 ]

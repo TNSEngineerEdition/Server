@@ -4,22 +4,22 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-class ResponseTramTripStop(BaseModel):
+class ResponseTripStop(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     id: int = Field(json_schema_extra={"x-go-type": "uint64", "x-go-name": "ID"})
     time: int = Field(json_schema_extra={"x-go-type": "uint"})
 
 
-class ResponseTramTrip(BaseModel):
+class ResponseTrip(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     trip_head_sign: str
     variant: str | None = Field(default=None)
-    stops: list[ResponseTramTripStop]
+    stops: list[ResponseTripStop]
 
 
-class ResponseTramRoute(BaseModel):
+class ResponseRoute(BaseModel):
     _HEX_COLOR_REGEX: ClassVar[re.Pattern[str]] = re.compile(r"^[0-9a-fA-F]{6}$")
     _DEFAULT_BACKGROUND_COLOR: ClassVar[str] = "366DF2"
     _DEFAULT_TEXT_COLOR: ClassVar[str] = "FFFFFF"
@@ -33,7 +33,7 @@ class ResponseTramRoute(BaseModel):
         default_factory=dict,
         json_schema_extra={"x-go-type": "map[string][]uint64"},
     )
-    trips: list[ResponseTramTrip] = Field(default_factory=list)
+    trips: list[ResponseTrip] = Field(default_factory=list)
 
     @field_validator("name", mode="before")
     @classmethod

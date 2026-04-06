@@ -3,23 +3,23 @@ from collections.abc import Generator
 
 import networkx as nx
 
-from city_configuration import CityConfiguration, GTFSConfiguration
+from city_configuration import CityConfiguration, GTFSConfiguration, TransitType
 from city_data_builder.model import (
     ResponseCityData,
     ResponseGraphEdge,
     ResponseGraphNode,
     ResponseGraphStop,
-    ResponseTramRoute,
-    ResponseTramTrip,
-    ResponseTramTripStop,
+    ResponseRoute,
+    ResponseTrip,
+    ResponseTripStop,
 )
 from graph_transformer import GraphTransformer, Node, NodeType
-from graph_transformer.tram_track_graph_inspector import (
-    TramTrackGraphInspector,
+from graph_transformer.graph_inspector import (
+    GraphInspector,
 )
 from gtfs import GTFSPackage, GTFSPackageStore, Weekday
 from overpass_client import OverpassClient
-from tram_stop_mapper import StopIDAndTime, TramStopMapper
+from stop_mapper import StopIDAndTime, StopMapper
 
 
 class CityDataBuilder:
@@ -40,20 +40,17 @@ class CityDataBuilder:
         self._custom_gtfs_package = custom_gtfs_package
         self._max_distance_between_nodes = max_distance_between_nodes
 
-        self._tram_stop_mappers = self._get_tram_stop_mappers()
+        self._stop_mappers = self._get_stop_mappers()
         self._tram_track_graph = self._get_tram_track_graph()
         self._bus_road_graph = self._get_bus_road_graph()
 
     def _get_gtfs_package_for_gtfs_config(
         self, gtfs_config: GTFSConfiguration
     ) -> GTFSPackage:
-        return (
-            self._custom_gtfs_package
-            or self._tram_stop_mappers[gtfs_config].gtfs_package
-        )
+        return self._custom_gtfs_package or self._stop_mappers[gtfs_config].gtfs_package
 
-    def _get_tram_stop_mappers(self) -> dict[GTFSConfiguration, TramStopMapper]:
-        tram_stop_mappers: dict[GTFSConfiguration, TramStopMapper] = {}
+    def _get_stop_mappers(self) -> dict[GTFSConfiguration, StopMapper]:
+        stop_mappers: dict[GTFSConfiguration, StopMapper] = {}
 
         for gtfs_config in self._city_configuration.gtfs_configurations:
             custom_node_ids: list[int] = []
@@ -76,20 +73,22 @@ class CityDataBuilder:
 
             gtfs_package = self._gtfs_package_store.load_gtfs_package(gtfs_config)
 
-            tram_stop_mapper = TramStopMapper(
+            stop_mapper = StopMapper(
                 gtfs_config,
                 gtfs_package,
                 relations_and_stops,
                 self._city_configuration.ignored_osm_relations,
             )
 
-            tram_stop_mappers[gtfs_config] = tram_stop_mapper
+            stop_mappers[gtfs_config] = stop_mapper
 
-        return tram_stop_mappers
+        return stop_mappers
 
     def _get_tram_track_graph(self) -> "nx.DiGraph[Node]":
-        tram_stops_and_tracks = OverpassClient.get_tram_stops_and_tracks(
-            self._city_configuration.osm_relations_area_name
+        tram_stops_and_tracks = OverpassClient.get_way_geometry(
+            TransitType.TRAM,
+            self._city_configuration.osm_network,
+            self._city_configuration.osm_relations_area_name,
         )
 
         tram_track_graph_transformer = GraphTransformer(
@@ -101,13 +100,15 @@ class CityDataBuilder:
             self._max_distance_between_nodes
         )
 
-        tram_track_graph_inspector = TramTrackGraphInspector(tram_track_graph)
-        for tram_stop_mapper in self._tram_stop_mappers.values():
+        tram_track_graph_inspector = GraphInspector(tram_track_graph)
+        for gtfs_config, stop_mapper in self._stop_mappers.items():
+            if gtfs_config.transit_type != TransitType.TRAM:
+                continue
             for (
                 start_stop_id,
                 end_stop_id,
-            ) in tram_track_graph_inspector.get_unique_tram_stop_pairs(
-                tram_stop_mapper.stop_nodes_by_gtfs_trip_id
+            ) in tram_track_graph_inspector.get_unique_stop_pairs(
+                stop_mapper.stop_nodes_by_gtfs_trip_id
             ):
                 tram_track_graph_inspector.check_path_viability(
                     start_stop_id, end_stop_id, self._max_distance_between_nodes
@@ -116,8 +117,10 @@ class CityDataBuilder:
         return tram_track_graph
 
     def _get_bus_road_graph(self) -> "nx.DiGraph[Node]":
-        bus_roads = OverpassClient.get_bus_roads(
-            self._city_configuration.osm_relations_area_name
+        bus_roads = OverpassClient.get_way_geometry(
+            TransitType.BUS,
+            self._city_configuration.osm_network,
+            self._city_configuration.osm_relations_area_name,
         )
 
         bus_road_graph_transformer = GraphTransformer(
@@ -136,24 +139,31 @@ class CityDataBuilder:
             tram_track_graph=self.tram_track_graph_data,
             tram_routes=self.tram_routes_data,
             bus_road_graph=self.bus_road_graph_data,
+            bus_routes=self.bus_routes_data,
         )
 
-    def _get_tram_stop_node(
+    def _get_stop_node(
         self,
-        tram_stop_mapper: TramStopMapper,
+        stop_mapper: StopMapper,
         node: Node,
         neighbors: dict[int, ResponseGraphEdge],
     ) -> ResponseGraphStop:
-        gtfs_stop_ids = sorted(tram_stop_mapper.gtfs_stop_ids_by_node_id[node.id])
+        gtfs_stop_ids = sorted(stop_mapper.gtfs_stop_ids_by_node_id.get(node.id, set()))
 
-        if node.type == NodeType.TRAM_STOP:
+        if node.type == NodeType.TRAM_STOP or node.type == NodeType.BUS_STOP:
             stop_name = node.name or ""
-        else:
-            stop_row = tram_stop_mapper.gtfs_package.stops.loc[gtfs_stop_ids[0]]
+        elif gtfs_stop_ids:
+            stop_row = stop_mapper.gtfs_package.stops.loc[gtfs_stop_ids[0]]
             stop_name = str(stop_row["stop_name"])
+        else:
+            stop_name = node.name or ""
 
-        stop_group_name = tram_stop_mapper.gtfs_package.get_stop_group_name_by_stop_ids(
-            tram_stop_mapper._gtfs_config.stop_group_name_pattern, gtfs_stop_ids
+        stop_group_name = (
+            stop_mapper.gtfs_package.get_stop_group_name_by_stop_ids(
+                stop_mapper._gtfs_config.stop_group_name_pattern, gtfs_stop_ids
+            )
+            if gtfs_stop_ids
+            else None
         )
 
         return ResponseGraphStop(
@@ -169,15 +179,20 @@ class CityDataBuilder:
     def _get_response_node(
         self, node: Node, neighbors: dict[int, ResponseGraphEdge]
     ) -> ResponseGraphNode | ResponseGraphStop:
-        for tram_stop_mapper in self._tram_stop_mappers.values():
-            if not (
-                node.type == NodeType.TRAM_STOP
-                # If non tram stop node was added in custom mapping
-                or node.id in tram_stop_mapper.gtfs_stop_ids_by_node_id
-            ):
-                continue
+        for stop_mapper in self._stop_mappers.values():
+            if node.id in stop_mapper.gtfs_stop_ids_by_node_id:
+                return self._get_stop_node(stop_mapper, node, neighbors)
 
-            return self._get_tram_stop_node(tram_stop_mapper, node, neighbors)
+        if node.type == NodeType.TRAM_STOP or node.type == NodeType.BUS_STOP:
+            return ResponseGraphStop(
+                id=node.id,
+                lat=node.lat,
+                lon=node.lon,
+                name=node.name or "",
+                stop_group_name=None,
+                neighbors=neighbors,
+                gtfs_stop_ids=[],
+            )
 
         return ResponseGraphNode(
             id=node.id,
@@ -220,22 +235,7 @@ class CityDataBuilder:
             )
 
         return [
-            (
-                ResponseGraphNode(
-                    id=node.id,
-                    lat=node.lat,
-                    lon=node.lon,
-                    neighbors=neighbors,
-                )
-                if node.type != NodeType.BUS_STOP
-                else ResponseGraphStop(
-                    id=node.id,
-                    lat=node.lat,
-                    lon=node.lon,
-                    neighbors=neighbors,
-                    name=node.name or "",
-                )
-            )
+            self._get_response_node(node, neighbors)
             for node, neighbors in response_data_edge_by_source.items()
         ]
 
@@ -243,7 +243,7 @@ class CityDataBuilder:
         self,
         gtfs_package: GTFSPackage,
         trip_stops_by_trip_id: dict[str, list[StopIDAndTime]],
-        routes_by_route_id: dict[str, ResponseTramRoute],
+        routes_by_route_id: dict[str, ResponseRoute],
     ) -> None:
         service_ids = (
             gtfs_package.get_service_ids_for_date(datetime.date.today())
@@ -253,7 +253,7 @@ class CityDataBuilder:
 
         for trip_id, trip_data in gtfs_package.get_trips_for_service_ids(service_ids):
             trip_stops = [
-                ResponseTramTripStop(id=stop.stop_id, time=stop.time)
+                ResponseTripStop(id=stop.stop_id, time=stop.time)
                 for stop in trip_stops_by_trip_id.get(trip_id, [])
             ]
             if len(trip_stops) <= 1:
@@ -272,7 +272,7 @@ class CityDataBuilder:
             )
 
             route.trips.append(
-                ResponseTramTrip(
+                ResponseTrip(
                     trip_head_sign=trip_data["trip_headsign"],
                     variant=variant,
                     stops=trip_stops,
@@ -281,19 +281,19 @@ class CityDataBuilder:
 
     def _get_tram_routes_data_for_gtfs_config(
         self, gtfs_config: GTFSConfiguration
-    ) -> Generator[ResponseTramRoute, None, None]:
-        tram_stop_mapper = self._tram_stop_mappers[gtfs_config]
+    ) -> Generator[ResponseRoute, None, None]:
+        tram_stop_mapper = self._stop_mappers[gtfs_config]
         gtfs_package = self._get_gtfs_package_for_gtfs_config(gtfs_config)
 
         trip_stops_by_trip_id = tram_stop_mapper.get_trip_stops_by_trip_id(
             self._custom_gtfs_package
         )
 
-        routes_by_route_id: dict[str, ResponseTramRoute] = {}
+        routes_by_route_id: dict[str, ResponseRoute] = {}
         for route_id, route_data in gtfs_package.routes.iterrows():
             route_name = str(route_data["route_short_name"])
 
-            routes_by_route_id[str(route_id)] = ResponseTramRoute(
+            routes_by_route_id[str(route_id)] = ResponseRoute(
                 name=route_name,
                 background_color=route_data["route_color"],
                 text_color=route_data["route_text_color"],
@@ -310,11 +310,54 @@ class CityDataBuilder:
 
         yield from filter(lambda x: x.trips, routes_by_route_id.values())
 
+    def _get_bus_routes_data_for_gtfs_config(
+        self, gtfs_config: GTFSConfiguration
+    ) -> Generator[ResponseRoute, None, None]:
+        bus_stop_mapper = self._stop_mappers[gtfs_config]
+        gtfs_package = self._get_gtfs_package_for_gtfs_config(gtfs_config)
+
+        trip_stops_by_trip_id = bus_stop_mapper.get_trip_stops_by_trip_id(
+            self._custom_gtfs_package
+        )
+
+        routes_by_route_id: dict[str, ResponseRoute] = {}
+        for route_id, route_data in gtfs_package.routes.iterrows():
+            route_name = str(route_data["route_short_name"])
+
+            routes_by_route_id[str(route_id)] = ResponseRoute(
+                name=route_name,
+                background_color=route_data["route_color"],
+                text_color=route_data["route_text_color"],
+                variants={},
+            )
+
+        self._add_trips_to_routes(
+            gtfs_package,
+            trip_stops_by_trip_id,
+            routes_by_route_id,
+        )
+
+        yield from filter(lambda x: x.trips, routes_by_route_id.values())
+
     @property
-    def tram_routes_data(self) -> list[ResponseTramRoute]:
-        tram_routes: list[ResponseTramRoute] = []
+    def tram_routes_data(self) -> list[ResponseRoute]:
+        tram_routes: list[ResponseRoute] = []
 
         for gtfs_config in self._city_configuration.gtfs_configurations:
-            tram_routes.extend(self._get_tram_routes_data_for_gtfs_config(gtfs_config))
+            if gtfs_config.transit_type == TransitType.TRAM:
+                tram_routes.extend(
+                    self._get_tram_routes_data_for_gtfs_config(gtfs_config)
+                )
 
         return tram_routes
+
+    @property
+    def bus_routes_data(self) -> list[ResponseRoute]:
+        bus_routes: list[ResponseRoute] = []
+        for gtfs_config in self._city_configuration.gtfs_configurations:
+            if gtfs_config.transit_type == TransitType.BUS:
+                bus_routes.extend(
+                    self._get_bus_routes_data_for_gtfs_config(gtfs_config)
+                )
+
+        return bus_routes

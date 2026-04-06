@@ -8,7 +8,7 @@ from pydantic import BaseModel, ValidationError
 
 from city_configuration.models import (
     GTFSConfiguration,
-    TramStopPairCheck,
+    StopPairCheck,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ class CityConfiguration(BaseModel):
     gtfs_configurations: list[GTFSConfiguration]
     ignored_osm_relations: list[int]
     max_distance_ratio: float
-    custom_tram_stop_pair_max_distance_checks: list[TramStopPairCheck]
+    custom_stop_pair_max_distance_checks: list[StopPairCheck]
 
     @classmethod
     def from_path(cls, path: Path) -> Self:
@@ -65,8 +65,8 @@ class CityConfiguration(BaseModel):
         return cls._get_latest_in_directory(configuration_city)
 
     @cached_property
-    def custom_tram_stop_pair_ratio_map(self) -> dict[tuple[int, int], float]:
+    def custom_stop_pair_ratio_map(self) -> dict[tuple[int, int], float]:
         return {
             (item.source, item.destination): item.ratio
-            for item in self.custom_tram_stop_pair_max_distance_checks
+            for item in self.custom_stop_pair_max_distance_checks
         }

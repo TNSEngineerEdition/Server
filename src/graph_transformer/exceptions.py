@@ -1,6 +1,6 @@
-class TrackDirectionChangeError(Exception):
+class DirectionChangeError(Exception):
     """
-    Exception raised when a change in track direction is detected
+    Exception raised when a change in way direction is detected
     at a node that is not permanent node.
     """
 
@@ -8,7 +8,7 @@ class TrackDirectionChangeError(Exception):
         self.node_id = node_id
         self.start_node_id = start_node_id
         super().__init__(
-            f"Track from permanent node {start_node_id} "
+            f"Way from permanent node {start_node_id} "
             f"changes direction at non-permanent node {node_id}."
         )
 

@@ -1,11 +1,11 @@
 from .city_configuration import CityConfiguration
 from .enums import TransitType
-from .models import CustomTramStopPairMapping, GTFSConfiguration, TramStopPairCheck
+from .models import CustomStopPairMapping, GTFSConfiguration, StopPairCheck
 
 __all__ = [
     "CityConfiguration",
-    "CustomTramStopPairMapping",
-    "TramStopPairCheck",
+    "CustomStopPairMapping",
+    "StopPairCheck",
     "GTFSConfiguration",
     "TransitType",
 ]

@@ -8,20 +8,20 @@ from graph_transformer.exceptions import (
     NoPathFoundError,
     PathTooLongError,
 )
-from graph_transformer.node import Node
-from graph_transformer.tram_track_graph_inspector import (
-    TramTrackGraphInspector,
+from graph_transformer.graph_inspector import (
+    GraphInspector,
 )
+from graph_transformer.node import Node
 
 
-class TestTramTrackGraphInspector:
+class TestGraphInspector:
     geod = Geod(ellps="WGS84")
 
     @pytest.fixture
-    def unique_tram_stop_pairs(
-        self, tram_trips_by_id: dict[str, list[int]]
+    def unique_stop_pairs(
+        self, trips_by_id: dict[str, list[int]]
     ) -> set[tuple[int, int]]:
-        return TramTrackGraphInspector.get_unique_tram_stop_pairs(tram_trips_by_id)
+        return GraphInspector.get_unique_stop_pairs(trips_by_id)
 
     def _get_dijkstra_path(
         self, graph: "nx.DiGraph[Node]", start_node: Node, end_node: Node
@@ -33,36 +33,32 @@ class TestTramTrackGraphInspector:
             weight=lambda u, v, _: self.geod.inv(u.lon, u.lat, v.lon, v.lat)[2],
         )
 
-    def test_get_unique_tram_stop_pairs(
-        self, tram_trips_by_id: dict[str, list[int]]
-    ) -> None:
+    def test_get_unique_stop_pairs(self, trips_by_id: dict[str, list[int]]) -> None:
         # Act
-        unique_tram_stop_pairs = TramTrackGraphInspector.get_unique_tram_stop_pairs(
-            tram_trips_by_id
-        )
+        unique_stop_pairs = GraphInspector.get_unique_stop_pairs(trips_by_id)
 
         # Assert
-        assert len(unique_tram_stop_pairs) == 442
+        assert len(unique_stop_pairs) == 442
         assert all(
-            (dest, source) not in unique_tram_stop_pairs
-            for source, dest in unique_tram_stop_pairs
+            (dest, source) not in unique_stop_pairs
+            for source, dest in unique_stop_pairs
         )
 
     def test_check_path_viability(
         self,
         krakow_city_configuration: CityConfiguration,
-        krakow_tram_network_graph: "nx.DiGraph[Node]",
-        unique_tram_stop_pairs: set[tuple[int, int]],
+        krakow_network_graph: "nx.DiGraph[Node]",
+        unique_stop_pairs: set[tuple[int, int]],
     ) -> None:
         # Arrange
-        tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
+        graph_inspector = GraphInspector(krakow_network_graph)
 
         # Act
-        for start_id, end_id in unique_tram_stop_pairs:
-            tram_graph_inspector.check_path_viability(
+        for start_id, end_id in unique_stop_pairs:
+            graph_inspector.check_path_viability(
                 start_id,
                 end_id,
-                krakow_city_configuration.custom_tram_stop_pair_ratio_map.get(
+                krakow_city_configuration.custom_stop_pair_ratio_map.get(
                     (start_id, end_id), krakow_city_configuration.max_distance_ratio
                 ),
             )
@@ -79,20 +75,20 @@ class TestTramTrackGraphInspector:
         self,
         node_id: int,
         krakow_city_configuration: CityConfiguration,
-        krakow_tram_network_graph: "nx.DiGraph[Node]",
-        unique_tram_stop_pairs: set[tuple[int, int]],
+        krakow_network_graph: "nx.DiGraph[Node]",
+        unique_stop_pairs: set[tuple[int, int]],
     ) -> None:
         # Arrange
-        krakow_tram_network_graph.remove_node(node_id)  # type: ignore
-        tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
+        krakow_network_graph.remove_node(node_id)  # type: ignore
+        graph_inspector = GraphInspector(krakow_network_graph)
 
         # Act
         with pytest.raises(NodeNotFoundError) as exc_info:
-            for start_id, end_id in unique_tram_stop_pairs:
-                tram_graph_inspector.check_path_viability(
+            for start_id, end_id in unique_stop_pairs:
+                graph_inspector.check_path_viability(
                     start_id,
                     end_id,
-                    krakow_city_configuration.custom_tram_stop_pair_ratio_map.get(
+                    krakow_city_configuration.custom_stop_pair_ratio_map.get(
                         (start_id, end_id), krakow_city_configuration.max_distance_ratio
                     ),
                 )
@@ -132,20 +128,20 @@ class TestTramTrackGraphInspector:
         start_stop: int,
         end_stop: int,
         krakow_city_configuration: CityConfiguration,
-        krakow_tram_network_graph: "nx.DiGraph[Node]",
-        unique_tram_stop_pairs: set[tuple[int, int]],
+        krakow_network_graph: "nx.DiGraph[Node]",
+        unique_stop_pairs: set[tuple[int, int]],
     ) -> None:
         # Arrange
-        krakow_tram_network_graph.remove_edge(*edge)  # type: ignore
-        tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
+        krakow_network_graph.remove_edge(*edge)  # type: ignore
+        graph_inspector = GraphInspector(krakow_network_graph)
 
         # Act
         with pytest.raises(PathTooLongError) as exc_info:
-            for start_id, end_id in unique_tram_stop_pairs:
-                tram_graph_inspector.check_path_viability(
+            for start_id, end_id in unique_stop_pairs:
+                graph_inspector.check_path_viability(
                     start_id,
                     end_id,
-                    krakow_city_configuration.custom_tram_stop_pair_ratio_map.get(
+                    krakow_city_configuration.custom_stop_pair_ratio_map.get(
                         (start_id, end_id), krakow_city_configuration.max_distance_ratio
                     ),
                 )
@@ -186,20 +182,20 @@ class TestTramTrackGraphInspector:
         start_stop: int,
         end_stop: int,
         krakow_city_configuration: CityConfiguration,
-        krakow_tram_network_graph: "nx.DiGraph[Node]",
-        unique_tram_stop_pairs: set[tuple[int, int]],
+        krakow_network_graph: "nx.DiGraph[Node]",
+        unique_stop_pairs: set[tuple[int, int]],
     ) -> None:
         # Arrange
-        krakow_tram_network_graph.remove_edge(*edge)  # type: ignore
-        tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
+        krakow_network_graph.remove_edge(*edge)  # type: ignore
+        graph_inspector = GraphInspector(krakow_network_graph)
 
         # Act
         with pytest.raises(NoPathFoundError) as exc_info:
-            for start_id, end_id in unique_tram_stop_pairs:
-                tram_graph_inspector.check_path_viability(
+            for start_id, end_id in unique_stop_pairs:
+                graph_inspector.check_path_viability(
                     start_id,
                     end_id,
-                    krakow_city_configuration.custom_tram_stop_pair_ratio_map.get(
+                    krakow_city_configuration.custom_stop_pair_ratio_map.get(
                         (start_id, end_id), krakow_city_configuration.max_distance_ratio
                     ),
                 )
@@ -212,19 +208,19 @@ class TestTramTrackGraphInspector:
 
     def test_shortest_path_between_nodes(
         self,
-        krakow_tram_network_graph: "nx.DiGraph[Node]",
-        unique_tram_stop_pairs: set[tuple[int, int]],
+        krakow_network_graph: "nx.DiGraph[Node]",
+        unique_stop_pairs: set[tuple[int, int]],
     ) -> None:
         # Arrange
-        tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
-        nodes_by_id = {node.id: node for node in krakow_tram_network_graph.nodes}
-        for start_id, end_id in unique_tram_stop_pairs:
+        graph_inspector = GraphInspector(krakow_network_graph)
+        nodes_by_id = {node.id: node for node in krakow_network_graph.nodes}
+        for start_id, end_id in unique_stop_pairs:
             dijkstra_path = self._get_dijkstra_path(
-                krakow_tram_network_graph, nodes_by_id[start_id], nodes_by_id[end_id]
+                krakow_network_graph, nodes_by_id[start_id], nodes_by_id[end_id]
             )
 
             # Act
-            astar_path = tram_graph_inspector.shortest_path_between_nodes(
+            astar_path = graph_inspector.shortest_path_between_nodes(
                 nodes_by_id[start_id], nodes_by_id[end_id]
             )
 

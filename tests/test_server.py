@@ -16,7 +16,7 @@ from city_configuration import CityConfiguration
 from city_data_builder import ResponseCityData
 from gtfs import GTFSPackage
 from server import app
-from tram_stop_mapper import TramStopMappingBuildError, TramStopMappingErrors
+from stop_mapper import StopMappingBuildError, StopMappingErrors
 
 
 class TestServer:
@@ -313,8 +313,8 @@ class TestServer:
     ) -> None:
         # Arrange
         get_by_city_id_mock.return_value = krakow_city_configuration
-        city_data_builder_init_mock.side_effect = TramStopMappingBuildError(
-            TramStopMappingErrors(missing_relations_for_lines={"10"})
+        city_data_builder_init_mock.side_effect = StopMappingBuildError(
+            StopMappingErrors(missing_relations_for_lines={"10"})
         )
 
         # Act

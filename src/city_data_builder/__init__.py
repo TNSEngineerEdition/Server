@@ -4,16 +4,16 @@ from .model import (
     ResponseGraphEdge,
     ResponseGraphNode,
     ResponseGraphStop,
-    ResponseTramRoute,
-    ResponseTramTrip,
+    ResponseRoute,
+    ResponseTrip,
 )
 
 __all__ = [
     "CityDataBuilder",
     "ResponseGraphNode",
     "ResponseGraphStop",
-    "ResponseTramTrip",
-    "ResponseTramRoute",
+    "ResponseTrip",
+    "ResponseRoute",
     "ResponseGraphEdge",
     "ResponseCityData",
 ]

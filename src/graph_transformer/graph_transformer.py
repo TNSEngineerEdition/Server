@@ -8,7 +8,7 @@ from pyproj import Geod, Transformer
 from shapely.geometry import LineString
 
 from city_configuration import CityConfiguration
-from graph_transformer.exceptions import TrackDirectionChangeError
+from graph_transformer.exceptions import DirectionChangeError
 from graph_transformer.node import Node
 from graph_transformer.node_type import NodeType
 
@@ -129,9 +129,11 @@ class GraphTransformer:
             if node.id in gtfs_config.custom_stop_mapping.values():
                 return NodeType.TRAM_STOP
 
-            if public_transport == "stop_position" or highway == "bus_stop":
-                return NodeType.BUS_STOP
-
+            if public_transport == "stop_position":
+                if NodeType.get_by_value_safe(railway) == NodeType.TRAM_STOP:
+                    return NodeType.TRAM_STOP
+                else:
+                    return NodeType.BUS_STOP
             if highway == "traffic_signals":
                 return NodeType.TRAFFIC_SIGNALS
 
@@ -227,7 +229,7 @@ class GraphTransformer:
             )
 
             if next_candidate is None:
-                raise TrackDirectionChangeError(permanent_node.id, current_node.id)
+                raise DirectionChangeError(permanent_node.id, current_node.id)
 
             previous_node, current_node = current_node, next_candidate
 
@@ -345,7 +347,7 @@ class GraphTransformer:
 
         densified_graph: "nx.DiGraph[Node]" = nx.DiGraph()
         nodes_by_coordinates: dict[tuple[float, float], Node] = {}
-        errors: list[TrackDirectionChangeError] = []
+        errors: list[DirectionChangeError] = []
 
         for permanent_node in self._permanent_nodes:
             for successor in self._skeleton_graph.successors(permanent_node):
@@ -353,7 +355,7 @@ class GraphTransformer:
                     path_nodes, max_speed = self._find_path_between_permanent_nodes(
                         permanent_node, successor
                     )
-                except TrackDirectionChangeError as e:
+                except DirectionChangeError as e:
                     errors.append(e)
                     continue
 
@@ -371,6 +373,6 @@ class GraphTransformer:
                 )
 
         if errors and error_enable:
-            raise ExceptionGroup("Track direction errors during densification", errors)
+            raise ExceptionGroup("Way direction errors during densification", errors)
 
         return densified_graph

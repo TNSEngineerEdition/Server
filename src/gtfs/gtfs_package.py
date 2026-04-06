@@ -134,7 +134,7 @@ class GTFSPackage(BaseModel):
             routes = routes.set_index("route_id")
 
         with zip_file.open("trips.txt") as file:
-            trips = pd.read_csv(file)
+            trips = pd.read_csv(file, low_memory=False)
             trips["trip_id"] = trips["trip_id"].astype(str)
             trips = trips.set_index("trip_id")
 

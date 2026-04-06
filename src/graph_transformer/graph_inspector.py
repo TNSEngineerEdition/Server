@@ -12,7 +12,7 @@ from graph_transformer.exceptions import (
 from graph_transformer.node import Node
 
 
-class TramTrackGraphInspector:
+class GraphInspector:
     def __init__(self, graph: "nx.DiGraph[Node]"):
         self._graph = graph
         self._geod = Geod(ellps="WGS84")
@@ -22,7 +22,7 @@ class TramTrackGraphInspector:
         return {node.id: node for node in self._graph.nodes}
 
     @staticmethod
-    def get_unique_tram_stop_pairs(
+    def get_unique_stop_pairs(
         stop_nodes_by_gtfs_trip_id: dict[str, list[int]],
     ) -> set[tuple[int, int]]:
         return {

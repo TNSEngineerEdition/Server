@@ -9,7 +9,7 @@ from freezegun import freeze_time
 from city_configuration import CityConfiguration, TransitType
 from city_data_builder import CityDataBuilder, ResponseGraphStop
 from gtfs import GTFSPackage, GTFSPackageStore, Weekday
-from tram_stop_mapper import TramStopNotFound
+from stop_mapper import StopNotFound
 
 
 class TestCityDataBuilder:
@@ -342,7 +342,7 @@ class TestCityDataBuilder:
 
         # Act
         with pytest.raises(
-            TramStopNotFound, match="Stop stop_000_00000 not found in any mapping."
+            StopNotFound, match="Stop stop_000_00000 not found in any mapping."
         ):
             city_data_builder.tram_routes_data
 

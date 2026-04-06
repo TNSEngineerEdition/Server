@@ -9,12 +9,12 @@ from pydantic import BaseModel
 
 from city_configuration import GTFSConfiguration, TransitType
 from gtfs import GTFSPackage
-from tram_stop_mapper.exceptions import (
+from stop_mapper.exceptions import (
     InvalidRelationTag,
-    TramStopMappingBuildError,
-    TramStopNotFound,
+    StopMappingBuildError,
+    StopNotFound,
 )
-from tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
+from stop_mapper.stop_mapping_errors import StopMappingErrors
 
 
 class StopIDAndTime(BaseModel):
@@ -22,28 +22,28 @@ class StopIDAndTime(BaseModel):
     time: int
 
 
-class TramStopMapper:
+class StopMapper:
     """
-    TramStopMapper class creates mapping of GTFS stop_id to OpenStreetMap's node IDs.
-    There are three categories of tram stop mapping:
+    StopMapper class creates mapping of GTFS stop_id to OpenStreetMap's node IDs.
+    There are three categories of stop mapping:
     - regular: 1-to-1 mapping between GTFS and OpenStreetMap
     - first: 1-to-many mapping, as there can be multiple platforms from which a trip starts
     - last: 1-to-many mapping, as there can be multiple platforms where a trip ends
 
-    The mapping is created using GTFS dataset, OSM node IDs representing tram stops
-    and OSM relations representing tram trips. Bare in mind that a given stop_id can
+    The mapping is created using GTFS dataset, OSM node IDs representing stops
+    and OSM relations representing trips. Bare in mind that a given stop_id can
     be present in all three mappings, because GTFS datasets may not correctly
     differentiate between platforms where trip starts and platforms where trips end.
 
     The mapping is created when the class instantiates. If the supplied data contains
-    ambiguities or insufficient data, a TramStopMappingBuildError is raised. Otherwise
+    ambiguities or insufficient data, a StopMappingBuildError is raised. Otherwise
     the created mapping is available under gtfs_stop_id_to_osm_node_id_mapping,
     first_gtfs_stop_id_to_osm_node_id_mapping and last_gtfs_stop_id_to_osm_node_id_mapping
     properties. In order to efficiently use the mapping, the get_stop_nodes_by_gtfs_trip_id
     method is available.
     """
 
-    RELATION_NAME_REGEX = re.compile(r"^Tram [a-zA-Z0-9\(\) ]+: (.+)")
+    TRAM_RELATION_NAME_REGEX = re.compile(r"^Tram [a-zA-Z0-9\(\) ]+: (.+)")
     UNIVERSAL_STOP_NAME_IGNORED_CHARS_REGEX = re.compile(r"[0-9\.\-”\"\s]")
 
     def __init__(
@@ -62,16 +62,16 @@ class TramStopMapper:
             self._get_initial_stop_mapping()
         )
 
-        self._mapping_errors = TramStopMappingErrors()
+        self._mapping_errors = StopMappingErrors()
         self._longest_osm_relation_by_trip_id: dict[str, overpy.Relation] = {}
         self._longest_match_size_by_osm_relation: defaultdict[overpy.Relation, int] = (
             defaultdict(int)
         )
 
-        self._build_tram_stop_mapping()
+        self._build_stop_mapping()
 
         if self._mapping_errors:
-            raise TramStopMappingBuildError(self._mapping_errors)
+            raise StopMappingBuildError(self._mapping_errors)
 
     def _get_initial_stop_mapping(
         self,
@@ -133,11 +133,11 @@ class TramStopMapper:
         to their universal form, in this case 'meksyk'.
         """
 
-        return (
-            cls.UNIVERSAL_STOP_NAME_IGNORED_CHARS_REGEX.sub("", stop_name.lower())
-            .replace("(nż)", "")
-            .replace("(dla wysiadających)", "")
+        normalized = (
+            stop_name.lower().replace("(nż)", "").replace("(dla wysiadających)", "")
         )
+
+        return cls.UNIVERSAL_STOP_NAME_IGNORED_CHARS_REGEX.sub("", normalized)
 
     @cached_property
     def _universal_stop_names_by_osm_relation(self) -> dict[overpy.Relation, list[str]]:
@@ -300,7 +300,7 @@ class TramStopMapper:
 
             self._longest_osm_relation_by_trip_id[gtfs_trip_id] = longest_relation
 
-    def _build_tram_stop_mapping(self) -> None:
+    def _build_stop_mapping(self) -> None:
         route_names_and_ids = self._gtfs_package.get_route_names_and_ids(
             ignored_route_names=set(self._gtfs_config.ignored_route_names)
         )
@@ -390,7 +390,7 @@ class TramStopMapper:
         if gtfs_stop_id in self.last_gtfs_stop_id_to_osm_node_ids:
             return self.last_gtfs_stop_id_to_osm_node_ids[gtfs_stop_id][0]
 
-        raise TramStopNotFound(gtfs_stop_id)
+        raise StopNotFound(gtfs_stop_id)
 
     def _get_stop_nodes_from_mapping(self, gtfs_trip_stops: list[str]) -> list[int]:
         custom_pair_mapping_last_used = False
@@ -501,7 +501,7 @@ class TramStopMapper:
         invalid_relation_exceptions: list[InvalidRelationTag] = []
 
         for relation in self._get_route_relations(route_name):
-            match_result = self.RELATION_NAME_REGEX.match(
+            match_result = self.TRAM_RELATION_NAME_REGEX.match(
                 str(relation.tags.get("name", ""))
             )
 
