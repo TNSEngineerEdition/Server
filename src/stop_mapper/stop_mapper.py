@@ -43,7 +43,7 @@ class StopMapper:
     method is available.
     """
 
-    TRAM_RELATION_NAME_REGEX = re.compile(r"^Tram [a-zA-Z0-9\(\) ]+: (.+)")
+    RELATION_NAME_REGEX = re.compile(r"^(?:Tram|Bus) [a-zA-Z0-9\(\) ]+: (.+)")
     UNIVERSAL_STOP_NAME_IGNORED_CHARS_REGEX = re.compile(r"[0-9\.\-”\"\s]")
 
     def __init__(
@@ -106,6 +106,10 @@ class StopMapper:
     def gtfs_package(self) -> GTFSPackage:
         return self._gtfs_package
 
+    @property
+    def gtfs_configuration(self) -> GTFSConfiguration:
+        return self._gtfs_config
+
     @cached_property
     def _osm_node_by_id(self) -> dict[int, overpy.Node]:
         return {item.id: item for item in self._relations_and_stops.get_nodes()}
@@ -134,7 +138,7 @@ class StopMapper:
         """
 
         normalized = (
-            stop_name.lower().replace("(nż)", "").replace("(dla wysiadających)", "")
+            stop_name.lower().replace("(nż)", "").replace("(dlawysiadających)", "")
         )
 
         return cls.UNIVERSAL_STOP_NAME_IGNORED_CHARS_REGEX.sub("", normalized)
@@ -501,7 +505,7 @@ class StopMapper:
         invalid_relation_exceptions: list[InvalidRelationTag] = []
 
         for relation in self._get_route_relations(route_name):
-            match_result = self.TRAM_RELATION_NAME_REGEX.match(
+            match_result = self.RELATION_NAME_REGEX.match(
                 str(relation.tags.get("name", ""))
             )
 

@@ -24,3 +24,4 @@ class ResponseCityData(BaseModel):
         ]
     ] = Field(default_factory=list)
     bus_routes: list[ResponseRoute] = Field(default_factory=list)
+    paths: dict[int, dict[int, list[int]]] = Field(default_factory=dict)
