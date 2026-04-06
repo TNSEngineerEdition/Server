@@ -139,13 +139,13 @@ class TestCityDataBuilder:
         assert get_way_geometry_mock.call_count == 2
         get_way_geometry_mock.assert_any_call(
             TransitType.TRAM,
-            network=krakow_city_configuration.osm_network,
-            area_name=krakow_city_configuration.osm_relations_area_name,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
         )
         get_way_geometry_mock.assert_any_call(
             TransitType.BUS,
-            network=krakow_city_configuration.osm_network,
-            area_name=krakow_city_configuration.osm_relations_area_name,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
         )
         gtfs_package_store_mock.load_gtfs_package.assert_called_once_with(
             krakow_city_configuration.gtfs_configurations[0]
@@ -209,8 +209,8 @@ class TestCityDataBuilder:
         )
         get_way_geometry_mock.assert_any_call(
             TransitType.BUS,
-            network=krakow_city_configuration.osm_network,
-            area_name=krakow_city_configuration.osm_relations_area_name,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
         )
         gtfs_package_store_mock.load_gtfs_package.assert_called_once_with(
             krakow_city_configuration.gtfs_configurations[0]
@@ -295,8 +295,8 @@ class TestCityDataBuilder:
         )
         get_way_geometry_mock.assert_any_call(
             TransitType.BUS,
-            network=krakow_city_configuration.osm_network,
-            area_name=krakow_city_configuration.osm_relations_area_name,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
         )
         gtfs_package_store_mock.load_gtfs_package.assert_called_once_with(
             krakow_city_configuration.gtfs_configurations[0]
@@ -380,6 +380,6 @@ class TestCityDataBuilder:
         )
         get_way_geometry_mock.assert_any_call(
             TransitType.BUS,
-            network=krakow_city_configuration.osm_network,
-            area_name=krakow_city_configuration.osm_relations_area_name,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
         )

@@ -109,7 +109,7 @@ class TestOverpassClient:
 
         # Act
         query_result = OverpassClient.get_way_geometry(
-            TransitType.TRAM, network=None, area_name=self.RELATIONS_AREA_NAME
+            TransitType.TRAM, None, self.RELATIONS_AREA_NAME
         )
 
         # Assert
