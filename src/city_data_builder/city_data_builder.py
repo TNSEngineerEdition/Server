@@ -188,7 +188,7 @@ class CityDataBuilder:
             stop_name = node.name or ""
 
         stop_group_name = (
-            stop_mapper.gtfs_package.get_stop_group_name_by_stop_ids(
+            stop_mapper._gtfs_package.get_stop_group_name_by_stop_ids(
                 stop_mapper._gtfs_config.stop_group_name_pattern, gtfs_stop_ids
             )
             if gtfs_stop_ids
