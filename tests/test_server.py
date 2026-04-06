@@ -385,6 +385,7 @@ class TestServer:
         )
         get_way_geometry_mock.assert_any_call(
             TransitType.BUS,
+            krakow_city_configuration.osm_network,
             "Kraków",
         )
         load_gtfs_package_mock.assert_called_once_with(
@@ -603,6 +604,7 @@ class TestServer:
         )
         get_way_geometry_mock.assert_any_call(
             TransitType.BUS,
+            krakow_city_configuration.osm_network,
             "Kraków",
         )
         load_gtfs_package_mock.assert_called_once_with(
