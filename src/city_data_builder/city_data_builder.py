@@ -114,7 +114,9 @@ class CityDataBuilder:
 
     def _get_bus_road_graph(self) -> "nx.DiGraph[Node]":
         bus_roads = OverpassClient.get_way_geometry(
-            TransitType.BUS, self._city_configuration.osm_relations_area_name
+            TransitType.BUS,
+            network=self._city_configuration.osm_network,
+            area_name=self._city_configuration.osm_relations_area_name,
         )
 
         return self._get_graph(bus_roads, False)
