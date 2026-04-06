@@ -8,20 +8,18 @@ from graph_transformer.exceptions import (
     NoPathFoundError,
     PathTooLongError,
 )
+from graph_transformer.graph_inspector import GraphInspector
 from graph_transformer.node import Node
-from graph_transformer.tram_track_graph_inspector import (
-    TramTrackGraphInspector,
-)
 
 
-class TestTramTrackGraphInspector:
+class TestGraphInspector:
     geod = Geod(ellps="WGS84")
 
     @pytest.fixture
     def unique_tram_stop_pairs(
         self, tram_trips_by_id: dict[str, list[int]]
     ) -> set[tuple[int, int]]:
-        return TramTrackGraphInspector.get_unique_tram_stop_pairs(tram_trips_by_id)
+        return GraphInspector.get_unique_tram_stop_pairs(tram_trips_by_id)
 
     def _get_dijkstra_path(
         self, graph: "nx.DiGraph[Node]", start_node: Node, end_node: Node
@@ -37,7 +35,7 @@ class TestTramTrackGraphInspector:
         self, tram_trips_by_id: dict[str, list[int]]
     ) -> None:
         # Act
-        unique_tram_stop_pairs = TramTrackGraphInspector.get_unique_tram_stop_pairs(
+        unique_tram_stop_pairs = GraphInspector.get_unique_tram_stop_pairs(
             tram_trips_by_id
         )
 
@@ -48,18 +46,18 @@ class TestTramTrackGraphInspector:
             for source, dest in unique_tram_stop_pairs
         )
 
-    def test_check_path_viability(
+    def test_get_viable_path(
         self,
         krakow_city_configuration: CityConfiguration,
         krakow_tram_network_graph: "nx.DiGraph[Node]",
         unique_tram_stop_pairs: set[tuple[int, int]],
     ) -> None:
         # Arrange
-        tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
+        tram_graph_inspector = GraphInspector(krakow_tram_network_graph)
 
         # Act
         for start_id, end_id in unique_tram_stop_pairs:
-            tram_graph_inspector.check_path_viability(
+            tram_graph_inspector.get_viable_path(
                 start_id,
                 end_id,
                 krakow_city_configuration.custom_tram_stop_pair_ratio_map.get(
@@ -75,7 +73,7 @@ class TestTramTrackGraphInspector:
             pytest.param(651848336, id="Rondo Mogilskie 05"),
         ],
     )
-    def test_check_path_viability_node_not_found(
+    def test_get_viable_path_node_not_found(
         self,
         node_id: int,
         krakow_city_configuration: CityConfiguration,
@@ -84,12 +82,12 @@ class TestTramTrackGraphInspector:
     ) -> None:
         # Arrange
         krakow_tram_network_graph.remove_node(node_id)  # type: ignore
-        tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
+        tram_graph_inspector = GraphInspector(krakow_tram_network_graph)
 
         # Act
         with pytest.raises(NodeNotFoundError) as exc_info:
             for start_id, end_id in unique_tram_stop_pairs:
-                tram_graph_inspector.check_path_viability(
+                tram_graph_inspector.get_viable_path(
                     start_id,
                     end_id,
                     krakow_city_configuration.custom_tram_stop_pair_ratio_map.get(
@@ -126,7 +124,7 @@ class TestTramTrackGraphInspector:
             ),
         ],
     )
-    def test_check_path_viability_path_too_long(
+    def test_get_viable_path_path_too_long(
         self,
         edge: tuple[int, int],
         start_stop: int,
@@ -137,12 +135,12 @@ class TestTramTrackGraphInspector:
     ) -> None:
         # Arrange
         krakow_tram_network_graph.remove_edge(*edge)  # type: ignore
-        tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
+        tram_graph_inspector = GraphInspector(krakow_tram_network_graph)
 
         # Act
         with pytest.raises(PathTooLongError) as exc_info:
             for start_id, end_id in unique_tram_stop_pairs:
-                tram_graph_inspector.check_path_viability(
+                tram_graph_inspector.get_viable_path(
                     start_id,
                     end_id,
                     krakow_city_configuration.custom_tram_stop_pair_ratio_map.get(
@@ -180,7 +178,7 @@ class TestTramTrackGraphInspector:
             ),
         ],
     )
-    def test_check_path_viability_no_path_found(
+    def test_get_viable_path_no_path_found(
         self,
         edge: tuple[int, int],
         start_stop: int,
@@ -191,12 +189,12 @@ class TestTramTrackGraphInspector:
     ) -> None:
         # Arrange
         krakow_tram_network_graph.remove_edge(*edge)  # type: ignore
-        tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
+        tram_graph_inspector = GraphInspector(krakow_tram_network_graph)
 
         # Act
         with pytest.raises(NoPathFoundError) as exc_info:
             for start_id, end_id in unique_tram_stop_pairs:
-                tram_graph_inspector.check_path_viability(
+                tram_graph_inspector.get_viable_path(
                     start_id,
                     end_id,
                     krakow_city_configuration.custom_tram_stop_pair_ratio_map.get(
@@ -216,7 +214,7 @@ class TestTramTrackGraphInspector:
         unique_tram_stop_pairs: set[tuple[int, int]],
     ) -> None:
         # Arrange
-        tram_graph_inspector = TramTrackGraphInspector(krakow_tram_network_graph)
+        tram_graph_inspector = GraphInspector(krakow_tram_network_graph)
         nodes_by_id = {node.id: node for node in krakow_tram_network_graph.nodes}
         for start_id, end_id in unique_tram_stop_pairs:
             dijkstra_path = self._get_dijkstra_path(

@@ -23,3 +23,4 @@ class ResponseCityData(BaseModel):
             Field(discriminator="node_type"),
         ]
     ] = Field(default_factory=list)
+    paths: dict[int, dict[int, list[int]]] = Field(default_factory=dict)

@@ -10,9 +10,10 @@ from graph_transformer.exceptions import (
     PathTooLongError,
 )
 from graph_transformer.node import Node
+from graph_transformer.node_type import NodeType
 
 
-class TramTrackGraphInspector:
+class GraphInspector:
     def __init__(self, graph: "nx.DiGraph[Node]"):
         self._graph = graph
         self._geod = Geod(ellps="WGS84")
@@ -42,9 +43,9 @@ class TramTrackGraphInspector:
             weight=lambda u, v, _: self._geod.inv(u.lon, u.lat, v.lon, v.lat)[2],
         )
 
-    def check_path_viability(
+    def get_viable_path(
         self, start_stop_id: int, end_stop_id: int, max_distance_ratio: float
-    ) -> None:
+    ) -> list[Node]:
         if (start_node := self._nodes_by_id.get(start_stop_id)) is None:
             raise NodeNotFoundError(start_stop_id)
         if (end_node := self._nodes_by_id.get(end_stop_id)) is None:
@@ -65,8 +66,9 @@ class TramTrackGraphInspector:
         )
         if path_distance > straight_line_distance * max_distance_ratio:
             raise PathTooLongError(
-                start_stop_id,
-                end_stop_id,
+                [item.id for item in path if item.type != NodeType.INTERPOLATED],
                 path_distance,
                 straight_line_distance * max_distance_ratio,
             )
+
+        return path
