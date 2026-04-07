@@ -43,7 +43,7 @@
     19165543
   ],
   "max_distance_ratio": 1.5,
-  "custom_tram_stop_pair_max_distance_checks": [
+  "custom_stop_pair_max_distance_checks": [
     {
       "source": 10757365408,
       "destination": 773635753,

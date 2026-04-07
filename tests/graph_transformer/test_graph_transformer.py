@@ -7,7 +7,7 @@ import pytest
 from pyproj import Geod
 
 from city_configuration import CityConfiguration
-from graph_transformer.exceptions import TrackDirectionChangeError
+from graph_transformer.exceptions import DirectionChangeError
 from graph_transformer.graph_transformer import (
     GraphTransformer,
 )
@@ -220,7 +220,7 @@ class TestGraphTransformer:
         ]
 
         expected_exception_message = (
-            "Track from permanent node 3161207817 changes direction "
+            "Way from permanent node 3161207817 changes direction "
             "at non-permanent node 3161187695."
         )
 
@@ -231,7 +231,7 @@ class TestGraphTransformer:
         # Act
         with pytest.raises(
             ExceptionGroup,
-            match="Track direction errors during densification",
+            match="Way direction errors during densification",
         ) as exc_info:
             transformer.densify_graph_by_max_distance(25)
 
@@ -239,5 +239,5 @@ class TestGraphTransformer:
         assert len(exc_info.value.exceptions) == 1
 
         exception = exc_info.value.exceptions[0]
-        assert isinstance(exception, TrackDirectionChangeError)
+        assert isinstance(exception, DirectionChangeError)
         assert str(exception) == expected_exception_message

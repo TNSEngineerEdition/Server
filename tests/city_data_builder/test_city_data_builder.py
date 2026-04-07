@@ -9,7 +9,7 @@ from freezegun import freeze_time
 from city_configuration import CityConfiguration, TransitType
 from city_data_builder import CityDataBuilder, ResponseGraphStop
 from gtfs import GTFSPackage, GTFSPackageStore, Weekday
-from tram_stop_mapper import TramStopNotFound
+from stop_mapper import StopNotFound
 
 
 class TestCityDataBuilder:
@@ -84,14 +84,12 @@ class TestCityDataBuilder:
             pytest.param(Weekday.SUNDAY, 23, 2375, 62988, id=Weekday.SUNDAY),
         ],
     )
-    @patch("overpass_client.OverpassClient.get_bus_roads")
-    @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
-    @patch("overpass_client.OverpassClient.get_relations_and_stops")
+    @patch("overpass_client.overpass_client.OverpassClient.get_way_geometry")
+    @patch("overpass_client.overpass_client.OverpassClient.get_relations_and_stops")
     def test_city_data_builder(
         self,
         get_relations_and_stops_mock: MagicMock,
-        get_tram_stops_and_tracks_mock: MagicMock,
-        get_bus_roads_mock: MagicMock,
+        get_way_geometry_mock: MagicMock,
         gtfs_package_store_mock: MagicMock,
         krakow_city_configuration: CityConfiguration,
         relations_and_stops_overpass_query_result: overpy.Result,
@@ -106,10 +104,10 @@ class TestCityDataBuilder:
         get_relations_and_stops_mock.return_value = (
             relations_and_stops_overpass_query_result
         )
-        get_tram_stops_and_tracks_mock.return_value = (
-            tram_stops_and_tracks_overpass_query_result
-        )
-        get_bus_roads_mock.return_value = bus_roads_overpass_query_result
+        get_way_geometry_mock.side_effect = [
+            tram_stops_and_tracks_overpass_query_result,
+            bus_roads_overpass_query_result,
+        ]
 
         expected_node_count, expected_edge_count = 43321, 46047
 
@@ -138,22 +136,28 @@ class TestCityDataBuilder:
             krakow_city_configuration.osm_stops_area_name,
             (1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153),
         )
-        get_tram_stops_and_tracks_mock.assert_called_once_with(
-            krakow_city_configuration.osm_relations_area_name
+        assert get_way_geometry_mock.call_count == 2
+        get_way_geometry_mock.assert_any_call(
+            TransitType.TRAM,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
+        )
+        get_way_geometry_mock.assert_any_call(
+            TransitType.BUS,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
         )
         gtfs_package_store_mock.load_gtfs_package.assert_called_once_with(
             krakow_city_configuration.gtfs_configurations[0]
         )
 
     @freeze_time("2025-05-01")
-    @patch("overpass_client.OverpassClient.get_bus_roads")
-    @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
-    @patch("overpass_client.OverpassClient.get_relations_and_stops")
+    @patch("overpass_client.overpass_client.OverpassClient.get_way_geometry")
+    @patch("overpass_client.overpass_client.OverpassClient.get_relations_and_stops")
     def test_city_data_builder_today(
         self,
         get_relations_and_stops_mock: MagicMock,
-        get_tram_stops_and_tracks_mock: MagicMock,
-        get_bus_roads_mock: MagicMock,
+        get_way_geometry_mock: MagicMock,
         gtfs_package_store_mock: MagicMock,
         krakow_city_configuration: CityConfiguration,
         relations_and_stops_overpass_query_result: overpy.Result,
@@ -164,11 +168,10 @@ class TestCityDataBuilder:
         get_relations_and_stops_mock.return_value = (
             relations_and_stops_overpass_query_result
         )
-        get_tram_stops_and_tracks_mock.return_value = (
-            tram_stops_and_tracks_overpass_query_result
-        )
-
-        get_bus_roads_mock.return_value = bus_roads_overpass_query_result
+        get_way_geometry_mock.side_effect = [
+            tram_stops_and_tracks_overpass_query_result,
+            bus_roads_overpass_query_result,
+        ]
 
         expected_node_count, expected_edge_count = 43321, 46047
 
@@ -198,8 +201,16 @@ class TestCityDataBuilder:
             krakow_city_configuration.osm_stops_area_name,
             (1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153),
         )
-        get_tram_stops_and_tracks_mock.assert_called_once_with(
-            krakow_city_configuration.osm_relations_area_name
+        assert get_way_geometry_mock.call_count == 2
+        get_way_geometry_mock.assert_any_call(
+            TransitType.TRAM,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
+        )
+        get_way_geometry_mock.assert_any_call(
+            TransitType.BUS,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
         )
         gtfs_package_store_mock.load_gtfs_package.assert_called_once_with(
             krakow_city_configuration.gtfs_configurations[0]
@@ -222,14 +233,12 @@ class TestCityDataBuilder:
             pytest.param(Weekday.SUNDAY, 22, 2198, 57536, id=Weekday.SUNDAY),
         ],
     )
-    @patch("overpass_client.OverpassClient.get_bus_roads")
-    @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
-    @patch("overpass_client.OverpassClient.get_relations_and_stops")
+    @patch("overpass_client.overpass_client.OverpassClient.get_way_geometry")
+    @patch("overpass_client.overpass_client.OverpassClient.get_relations_and_stops")
     def test_city_data_builder_with_custom_schedule(
         self,
         get_relations_and_stops_mock: MagicMock,
-        get_tram_stops_and_tracks_mock: MagicMock,
-        get_bus_roads_mock: MagicMock,
+        get_way_geometry_mock: MagicMock,
         gtfs_package_store_mock: MagicMock,
         krakow_city_configuration: CityConfiguration,
         relations_and_stops_overpass_query_result: overpy.Result,
@@ -245,10 +254,10 @@ class TestCityDataBuilder:
         get_relations_and_stops_mock.return_value = (
             relations_and_stops_overpass_query_result
         )
-        get_tram_stops_and_tracks_mock.return_value = (
-            tram_stops_and_tracks_overpass_query_result
-        )
-        get_bus_roads_mock.return_value = bus_roads_overpass_query_result
+        get_way_geometry_mock.side_effect = [
+            tram_stops_and_tracks_overpass_query_result,
+            bus_roads_overpass_query_result,
+        ]
 
         expected_node_count, expected_edge_count = 43321, 46047
 
@@ -278,21 +287,27 @@ class TestCityDataBuilder:
             krakow_city_configuration.osm_stops_area_name,
             (1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153),
         )
-        get_tram_stops_and_tracks_mock.assert_called_once_with(
-            krakow_city_configuration.osm_relations_area_name
+        assert get_way_geometry_mock.call_count == 2
+        get_way_geometry_mock.assert_any_call(
+            TransitType.TRAM,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
+        )
+        get_way_geometry_mock.assert_any_call(
+            TransitType.BUS,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
         )
         gtfs_package_store_mock.load_gtfs_package.assert_called_once_with(
             krakow_city_configuration.gtfs_configurations[0]
         )
 
-    @patch("overpass_client.OverpassClient.get_bus_roads")
-    @patch("overpass_client.OverpassClient.get_tram_stops_and_tracks")
-    @patch("overpass_client.OverpassClient.get_relations_and_stops")
+    @patch("overpass_client.overpass_client.OverpassClient.get_way_geometry")
+    @patch("overpass_client.overpass_client.OverpassClient.get_relations_and_stops")
     def test_tram_routes_data_with_custom_schedule_stop_not_found_in_mapping(
         self,
         get_relations_and_stops_mock: MagicMock,
-        get_tram_stops_and_tracks_mock: MagicMock,
-        get_bus_roads_mock: MagicMock,
+        get_way_geometry_mock: MagicMock,
         gtfs_package_store_mock: MagicMock,
         krakow_city_configuration: CityConfiguration,
         relations_and_stops_overpass_query_result: overpy.Result,
@@ -304,10 +319,10 @@ class TestCityDataBuilder:
         get_relations_and_stops_mock.return_value = (
             relations_and_stops_overpass_query_result
         )
-        get_tram_stops_and_tracks_mock.return_value = (
-            tram_stops_and_tracks_overpass_query_result
-        )
-        get_bus_roads_mock.return_value = bus_roads_overpass_query_result
+        get_way_geometry_mock.side_effect = [
+            tram_stops_and_tracks_overpass_query_result,
+            bus_roads_overpass_query_result,
+        ]
 
         custom_gtfs_package.stop_times = pd.concat(
             [
@@ -342,7 +357,7 @@ class TestCityDataBuilder:
 
         # Act
         with pytest.raises(
-            TramStopNotFound, match="Stop stop_000_00000 not found in any mapping."
+            StopNotFound, match="Stop stop_000_00000 not found in any mapping."
         ):
             city_data_builder.tram_routes_data
 
@@ -354,12 +369,17 @@ class TestCityDataBuilder:
             krakow_city_configuration.osm_stops_area_name,
             (1770194211, 2163355814, 10020926691, 2163355821, 2375524420, 629106153),
         )
-        get_tram_stops_and_tracks_mock.assert_called_once_with(
-            krakow_city_configuration.osm_relations_area_name
-        )
         gtfs_package_store_mock.load_gtfs_package.assert_called_once_with(
             krakow_city_configuration.gtfs_configurations[0]
         )
-        get_bus_roads_mock.assert_called_once_with(
-            krakow_city_configuration.osm_relations_area_name
+        assert get_way_geometry_mock.call_count == 2
+        get_way_geometry_mock.assert_any_call(
+            TransitType.TRAM,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
+        )
+        get_way_geometry_mock.assert_any_call(
+            TransitType.BUS,
+            krakow_city_configuration.osm_network,
+            krakow_city_configuration.osm_relations_area_name,
         )

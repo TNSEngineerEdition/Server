@@ -1,8 +1,8 @@
 from .exceptions import (
+    DirectionChangeError,
     NodeNotFoundError,
     NoPathFoundError,
     PathTooLongError,
-    TrackDirectionChangeError,
 )
 from .graph_inspector import GraphInspector
 from .graph_transformer import GraphTransformer
@@ -17,5 +17,5 @@ __all__ = [
     "NodeNotFoundError",
     "NoPathFoundError",
     "PathTooLongError",
-    "TrackDirectionChangeError",
+    "DirectionChangeError",
 ]

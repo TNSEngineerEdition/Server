@@ -23,7 +23,7 @@ class GraphInspector:
         return {node.id: node for node in self._graph.nodes}
 
     @staticmethod
-    def get_unique_tram_stop_pairs(
+    def get_unique_stop_pairs(
         stop_nodes_by_gtfs_trip_id: dict[str, list[int]],
     ) -> set[tuple[int, int]]:
         return {

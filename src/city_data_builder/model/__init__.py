@@ -5,15 +5,15 @@ from .graph_model import (
     ResponseGraphNode,
     ResponseGraphStop,
 )
-from .tram_trip_model import ResponseTramRoute, ResponseTramTrip, ResponseTramTripStop
+from .trip_model import ResponseRoute, ResponseTrip, ResponseTripStop
 
 __all__ = [
     "ResponseGraphEdge",
     "BaseGraphNode",
     "ResponseGraphNode",
     "ResponseGraphStop",
-    "ResponseTramTripStop",
-    "ResponseTramTrip",
-    "ResponseTramRoute",
+    "ResponseTripStop",
+    "ResponseTrip",
+    "ResponseRoute",
     "ResponseCityData",
 ]

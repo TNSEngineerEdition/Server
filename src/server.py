@@ -13,7 +13,7 @@ from city_configuration import CityConfiguration
 from city_data_builder import CityDataBuilder, ResponseCityData
 from city_data_cache import CachedCityDates, CityDataCache
 from gtfs import GTFSPackage, GTFSPackageStore, Weekday
-from tram_stop_mapper import TramStopMappingBuildError, TramStopNotFound
+from stop_mapper import StopMappingBuildError, StopNotFound
 
 app = FastAPI()
 app.add_middleware(GZipMiddleware)
@@ -66,7 +66,7 @@ def _get_city_data_by_weekday(
             is_today=is_today,
             custom_gtfs_package=custom_gtfs_package,
         )
-    except TramStopMappingBuildError as exc:
+    except StopMappingBuildError as exc:
         raise HTTPException(500, str(exc))
     except overpy.exception.OverpassGatewayTimeout as exc:
         raise HTTPException(500, f"Overpass gateway timeout: {str(exc)}")
@@ -81,7 +81,7 @@ def _get_city_data_by_weekday(
 
     try:
         return city_data_builder.to_response_city_data()
-    except TramStopNotFound as exc:
+    except StopNotFound as exc:
         raise HTTPException(500, str(exc))
     except Exception as exc:
         logger.exception(

@@ -16,7 +16,7 @@ class OverpassClient:
     _TRAM_STOPS_AND_TRACKS_CACHE: TTLCache[Any, overpy.Result] = TTLCache(
         128, _CACHE_TTL
     )
-    _BUS_ROADS_CACHE: TTLCache[Any, overpy.Result] = TTLCache(128, _CACHE_TTL)
+    _WAY_GEOMETRY_CACHE: TTLCache[Any, overpy.Result] = TTLCache(128, _CACHE_TTL)
 
     _TRAM_RELATIONS_STOPS_QUERY_TEMPLATE = """
     [out:json][timeout:600];
@@ -85,14 +85,7 @@ class OverpassClient:
     area["name"="{area_name}"]->.search_area;
 
     (
-    rel(area.search_area)["type"="route"]["route"="bus"]["network"="KMK"];
-    rel(area.search_area)["type"="route"]["route"="bus"]["network"="Komunikacja Miejska w Krakowie"];
-    rel(area.search_area)["type"="route"]["route"="bus"]["network"="ZTP w Krakowie"];
-    rel(area.search_area)["type"="route"]["route"="bus"]["network:short"="KMK"];
-    rel(area.search_area)["type"="route"]["route"="bus"]["operator"="Zarząd Transportu Publicznego w Krakowie"];
-    rel(area.search_area)["type"="route"]["route"="bus"]["operator"="ZTP Kraków"];
-    rel(area.search_area)["type"="route"]["route"="bus"]["operator"="MPK Kraków"];
-    rel(area.search_area)["type"="route"]["route"="bus"]["operator"="kmk"];
+    rel(area.search_area)["type"="route"]["route"="bus"]["network"="{network}"];
     )->.candidate_routes;
 
     rel.candidate_routes["ref"~"^(Telebus|LR[0-9]+|[0-9]{{2,3}})$"]->.line_routes;
@@ -102,7 +95,6 @@ class OverpassClient:
     ["area"!="yes"]->.bus_ways;
 
     (
-    .line_routes;
     .bus_ways;
     node(w.bus_ways);
     );
@@ -173,13 +165,21 @@ class OverpassClient:
         return cls._OVERPASS.query(query)
 
     @classmethod
-    @cached(_TRAM_STOPS_AND_TRACKS_CACHE)
-    def get_tram_stops_and_tracks(cls, area_name: str) -> overpy.Result:
-        query = cls._TRAM_STOPS_AND_TRACKS_TEMPLATE.format(area_name=area_name)
-        return cls._OVERPASS.query(query)
+    @cached(_WAY_GEOMETRY_CACHE)
+    def get_way_geometry(
+        cls,
+        transit_type: TransitType,
+        network: str | None,
+        area_name: str,
+    ) -> overpy.Result:
+        match transit_type:
+            case TransitType.TRAM:
+                query = cls._TRAM_STOPS_AND_TRACKS_TEMPLATE.format(area_name=area_name)
+            case TransitType.BUS:
+                query = cls._BUS_ROADS_TEMPLATE.format(
+                    area_name=area_name, network=network
+                )
+            case _:
+                raise ValueError("Unknown transit type")
 
-    @classmethod
-    @cached(_BUS_ROADS_CACHE)
-    def get_bus_roads(cls, area_name: str) -> overpy.Result:
-        query = cls._BUS_ROADS_TEMPLATE.format(area_name=area_name)
         return cls._OVERPASS.query(query)

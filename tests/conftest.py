@@ -119,14 +119,14 @@ def bus_roads_overpass_query_result() -> overpy.Result:
 
 
 @pytest.fixture
-def krakow_tram_network_graph() -> "nx.DiGraph[Node]":
+def krakow_network_graph() -> "nx.DiGraph[Node]":
     with zipfile.ZipFile("tests/assets/krakow_tram_network_graph.zip") as zip_file:
         with zip_file.open("krakow_tram_network_graph.pickle") as file:
             return cast("nx.DiGraph[Node]", pickle.load(file))
 
 
 @pytest.fixture
-def tram_trips_by_id() -> dict[str, list[int]]:
+def trips_by_id() -> dict[str, list[int]]:
     with zipfile.ZipFile("tests/assets/tram_trips_by_id.zip") as zip_file:
         with zip_file.open("tram_trips_by_id.json") as file:
             return cast(dict[str, list[int]], json.load(file))

@@ -1,14 +1,14 @@
 import overpy
 
-from tram_stop_mapper.tram_stop_mapping_errors import TramStopMappingErrors
+from stop_mapper.stop_mapping_errors import StopMappingErrors
 
 
-class TramStopMappingBuildError(ValueError):
+class StopMappingBuildError(ValueError):
     """
     Failure to build correct mapping of GTFS stops to OSM nodes.
     """
 
-    def __init__(self, mapping_errors: TramStopMappingErrors) -> None:
+    def __init__(self, mapping_errors: StopMappingErrors) -> None:
         super().__init__(mapping_errors)
 
         self.mapping_errors = mapping_errors
@@ -20,7 +20,7 @@ class TramStopMappingBuildError(ValueError):
         )
 
 
-class TramStopNotFound(ValueError):
+class StopNotFound(ValueError):
     """
     Stop with provided ID was not found in any mapping.
     """

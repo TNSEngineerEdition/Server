@@ -108,8 +108,8 @@ class TestOverpassClient:
         query_mock.return_value = tram_stops_and_tracks_overpass_query_result
 
         # Act
-        query_result = OverpassClient.get_tram_stops_and_tracks(
-            self.RELATIONS_AREA_NAME
+        query_result = OverpassClient.get_way_geometry(
+            TransitType.TRAM, None, self.RELATIONS_AREA_NAME
         )
 
         # Assert

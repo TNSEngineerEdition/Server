@@ -2,7 +2,7 @@ import overpy
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class TramStopMappingErrors(BaseModel):
+class StopMappingErrors(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     missing_relations_for_lines: set[str] = Field(default_factory=set)

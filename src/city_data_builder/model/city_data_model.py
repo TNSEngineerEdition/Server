@@ -6,7 +6,7 @@ from city_data_builder.model.graph_model import (
     ResponseGraphNode,
     ResponseGraphStop,
 )
-from city_data_builder.model.tram_trip_model import ResponseTramRoute
+from city_data_builder.model.trip_model import ResponseRoute
 
 
 class ResponseCityData(BaseModel):
@@ -16,11 +16,12 @@ class ResponseCityData(BaseModel):
             Field(discriminator="node_type"),
         ]
     ]
-    tram_routes: list[ResponseTramRoute]
+    tram_routes: list[ResponseRoute]
     bus_road_graph: list[
         Annotated[
             ResponseGraphNode | ResponseGraphStop,
             Field(discriminator="node_type"),
         ]
     ] = Field(default_factory=list)
+    bus_routes: list[ResponseRoute] = Field(default_factory=list)
     paths: dict[int, dict[int, list[int]]] = Field(default_factory=dict)

@@ -9,14 +9,14 @@ from city_configuration.enums import TransitType
 type StopMapping = int | tuple[int | None, int | None, int | None]
 
 
-class CustomTramStopPairMapping(BaseModel):
+class CustomStopPairMapping(BaseModel):
     source_gtfs_stop_id: str
     source_osm_node_id: int
     destination_gtfs_stop_id: str
     destination_osm_node_id: int
 
 
-class TramStopPairCheck(BaseModel):
+class StopPairCheck(BaseModel):
     source: int
     destination: int
     ratio: float
@@ -27,9 +27,7 @@ class GTFSConfiguration(BaseModel):
     file_url: str
     ignored_route_names: list[str] = Field(default_factory=list)
     custom_stop_mapping: dict[str, StopMapping] = Field(default_factory=dict)
-    custom_stop_pair_mapping: list[CustomTramStopPairMapping] = Field(
-        default_factory=list
-    )
+    custom_stop_pair_mapping: list[CustomStopPairMapping] = Field(default_factory=list)
     ignored_node_conflicts: list[str] = Field(default_factory=list)
     stop_group_name_regex: str
 

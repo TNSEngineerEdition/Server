@@ -1,230 +1,243 @@
+from collections import deque
+from math import sqrt
+
 import networkx as nx
+import overpy
 import pytest
 from pyproj import Geod
 
 from city_configuration import CityConfiguration
-from graph_transformer.exceptions import (
-    NodeNotFoundError,
-    NoPathFoundError,
-    PathTooLongError,
+from graph_transformer.exceptions import DirectionChangeError
+from graph_transformer.graph_transformer import (
+    GraphTransformer,
 )
-from graph_transformer.graph_inspector import GraphInspector
 from graph_transformer.node import Node
 
 
-class TestGraphInspector:
-    geod = Geod(ellps="WGS84")
+class TestGraphTransformer:
+    CORRECT_MAX_DENSIFICATION_DISTANCES = [10.0, 25.0]
+    INCORRECT_MAX_DENSIFICATION_DISTANCES = [-5.0, 0.0]
+    _geod = Geod(ellps="WGS84")
 
-    @pytest.fixture
-    def unique_tram_stop_pairs(
-        self, tram_trips_by_id: dict[str, list[int]]
-    ) -> set[tuple[int, int]]:
-        return GraphInspector.get_unique_tram_stop_pairs(tram_trips_by_id)
-
-    def _get_dijkstra_path(
-        self, graph: "nx.DiGraph[Node]", start_node: Node, end_node: Node
-    ) -> list[Node]:
-        return nx.dijkstra_path(
-            graph,
-            start_node,
-            end_node,
-            weight=lambda u, v, _: self.geod.inv(u.lon, u.lat, v.lon, v.lat)[2],
-        )
-
-    def test_get_unique_tram_stop_pairs(
-        self, tram_trips_by_id: dict[str, list[int]]
-    ) -> None:
-        # Act
-        unique_tram_stop_pairs = GraphInspector.get_unique_tram_stop_pairs(
-            tram_trips_by_id
-        )
-
-        # Assert
-        assert len(unique_tram_stop_pairs) == 442
-        assert all(
-            (dest, source) not in unique_tram_stop_pairs
-            for source, dest in unique_tram_stop_pairs
-        )
-
-    def test_get_viable_path(
+    def _assert_densified_edges_within_distance(
         self,
+        graph: "nx.DiGraph[Node]",
+        perm_nodes: set[Node],
+        max_distance: int | float,
+    ) -> None:
+        tolerance = max_distance * 0.001
+        for perm_node in perm_nodes:
+            queue: deque[Node] = deque()
+            queue.append(perm_node)
+            visited = set()
+
+            while queue:
+                current = queue.popleft()
+                visited.add(current)
+
+                for neighbor in graph.successors(current):
+                    if neighbor not in perm_nodes and neighbor not in visited:
+                        queue.append(neighbor)
+
+                    _, _, distance = self._geod.inv(
+                        current.lon, current.lat, neighbor.lon, neighbor.lat
+                    )
+                    assert distance <= (max_distance + tolerance)
+
+    def _assert_even_spacing_of_densified_nodes(
+        self,
+        graph: "nx.DiGraph[Node]",
+        m: int | float,
+        perm_nodes: set[Node],
+        perm_node: Node,
+        succ_node: Node,
+    ) -> None:
+        if succ_node in perm_nodes:
+            return
+        distances = []
+        prev_node = perm_node
+        next_node = succ_node
+        visited = {prev_node}
+
+        while next_node not in perm_nodes and next_node not in visited:
+            _, _, distance = self._geod.inv(
+                prev_node.lon, prev_node.lat, next_node.lon, next_node.lat
+            )
+            distances.append(distance)
+            visited.add(prev_node)
+            prev_node = next_node
+            next_node = list(graph.successors(prev_node))[0]
+
+        mean = sum(distances) / len(distances)
+        sigma = sqrt(sum((x - mean) ** 2 for x in distances) / len(distances))
+        assert sigma < mean * m
+
+    def test_densify_graph_by_max_distance_crossings_in_graph(
+        self,
+        osm_tram_track_crossings: overpy.Result,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
         krakow_city_configuration: CityConfiguration,
-        krakow_tram_network_graph: "nx.DiGraph[Node]",
-        unique_tram_stop_pairs: set[tuple[int, int]],
     ) -> None:
         # Arrange
-        tram_graph_inspector = GraphInspector(krakow_tram_network_graph)
+        transformer = GraphTransformer(
+            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+        )
 
         # Act
-        for start_id, end_id in unique_tram_stop_pairs:
-            tram_graph_inspector.get_viable_path(
-                start_id,
-                end_id,
-                krakow_city_configuration.custom_tram_stop_pair_ratio_map.get(
-                    (start_id, end_id), krakow_city_configuration.max_distance_ratio
-                ),
+        graph = transformer.densify_graph_by_max_distance(25.0)
+
+        # Assert
+        for node_id in osm_tram_track_crossings.get_node_ids():
+            assert graph.has_node(node_id)
+
+    def test_densify_graph_by_max_distance_crossings_neighbors_amount(
+        self,
+        osm_tram_track_crossings: overpy.Result,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
+        krakow_city_configuration: CityConfiguration,
+    ) -> None:
+        # Arrange
+        transformer = GraphTransformer(
+            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+        )
+
+        # Act
+        graph = transformer.densify_graph_by_max_distance(25.0)
+
+        # Assert
+        for node_id in osm_tram_track_crossings.get_node_ids():
+            assert len(list(graph.predecessors(node_id))) == len(
+                list(graph.successors(node_id))
             )
 
-    @pytest.mark.parametrize(
-        "node_id",
-        [
-            pytest.param(2419986542, id="Glowackiego 02"),
-            pytest.param(2419986544, id="UKEN 02"),
-            pytest.param(651848336, id="Rondo Mogilskie 05"),
-        ],
-    )
-    def test_get_viable_path_node_not_found(
+    def test_densify_graph_by_max_distance_tram_stops_in_graph(
         self,
-        node_id: int,
+        osm_tram_stops: overpy.Result,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
         krakow_city_configuration: CityConfiguration,
-        krakow_tram_network_graph: "nx.DiGraph[Node]",
-        unique_tram_stop_pairs: set[tuple[int, int]],
     ) -> None:
         # Arrange
-        krakow_tram_network_graph.remove_node(node_id)  # type: ignore
-        tram_graph_inspector = GraphInspector(krakow_tram_network_graph)
-
-        # Act
-        with pytest.raises(NodeNotFoundError) as exc_info:
-            for start_id, end_id in unique_tram_stop_pairs:
-                tram_graph_inspector.get_viable_path(
-                    start_id,
-                    end_id,
-                    krakow_city_configuration.custom_tram_stop_pair_ratio_map.get(
-                        (start_id, end_id), krakow_city_configuration.max_distance_ratio
-                    ),
-                )
-
-        # Assert
-        assert (
-            str(exc_info.value).strip()
-            == f"Node with id {node_id} not found in the graph."
+        transformer = GraphTransformer(
+            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
         )
 
-    @pytest.mark.parametrize(
-        ("edge", "start_stop", "end_stop"),
-        [
-            pytest.param(
-                (6738229788, 6738229790),
-                2419959769,
-                2420069703,
-                id="Teatr Bagatela 03 -> Stary Kleparz 02",
-            ),
-            pytest.param(
-                (2420200294, 8551858404),
-                2420200261,
-                2420233975,
-                id="Lubicz 02 -> Uniwersytet Ekonomiczny 01",
-            ),
-            pytest.param(
-                (2419367476, 8551888613),
-                11271425380,
-                2419894822,
-                id="UJ / AST 02 -> Teatr Bagatela 01",
-            ),
-        ],
-    )
-    def test_get_viable_path_path_too_long(
-        self,
-        edge: tuple[int, int],
-        start_stop: int,
-        end_stop: int,
-        krakow_city_configuration: CityConfiguration,
-        krakow_tram_network_graph: "nx.DiGraph[Node]",
-        unique_tram_stop_pairs: set[tuple[int, int]],
-    ) -> None:
-        # Arrange
-        krakow_tram_network_graph.remove_edge(*edge)  # type: ignore
-        tram_graph_inspector = GraphInspector(krakow_tram_network_graph)
-
         # Act
-        with pytest.raises(PathTooLongError) as exc_info:
-            for start_id, end_id in unique_tram_stop_pairs:
-                tram_graph_inspector.get_viable_path(
-                    start_id,
-                    end_id,
-                    krakow_city_configuration.custom_tram_stop_pair_ratio_map.get(
-                        (start_id, end_id), krakow_city_configuration.max_distance_ratio
-                    ),
-                )
+        graph = transformer.densify_graph_by_max_distance(25.0)
 
         # Assert
-        assert (
-            str(exc_info.value)
-            .strip()
-            .startswith(f"Path too long: {start_stop} -> {end_stop}")
+        for node_id in osm_tram_stops.get_node_ids():
+            assert graph.has_node(node_id)
+
+    @pytest.mark.parametrize(
+        "max_densification_distance", CORRECT_MAX_DENSIFICATION_DISTANCES
+    )
+    def test_densify_graph_by_max_distance_max_distance(
+        self,
+        max_densification_distance: float,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
+        krakow_city_configuration: CityConfiguration,
+    ) -> None:
+        # Arrange
+        transformer = GraphTransformer(
+            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+        )
+        perm_nodes = transformer.permament_nodes
+
+        # Act
+        densified_graph = transformer.densify_graph_by_max_distance(
+            max_densification_distance
+        )
+
+        # Assert
+        self._assert_densified_edges_within_distance(
+            densified_graph, perm_nodes, max_densification_distance
         )
 
     @pytest.mark.parametrize(
-        ("edge", "start_stop", "end_stop"),
-        [
-            pytest.param(
-                (12685345137, 12685345138),
-                1768224703,
-                1768224656,
-                id="Bialucha 02 -> Cystersow 02",
-            ),
-            pytest.param(
-                (12685345293, 12685345294),
-                2420286331,
-                2423789750,
-                id="Nowy Kleparz 02 -> Pedzichow 02",
-            ),
-            pytest.param(
-                (12685341641, 12685341642),
-                2419986545,
-                2419986538,
-                id="Urzednicza 01 -> Biprostal 01",
-            ),
-        ],
+        "max_densification_distance", CORRECT_MAX_DENSIFICATION_DISTANCES
     )
-    def test_get_viable_path_no_path_found(
+    def test_densify_graph_by_max_distance_even_spacing(
         self,
-        edge: tuple[int, int],
-        start_stop: int,
-        end_stop: int,
+        max_densification_distance: float,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
         krakow_city_configuration: CityConfiguration,
-        krakow_tram_network_graph: "nx.DiGraph[Node]",
-        unique_tram_stop_pairs: set[tuple[int, int]],
     ) -> None:
         # Arrange
-        krakow_tram_network_graph.remove_edge(*edge)  # type: ignore
-        tram_graph_inspector = GraphInspector(krakow_tram_network_graph)
+        m = 0.05
+        transformer = GraphTransformer(
+            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+        )
+        perm_nodes = transformer.permament_nodes
 
         # Act
-        with pytest.raises(NoPathFoundError) as exc_info:
-            for start_id, end_id in unique_tram_stop_pairs:
-                tram_graph_inspector.get_viable_path(
-                    start_id,
-                    end_id,
-                    krakow_city_configuration.custom_tram_stop_pair_ratio_map.get(
-                        (start_id, end_id), krakow_city_configuration.max_distance_ratio
-                    ),
-                )
-
-        # Assert
-        assert (
-            str(exc_info.value).strip()
-            == f"No path found between stops: {start_stop} -> {end_stop}"
+        densified_graph = transformer.densify_graph_by_max_distance(
+            max_densification_distance
         )
 
-    def test_shortest_path_between_nodes(
+        # Assert
+        for perm_node in perm_nodes:
+            succ_nodes = densified_graph.successors(perm_node)
+            for succ_node in succ_nodes:
+                self._assert_even_spacing_of_densified_nodes(
+                    graph=densified_graph,
+                    m=m,
+                    perm_nodes=perm_nodes,
+                    perm_node=perm_node,
+                    succ_node=succ_node,
+                )
+
+    @pytest.mark.parametrize(
+        "max_densification_distance", INCORRECT_MAX_DENSIFICATION_DISTANCES
+    )
+    def test_densify_graph_by_max_distance_invalid_max_distance_in_meters(
         self,
-        krakow_tram_network_graph: "nx.DiGraph[Node]",
-        unique_tram_stop_pairs: set[tuple[int, int]],
+        max_densification_distance: float,
+        krakow_city_configuration: CityConfiguration,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
     ) -> None:
         # Arrange
-        tram_graph_inspector = GraphInspector(krakow_tram_network_graph)
-        nodes_by_id = {node.id: node for node in krakow_tram_network_graph.nodes}
-        for start_id, end_id in unique_tram_stop_pairs:
-            dijkstra_path = self._get_dijkstra_path(
-                krakow_tram_network_graph, nodes_by_id[start_id], nodes_by_id[end_id]
-            )
+        transformer = GraphTransformer(
+            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+        )
 
-            # Act
-            astar_path = tram_graph_inspector.shortest_path_between_nodes(
-                nodes_by_id[start_id], nodes_by_id[end_id]
-            )
+        # Act
+        with pytest.raises(
+            ValueError, match="max_distance_in_meters must be greater than 0."
+        ):
+            transformer.densify_graph_by_max_distance(max_densification_distance)
 
-            # Assert
-            assert astar_path == dijkstra_path
+    def test_densify_graph_by_max_distance_track_direction_change(
+        self,
+        krakow_city_configuration: CityConfiguration,
+        tram_stops_and_tracks_overpass_query_result: overpy.Result,
+    ) -> None:
+        # Arrange
+        del tram_stops_and_tracks_overpass_query_result.get_way(310663772).tags[
+            "oneway"
+        ]
+        del tram_stops_and_tracks_overpass_query_result.get_way(310661792).tags[
+            "oneway"
+        ]
+
+        expected_exception_message = (
+            "Way from permanent node 3161207817 changes direction "
+            "at non-permanent node 3161187695."
+        )
+
+        transformer = GraphTransformer(
+            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+        )
+
+        # Act
+        with pytest.raises(
+            ExceptionGroup,
+            match="Way direction errors during densification",
+        ) as exc_info:
+            transformer.densify_graph_by_max_distance(25)
+
+        # Assert
+        assert len(exc_info.value.exceptions) == 1
+
+        exception = exc_info.value.exceptions[0]
+        assert isinstance(exception, DirectionChangeError)
+        assert str(exception) == expected_exception_message
