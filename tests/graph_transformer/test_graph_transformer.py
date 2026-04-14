@@ -80,7 +80,9 @@ class TestGraphTransformer:
     ) -> None:
         # Arrange
         transformer = GraphTransformer(
-            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+            tram_stops_and_tracks_overpass_query_result,
+            krakow_city_configuration,
+            0,
         )
 
         # Act
@@ -98,7 +100,9 @@ class TestGraphTransformer:
     ) -> None:
         # Arrange
         transformer = GraphTransformer(
-            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+            tram_stops_and_tracks_overpass_query_result,
+            krakow_city_configuration,
+            0,
         )
 
         # Act
@@ -118,7 +122,9 @@ class TestGraphTransformer:
     ) -> None:
         # Arrange
         transformer = GraphTransformer(
-            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+            tram_stops_and_tracks_overpass_query_result,
+            krakow_city_configuration,
+            0,
         )
 
         # Act
@@ -139,9 +145,11 @@ class TestGraphTransformer:
     ) -> None:
         # Arrange
         transformer = GraphTransformer(
-            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+            tram_stops_and_tracks_overpass_query_result,
+            krakow_city_configuration,
+            0,
         )
-        perm_nodes = transformer.permament_nodes
+        perm_nodes = transformer.permanent_nodes
 
         # Act
         densified_graph = transformer.densify_graph_by_max_distance(
@@ -165,9 +173,11 @@ class TestGraphTransformer:
         # Arrange
         m = 0.05
         transformer = GraphTransformer(
-            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+            tram_stops_and_tracks_overpass_query_result,
+            krakow_city_configuration,
+            0,
         )
-        perm_nodes = transformer.permament_nodes
+        perm_nodes = transformer.permanent_nodes
 
         # Act
         densified_graph = transformer.densify_graph_by_max_distance(
@@ -197,7 +207,9 @@ class TestGraphTransformer:
     ) -> None:
         # Arrange
         transformer = GraphTransformer(
-            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+            tram_stops_and_tracks_overpass_query_result,
+            krakow_city_configuration,
+            0,
         )
 
         # Act
@@ -225,7 +237,9 @@ class TestGraphTransformer:
         )
 
         transformer = GraphTransformer(
-            tram_stops_and_tracks_overpass_query_result, krakow_city_configuration
+            tram_stops_and_tracks_overpass_query_result,
+            krakow_city_configuration,
+            0,
         )
 
         # Act

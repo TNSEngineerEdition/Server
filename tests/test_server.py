@@ -114,19 +114,19 @@ class TestServer:
     def _assert_city_data_content(self, city_data: Any) -> None:
         assert isinstance(city_data, dict)
 
-        tram_track_graph = city_data["tram_track_graph"]
-        assert tram_track_graph
-        assert isinstance(tram_track_graph, list)
+        graph = city_data["graph"]
+        assert graph
+        assert isinstance(graph, list)
 
-        for tram_track_node in tram_track_graph:
-            node_id = tram_track_node["id"]
+        for node in graph:
+            node_id = node["id"]
             assert node_id
             assert isinstance(node_id, int)
 
-            assert isinstance(tram_track_node["lat"], float)
-            assert isinstance(tram_track_node["lon"], float)
+            assert isinstance(node["lat"], float)
+            assert isinstance(node["lon"], float)
 
-            neighbors = tram_track_node["neighbors"]
+            neighbors = node["neighbors"]
             assert isinstance(neighbors, dict)
             for key, neighbor in neighbors.items():
                 assert isinstance(key, str)
@@ -149,17 +149,14 @@ class TestServer:
                 assert isinstance(neighbor_max_speed, float)
                 assert neighbor_max_speed > 0
 
-            if "name" in tram_track_node or "gtfs_stop_ids" in tram_track_node:
-                assert isinstance(tram_track_node["name"], str)
+            if "name" in node or "gtfs_stop_ids" in node:
+                assert isinstance(node["name"], str)
 
-                gtfs_stop_ids = tram_track_node["gtfs_stop_ids"]
+                gtfs_stop_ids = node["gtfs_stop_ids"]
                 assert isinstance(gtfs_stop_ids, list)
                 assert all(isinstance(item, str) for item in gtfs_stop_ids)
 
-        assert any(
-            ("name" in tram_track_node or "gtfs_stop_ids" in tram_track_node)
-            for tram_track_node in tram_track_graph
-        )
+        assert any(("name" in node or "gtfs_stop_ids" in node) for node in graph)
 
         tram_routes = city_data["tram_routes"]
         assert tram_routes

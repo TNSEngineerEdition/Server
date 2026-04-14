@@ -28,9 +28,9 @@ class TestCityDataBuilder:
         expected_trip_count: int,
         expected_stop_count: int,
     ) -> None:
-        assert len(city_data_builder.tram_track_graph_data) == expected_node_count
+        assert len(city_data_builder.response_graph_data) == expected_node_count
         assert (
-            sum(len(node.neighbors) for node in city_data_builder.tram_track_graph_data)
+            sum(len(node.neighbors) for node in city_data_builder.response_graph_data)
             == expected_edge_count
         )
 
@@ -56,9 +56,7 @@ class TestCityDataBuilder:
             for trip in route.trips
         )
 
-        nodes_by_id = {
-            node.id: node for node in city_data_builder.tram_track_graph_data
-        }
+        nodes_by_id = {node.id: node for node in city_data_builder.response_graph_data}
 
         assert all(
             isinstance(nodes_by_id[trip_stop.id], ResponseGraphStop)
@@ -109,7 +107,7 @@ class TestCityDataBuilder:
             bus_roads_overpass_query_result,
         ]
 
-        expected_node_count, expected_edge_count = 43321, 46047
+        expected_node_count, expected_edge_count = 295632, 477710
 
         # Act
         city_data_builder = CityDataBuilder(
@@ -173,7 +171,7 @@ class TestCityDataBuilder:
             bus_roads_overpass_query_result,
         ]
 
-        expected_node_count, expected_edge_count = 43321, 46047
+        expected_node_count, expected_edge_count = 295632, 477710
 
         # Act
         city_data_builder = CityDataBuilder(
@@ -259,7 +257,7 @@ class TestCityDataBuilder:
             bus_roads_overpass_query_result,
         ]
 
-        expected_node_count, expected_edge_count = 43321, 46047
+        expected_node_count, expected_edge_count = 295632, 477710
 
         # Act
         city_data_builder = CityDataBuilder(

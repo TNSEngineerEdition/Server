@@ -46,9 +46,7 @@ class CityDataBuilder:
         self._max_distance_between_nodes = max_distance_between_nodes
 
         self._stop_mappers = self._get_stop_mappers()
-        self._tram_track_graph = self._get_tram_track_graph()
-        self._bus_road_graph = self._get_bus_road_graph()
-
+        self._graph_by_transit_type = self._get_graph_by_transit_type()
         self._paths = self._get_paths()
 
     def _get_gtfs_package_for_gtfs_config(
@@ -91,41 +89,51 @@ class CityDataBuilder:
 
         return stop_mappers
 
-    def _get_graph(
-        self, overpy_result: overpy.Result, error_enable: bool
-    ) -> "nx.DiGraph[Node]":
-        graph_transformer = GraphTransformer(
-            overpy_result,
-            self._city_configuration,
+    def _get_graph_by_transit_type(self) -> "dict[TransitType, nx.DiGraph[Node]]":
+        overpy_result_by_transit_type: dict[TransitType, overpy.Result] = {
+            transit_type: OverpassClient.get_way_geometry(
+                transit_type,
+                self._city_configuration.osm_network,
+                self._city_configuration.osm_relations_area_name,
+            )
+            for transit_type in TransitType
+        }
+
+        max_node_id = max(
+            node_id
+            for overpy_result in overpy_result_by_transit_type.values()
+            for node_id in overpy_result.get_node_ids()
         )
 
-        return graph_transformer.densify_graph_by_max_distance(
-            self._max_distance_between_nodes, error_enable
-        )
+        graph_by_transit_type: "dict[TransitType, nx.DiGraph[Node]]" = {}
 
-    def _get_tram_track_graph(self) -> "nx.DiGraph[Node]":
-        tram_stops_and_tracks = OverpassClient.get_way_geometry(
-            TransitType.TRAM,
-            self._city_configuration.osm_network,
-            self._city_configuration.osm_relations_area_name,
-        )
+        for transit_type, overpy_result in overpy_result_by_transit_type.items():
+            graph_transformer = GraphTransformer(
+                overpy_result,
+                self._city_configuration,
+                max_node_id,
+            )
 
-        return self._get_graph(tram_stops_and_tracks, True)
+            graph_by_transit_type[transit_type] = (
+                graph_transformer.densify_graph_by_max_distance(
+                    self._max_distance_between_nodes,
+                    error_enable=transit_type == TransitType.TRAM,
+                )
+            )
 
-    def _get_bus_road_graph(self) -> "nx.DiGraph[Node]":
-        bus_roads = OverpassClient.get_way_geometry(
-            TransitType.BUS,
-            self._city_configuration.osm_network,
-            self._city_configuration.osm_relations_area_name,
-        )
+            max_node_id = graph_transformer.max_node_id
 
-        return self._get_graph(bus_roads, False)
+        return graph_by_transit_type
 
     def _get_paths(self) -> dict[int, dict[int, list[int]]]:
         paths: defaultdict[int, dict[int, list[int]]] = defaultdict(dict)
 
-        tram_track_graph_inspector = GraphInspector(self._tram_track_graph)
-        bus_road_graph_inspector = GraphInspector(self._bus_road_graph)
+        tram_track_graph_inspector = GraphInspector(
+            self._graph_by_transit_type[TransitType.TRAM]
+        )
+        bus_road_graph_inspector = GraphInspector(
+            self._graph_by_transit_type[TransitType.BUS]
+        )
 
         path_too_long_exceptions: list[PathTooLongError] = []
         for stop_mapper in self._stop_mappers.values():
@@ -164,9 +172,8 @@ class CityDataBuilder:
 
     def to_response_city_data(self) -> ResponseCityData:
         return ResponseCityData(
-            tram_track_graph=self.tram_track_graph_data,
+            graph=self.response_graph_data,
             tram_routes=self.tram_routes_data,
-            bus_road_graph=self.bus_road_graph_data,
             bus_routes=self.bus_routes_data,
             paths=self._paths,
         )
@@ -231,37 +238,22 @@ class CityDataBuilder:
         )
 
     @property
-    def tram_track_graph_data(self) -> list[ResponseGraphNode | ResponseGraphStop]:
-        response_data_edge_by_source: dict[Node, dict[int, ResponseGraphEdge]] = {
-            node: {} for node in self._tram_track_graph.nodes
-        }
+    def response_graph_data(self) -> list[ResponseGraphNode | ResponseGraphStop]:
+        response_data_edge_by_source: dict[Node, dict[int, ResponseGraphEdge]] = {}
 
-        for source, dest, data in self._tram_track_graph.edges.data():
-            response_data_edge_by_source[source][dest.id] = ResponseGraphEdge(
-                id=dest.id,
-                distance=data["distance"],
-                azimuth=data["azimuth"],
-                max_speed=data["max_speed"],
-            )
+        for transit_type, graph in self._graph_by_transit_type.items():
+            for node in graph.nodes:
+                response_data_edge_by_source[node] = {}
 
-        return [
-            self._get_response_node(node, neighbors)
-            for node, neighbors in response_data_edge_by_source.items()
-        ]
-
-    @property
-    def bus_road_graph_data(self) -> list[ResponseGraphNode | ResponseGraphStop]:
-        response_data_edge_by_source: dict[Node, dict[int, ResponseGraphEdge]] = {
-            node: {} for node in self._bus_road_graph.nodes
-        }
-
-        for source, dest, data in self._bus_road_graph.edges.data():
-            response_data_edge_by_source[source][dest.id] = ResponseGraphEdge(
-                id=dest.id,
-                distance=data["distance"],
-                azimuth=data["azimuth"],
-                max_speed=data["max_speed"],
-            )
+        for transit_type, graph in self._graph_by_transit_type.items():
+            for source, dest, data in graph.edges.data():
+                response_data_edge_by_source[source][dest.id] = ResponseGraphEdge(
+                    id=dest.id,
+                    distance=data["distance"],
+                    azimuth=data["azimuth"],
+                    max_speed=data["max_speed"],
+                    transit_type=transit_type,
+                )
 
         return [
             self._get_response_node(node, neighbors)
