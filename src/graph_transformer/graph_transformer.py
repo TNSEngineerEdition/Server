@@ -59,8 +59,10 @@ class GraphTransformer:
         self,
         overpy_result: overpy.Result,
         city_configuration: "CityConfiguration",
+        max_node_id: int,
     ):
         self._city_configuration = city_configuration
+        self._max_node_id = max_node_id
         self._ways = overpy_result.get_ways()
         self._nodes_by_id = {
             node.id: Node(
@@ -76,11 +78,14 @@ class GraphTransformer:
             self._build_skeleton_graph_from_osm_ways()
         )
         self._permanent_nodes = self._find_permanent_nodes()
-        self._max_node_id = max(node.id for node in self._permanent_nodes)
 
     @property
-    def permament_nodes(self) -> set[Node]:
+    def permanent_nodes(self) -> set[Node]:
         return self._permanent_nodes.copy()
+
+    @property
+    def max_node_id(self) -> int:
+        return self._max_node_id
 
     @classmethod
     def _get_max_speed_for_way(

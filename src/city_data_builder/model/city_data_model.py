@@ -10,18 +10,21 @@ from city_data_builder.model.trip_model import ResponseRoute
 
 
 class ResponseCityData(BaseModel):
-    tram_track_graph: list[
+    graph: list[
         Annotated[
             ResponseGraphNode | ResponseGraphStop,
             Field(discriminator="node_type"),
         ]
     ]
     tram_routes: list[ResponseRoute]
-    bus_road_graph: list[
-        Annotated[
-            ResponseGraphNode | ResponseGraphStop,
-            Field(discriminator="node_type"),
-        ]
-    ] = Field(default_factory=list)
-    bus_routes: list[ResponseRoute] = Field(default_factory=list)
-    paths: dict[int, dict[int, list[int]]] = Field(default_factory=dict)
+    bus_routes: list[ResponseRoute] = Field(
+        default_factory=list,
+        json_schema_extra={"x-go-type-skip-optional-pointer": True},
+    )
+    paths: dict[int, dict[int, list[int]]] = Field(
+        default_factory=dict,
+        json_schema_extra={
+            "x-go-type": "map[uint64]map[uint64][]uint64",
+            "x-go-type-skip-optional-pointer": True,
+        },
+    )

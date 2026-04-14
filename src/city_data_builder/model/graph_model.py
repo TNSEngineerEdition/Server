@@ -3,6 +3,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from city_configuration import TransitType
+
 
 class ResponseGraphEdge(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -11,6 +13,7 @@ class ResponseGraphEdge(BaseModel):
     distance: float
     azimuth: float
     max_speed: float
+    transit_type: TransitType
 
     @field_validator("distance", "azimuth", "max_speed", mode="after")
     @classmethod
