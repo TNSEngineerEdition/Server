@@ -5,6 +5,7 @@ import overpy
 from cachetools import cached, TTLCache
 
 from city_configuration import TransitType
+from overpass_client.retry_query import retry_query
 
 
 class OverpassClient:
@@ -139,6 +140,7 @@ class OverpassClient:
 
     @classmethod
     @cached(_RELATIONS_AND_STOPS_CACHE)
+    @retry_query(10)
     def get_relations_and_stops(
         cls,
         transit_type: TransitType,
@@ -166,6 +168,7 @@ class OverpassClient:
 
     @classmethod
     @cached(_WAY_GEOMETRY_CACHE)
+    @retry_query(10)
     def get_way_geometry(
         cls,
         transit_type: TransitType,
