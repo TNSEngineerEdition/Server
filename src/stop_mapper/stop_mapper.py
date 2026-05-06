@@ -138,7 +138,12 @@ class StopMapper:
         """
 
         normalized = (
-            stop_name.lower().replace("(nż)", "").replace("(dla wysiadających)", "")
+            stop_name.lower()
+            .replace("(nż)", "")
+            .replace("n/ż", "")
+            .replace("(dla wysiadających)", "")
+            .replace("(pętla)", "")
+            .replace(" - dla wysiadających", "")
         )
 
         return cls.UNIVERSAL_STOP_NAME_IGNORED_CHARS_REGEX.sub("", normalized)

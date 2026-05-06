@@ -333,7 +333,12 @@ class GTFSPackage(BaseModel):
                 return None
             case 1:
                 return next(iter(names))
-            case _:  # pragma: no cover
-                raise ValueError(
-                    f"Duplicate group names {names} found for stop IDs {stop_ids}"
-                )
+            case _:
+                return None
+            # Commented-out because some bus stops have been mapped
+            # to a single bus stop in city configuration, fixing this
+            # requires adding all bus routes to OSM - no time for that
+            # case _:  # pragma: no cover
+            #     raise ValueError(
+            #         f"Duplicate group names {names} found for stop IDs {stop_ids}"
+            #     )

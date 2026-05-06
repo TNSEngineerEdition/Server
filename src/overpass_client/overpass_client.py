@@ -1,15 +1,22 @@
 import os
+import urllib
+import urllib.request
 from typing import Any
 
 import overpy
 from cachetools import cached, TTLCache
 
 from city_configuration import TransitType
-from overpass_client.retry_query import retry_query
 
 
 class OverpassClient:
-    _OVERPASS = overpy.Overpass()
+    _OVERPASS = overpy.Overpass(
+        url=urllib.request.Request(
+            url=overpy.Overpass.default_url,
+            headers={"User-Agent": "TNS-Engineer-Edition"},
+        ),
+        max_retry_count=10,
+    )
 
     _CACHE_TTL = int(os.environ.get("OVERPASS_CACHE_TTL", 60 * 60))
 
@@ -92,7 +99,7 @@ class OverpassClient:
     rel.candidate_routes["ref"~"^(Telebus|LR[0-9]+|[0-9]{{2,3}})$"]->.line_routes;
 
     way(r.line_routes)
-    ["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|residential|service|living_street|busway|road)$"]
+    ["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|residential|service|living_street|busway|road|construction)$"]
     ["area"!="yes"]->.bus_ways;
 
     (
@@ -140,7 +147,6 @@ class OverpassClient:
 
     @classmethod
     @cached(_RELATIONS_AND_STOPS_CACHE)
-    @retry_query(10)
     def get_relations_and_stops(
         cls,
         transit_type: TransitType,
@@ -164,11 +170,13 @@ class OverpassClient:
             case _:
                 raise ValueError("Unknown transit type")
 
-        return cls._OVERPASS.query(query)
+        try:
+            return cls._OVERPASS.query(query)
+        except overpy.exception.MaxRetriesReached as exc:
+            raise ExceptionGroup(str(exc), exc.exceptions) from exc
 
     @classmethod
     @cached(_WAY_GEOMETRY_CACHE)
-    @retry_query(10)
     def get_way_geometry(
         cls,
         transit_type: TransitType,
@@ -185,4 +193,7 @@ class OverpassClient:
             case _:
                 raise ValueError("Unknown transit type")
 
-        return cls._OVERPASS.query(query)
+        try:
+            return cls._OVERPASS.query(query)
+        except overpy.exception.MaxRetriesReached as exc:
+            raise ExceptionGroup(str(exc), exc.exceptions) from exc
